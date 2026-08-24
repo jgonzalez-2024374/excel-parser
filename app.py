@@ -134,44 +134,45 @@ def normalize_bank():
                 "error": "La hoja no contiene datos"
             }), 400
 
-        formato = detectar_formato(rows)
+        # ====================================================
+        # DETECTAR AUTOMÁTICAMENTE LAS COLUMNAS
+        # ====================================================
 
-        if formato is None:
+        header_index, columns = detectar_columnas(rows)
 
-            # Mostrar las primeras filas para poder diagnosticar
-            muestra = []
-
-            for row in rows[:10]:
-                muestra.append(row)
+        if header_index is None:
 
             return jsonify({
                 "success": False,
                 "error": "No se pudo detectar automáticamente el encabezado de movimientos",
                 "filas_recibidas": len(rows),
-                "primeras_filas": muestra
+                "primeras_filas": rows[:10]
             }), 400
 
-        if formato == "FORMATO_1":
-            transactions = normalize_formato_1(rows)
+        # ====================================================
+        # EXTRAER TRANSACCIONES
+        # ====================================================
 
-        elif formato == "FORMATO_2":
-            transactions = normalize_formato_2(rows)
+        transactions = []
 
-        elif formato == "FORMATO_3":
-            transactions = normalize_formato_3(rows)
+        for row in rows[header_index + 1:]:
 
-        elif formato == "FORMATO_4":
-            transactions = normalize_formato_4(rows)
+            transaction = extraer_transaccion(
+                row,
+                columns
+            )
 
-        else:
-            return jsonify({
-                "success": False,
-                "error": "Formato no soportado"
-            }), 400
+            if transaction:
+                transactions.append(transaction)
+
+        # ====================================================
+        # RESPUESTA
+        # ====================================================
 
         return jsonify({
             "success": True,
-            "formato_detectado": formato,
+            "header_index": header_index,
+            "columns": columns,
             "transaction_count": len(transactions),
             "transactions": transactions
         })
@@ -182,32 +183,6 @@ def normalize_bank():
             "success": False,
             "error": str(e)
         }), 500
-# ============================================================
-# 4. LIMPIAR TEXTO
-# ============================================================
-
-def clean_text(value):
-
-    if value is None:
-        return ""
-
-    text = str(value)
-
-    text = text.replace("\xa0", " ")
-
-    text = unicodedata.normalize(
-        "NFKD",
-        text
-    ).encode(
-        "ascii",
-        "ignore"
-    ).decode(
-        "ascii"
-    )
-
-    return text.strip().lower()
-
-
 # ============================================================
 # 5. LIMPIAR NÚMEROS
 # ============================================================
