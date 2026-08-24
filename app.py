@@ -183,6 +183,35 @@ def normalize_bank():
             "success": False,
             "error": str(e)
         }), 500
+
+
+# ============================================================
+# 4. LIMPIAR TEXTO
+# ============================================================
+
+def clean_text(value):
+    if value is None:
+        return ""
+
+    text = str(value)
+
+    # Quitar espacios especiales
+    text = text.replace("\xa0", " ")
+
+    # Quitar acentos
+    text = unicodedata.normalize(
+        "NFKD",
+        text
+    ).encode(
+        "ascii",
+        "ignore"
+    ).decode(
+        "ascii"
+    )
+
+    # Quitar espacios al inicio y final
+    # y convertir a minúsculas
+    return text.strip().lower()
 # ============================================================
 # 5. LIMPIAR NÚMEROS
 # ============================================================
