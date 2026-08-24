@@ -288,7 +288,6 @@ def normalize_transaction(
 # ============================================================
 # 7. DETECTAR COLUMNAS AUTOMÁTICAMENTE
 # ============================================================
-
 def detectar_columnas(rows):
 
     for i, row in enumerate(rows):
@@ -302,158 +301,170 @@ def detectar_columnas(rows):
             if not texto:
                 continue
 
-
-            # -------------------------------
+            # ================================================
             # FECHA
-            # -------------------------------
+            # ================================================
 
-            if any(palabra in texto for palabra in [
-
-                "fecha",
-                "date",
-                "fecha transaccion",
-                "fecha de transaccion"
-
-            ]):
-
+            if (
+                texto == "fecha"
+                or "fecha de transaccion" in texto
+                or "fecha transaccion" in texto
+                or texto == "date"
+            ):
                 columnas.setdefault("fecha", index)
 
 
-            # -------------------------------
+            # ================================================
             # REFERENCIA
-            # -------------------------------
+            # ================================================
 
-            if any(palabra in texto for palabra in [
-
-                "referencia",
-                "reference",
-                "no doc",
-                "numero documento",
-                "numero de documento"
-
-            ]):
-
+            if (
+                texto == "referencia"
+                or "referencia de transaccion" in texto
+                or "referencia transaccion" in texto
+                or "no doc" in texto
+                or "numero documento" in texto
+                or "numero de documento" in texto
+            ):
                 columnas.setdefault("referencia", index)
 
 
-            # -------------------------------
-            # CÓDIGO
-            # -------------------------------
+            # ================================================
+            # CODIGO / SECUENCIAL
+            # ================================================
 
-            if any(palabra in texto for palabra in [
-
-                "codigo",
-                "code",
-                "tt",
-                "tipo transaccion",
-                "tipo de transaccion",
-                "secuencial"
-
-            ]):
-
+            if (
+                texto == "codigo"
+                or "codigo de transaccion" in texto
+                or texto == "tt"
+                or texto == "secuencial"
+                or "tipo transaccion" in texto
+                or "tipo de transaccion" in texto
+            ):
                 columnas.setdefault("codigo", index)
 
 
-            # -------------------------------
-            # DESCRIPCIÓN
-            # -------------------------------
+            # ================================================
+            # DESCRIPCION
+            # ================================================
 
-            if any(palabra in texto for palabra in [
-
-                "descripcion",
-                "description",
-                "detalle",
-                "concepto",
-                "movimiento"
-
-            ]):
-
+            if (
+                texto == "descripcion"
+                or "descripcion de transaccion" in texto
+                or texto == "description"
+                or texto == "detalle"
+                or texto == "concepto"
+                or texto == "movimiento"
+            ):
                 columnas.setdefault("descripcion", index)
 
 
-            # -------------------------------
-            # DÉBITO
-            # -------------------------------
+            # ================================================
+            # DEBITO
+            # ================================================
 
-            if any(palabra in texto for palabra in [
-
-                "debito",
-                "debe",
-                "debit",
-                "cargo",
-                "retiro"
-
-            ]):
-
+            if (
+                texto == "debito"
+                or texto == "debito (-)"
+                or texto == "debe"
+                or "debito de transaccion" in texto
+                or texto == "debit"
+                or texto == "cargo"
+                or texto == "retiro"
+            ):
                 columnas.setdefault("debito", index)
 
 
-            # -------------------------------
-            # CRÉDITO
-            # -------------------------------
+            # ================================================
+            # CREDITO
+            # ================================================
 
-            if any(palabra in texto for palabra in [
-
-                "credito",
-                "haber",
-                "credit",
-                "abono",
-                "deposito"
-
-            ]):
-
+            if (
+                texto == "credito"
+                or texto == "credito (+)"
+                or texto == "haber"
+                or "credito de transaccion" in texto
+                or texto == "credit"
+                or texto == "abono"
+                or texto == "deposito"
+            ):
                 columnas.setdefault("credito", index)
 
 
-            # -------------------------------
+            # ================================================
             # SALDO
-            # -------------------------------
+            # ================================================
 
-            if any(palabra in texto for palabra in [
+            if (
+                texto == "saldo"
+                or texto == "balance"
+                or texto == "saldo contable"
+                or texto == "saldo disponible"
+                or "balance de transaccion" in texto
+            ):
 
-                "saldo",
-                "balance",
-                "saldo contable",
-                "saldo disponible"
-
-            ]):
-
-                # Preferimos saldo contable
-                if "saldo contable" in texto:
-
+                # Preferir saldo contable sobre saldo disponible
+                if texto == "saldo contable":
                     columnas["saldo"] = index
 
                 elif "saldo" not in columnas:
-
                     columnas["saldo"] = index
 
 
-        # ----------------------------------------------------
-        # VALIDAR QUE SEA UN ENCABEZADO REAL
-        # ----------------------------------------------------
+        # ====================================================
+        # VALIDACIÓN DEL ENCABEZADO
+        # ====================================================
 
         tiene_descripcion = "descripcion" in columnas
 
-        tiene_saldo = "saldo" in columnas
+        tiene_debito = "debito" in columnas
 
-        tiene_movimiento = (
-            "debito" in columnas or
-            "credito" in columnas
-        )
+        tiene_credito = "credito" in columnas
+
+        tiene_saldo = "saldo" in columnas
 
         tiene_referencia = "referencia" in columnas
 
         tiene_fecha = "fecha" in columnas
 
 
+        # ====================================================
+        # FORMATO TIPO BANCO CON FECHA
+        # ====================================================
+
         if (
             tiene_descripcion
             and tiene_saldo
-            and tiene_movimiento
+            and tiene_debito
+            and tiene_credito
             and (
                 tiene_fecha
                 or tiene_referencia
             )
+        ):
+
+            return i, columnas
+
+
+        # ====================================================
+        # FORMATO COMO EL QUE ME MOSTRASTE
+        #
+        # Oficina
+        # Descripción
+        # Referencia
+        # Secuencial
+        # Débito (-)
+        # Crédito (+)
+        # Saldo Contable
+        # Saldo Disponible
+        # ====================================================
+
+        if (
+            tiene_descripcion
+            and tiene_referencia
+            and tiene_debito
+            and tiene_credito
+            and tiene_saldo
         ):
 
             return i, columnas
