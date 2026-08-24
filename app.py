@@ -108,16 +108,13 @@ def parse_excel():
 # ============================================================
 # 3. NORMALIZAR AUTOMÁTICAMENTE
 # ============================================================
-
 @app.route("/normalize-bank", methods=["POST"])
 def normalize_bank():
 
     try:
-
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data:
-
             return jsonify({
                 "success": False,
                 "error": "No se recibió JSON"
@@ -126,68 +123,58 @@ def normalize_bank():
         rows = data.get("rows", [])
 
         if not isinstance(rows, list):
-
             return jsonify({
                 "success": False,
                 "error": "rows debe ser un arreglo"
             }), 400
 
         if not rows:
-
             return jsonify({
                 "success": False,
                 "error": "La hoja no contiene datos"
             }), 400
 
+        formato = detectar_formato(rows)
 
-        # ----------------------------------------------------
-        # BUSCAR AUTOMÁTICAMENTE EL ENCABEZADO
-        # ----------------------------------------------------
+        if formato is None:
 
-        header_index, columns = detectar_columnas(rows)
+            # Mostrar las primeras filas para poder diagnosticar
+            muestra = []
 
-
-        if header_index is None:
+            for row in rows[:10]:
+                muestra.append(row)
 
             return jsonify({
                 "success": False,
-                "error": "No se pudo detectar automáticamente el encabezado de movimientos"
+                "error": "No se pudo detectar automáticamente el encabezado de movimientos",
+                "filas_recibidas": len(rows),
+                "primeras_filas": muestra
             }), 400
 
+        if formato == "FORMATO_1":
+            transactions = normalize_formato_1(rows)
 
-        # ----------------------------------------------------
-        # NORMALIZAR
-        # ----------------------------------------------------
+        elif formato == "FORMATO_2":
+            transactions = normalize_formato_2(rows)
 
-        transactions = []
+        elif formato == "FORMATO_3":
+            transactions = normalize_formato_3(rows)
 
-        for row in rows[header_index + 1:]:
+        elif formato == "FORMATO_4":
+            transactions = normalize_formato_4(rows)
 
-            transaction = extraer_transaccion(
-                row,
-                columns
-            )
-
-            if transaction is not None:
-
-                transactions.append(transaction)
-
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Formato no soportado"
+            }), 400
 
         return jsonify({
-
             "success": True,
-
-            "formato_detectado": {
-                "fila_encabezado": header_index,
-                "columnas": columns
-            },
-
+            "formato_detectado": formato,
             "transaction_count": len(transactions),
-
             "transactions": transactions
-
         })
-
 
     except Exception as e:
 
@@ -195,8 +182,6 @@ def normalize_bank():
             "success": False,
             "error": str(e)
         }), 500
-
-
 # ============================================================
 # 4. LIMPIAR TEXTO
 # ============================================================
