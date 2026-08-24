@@ -108,16 +108,13 @@ def parse_excel():
 # ============================================================
 # 3. NORMALIZAR AUTOMÁTICAMENTE
 # ============================================================
-
 @app.route("/normalize-bank", methods=["POST"])
 def normalize_bank():
 
     try:
-
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data:
-
             return jsonify({
                 "success": False,
                 "error": "No se recibió JSON"
@@ -126,38 +123,35 @@ def normalize_bank():
         rows = data.get("rows", [])
 
         if not isinstance(rows, list):
-
             return jsonify({
                 "success": False,
                 "error": "rows debe ser un arreglo"
             }), 400
 
         if not rows:
-
             return jsonify({
                 "success": False,
                 "error": "La hoja no contiene datos"
             }), 400
 
-
-        # ----------------------------------------------------
-        # BUSCAR AUTOMÁTICAMENTE EL ENCABEZADO
-        # ----------------------------------------------------
+        # ====================================================
+        # DETECTAR AUTOMÁTICAMENTE LAS COLUMNAS
+        # ====================================================
 
         header_index, columns = detectar_columnas(rows)
-
 
         if header_index is None:
 
             return jsonify({
                 "success": False,
-                "error": "No se pudo detectar automáticamente el encabezado de movimientos"
+                "error": "No se pudo detectar automáticamente el encabezado de movimientos",
+                "filas_recibidas": len(rows),
+                "primeras_filas": rows[:10]
             }), 400
 
-
-        # ----------------------------------------------------
-        # NORMALIZAR
-        # ----------------------------------------------------
+        # ====================================================
+        # EXTRAER TRANSACCIONES
+        # ====================================================
 
         transactions = []
 
@@ -168,26 +162,20 @@ def normalize_bank():
                 columns
             )
 
-            if transaction is not None:
-
+            if transaction:
                 transactions.append(transaction)
 
+        # ====================================================
+        # RESPUESTA
+        # ====================================================
 
         return jsonify({
-
             "success": True,
-
-            "formato_detectado": {
-                "fila_encabezado": header_index,
-                "columnas": columns
-            },
-
+            "header_index": header_index,
+            "columns": columns,
             "transaction_count": len(transactions),
-
             "transactions": transactions
-
         })
-
 
     except Exception as e:
 
@@ -195,34 +183,6 @@ def normalize_bank():
             "success": False,
             "error": str(e)
         }), 500
-
-
-# ============================================================
-# 4. LIMPIAR TEXTO
-# ============================================================
-
-def clean_text(value):
-
-    if value is None:
-        return ""
-
-    text = str(value)
-
-    text = text.replace("\xa0", " ")
-
-    text = unicodedata.normalize(
-        "NFKD",
-        text
-    ).encode(
-        "ascii",
-        "ignore"
-    ).decode(
-        "ascii"
-    )
-
-    return text.strip().lower()
-
-
 # ============================================================
 # 5. LIMPIAR NÚMEROS
 # ============================================================
