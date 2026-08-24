@@ -1,4 +1,4 @@
-```python
+
 from flask import Flask, request, jsonify, send_file, after_this_request
 from openpyxl import load_workbook
 from openpyxl.formula.translate import Translator
