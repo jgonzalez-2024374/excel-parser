@@ -320,6 +320,19 @@ def parse_number(value):
         return None
 
 
+def valor_o_nd(value):
+    """Devuelve 'N/D' cuando un dato realmente no existe.
+
+    Se usa principalmente al escribir el Excel final. Los cálculos internos
+    permanecen numéricos para no romper sumas, reportes ni el tablero.
+    """
+    if value is None:
+        return "N/D"
+    if isinstance(value, str) and not value.strip():
+        return "N/D"
+    return value
+
+
 def clean_number(value):
     parsed = parse_number(value)
     return parsed if parsed is not None else 0.0
@@ -852,8 +865,8 @@ def extraer_transaccion(
         return None
 
     return {
-        "banco": banco,
-        "cuenta": cuenta,
+        "banco": valor_o_nd(banco),
+        "cuenta": valor_o_nd(cuenta),
         "fecha": fecha,
         "referencia": texto_ref or texto_codigo,
         "codigo": texto_codigo,
@@ -862,6 +875,10 @@ def extraer_transaccion(
         "credito": credito,
         "saldo": balance_val if balance_val is not None else 0.0,
         "saldo_inicial_cuenta": saldo_inicial_cuenta,
+        # Conserva si el dato existía realmente en el estado de cuenta.
+        "_tiene_debito": debit_val is not None or (amount_val not in (None, 0) and debito != 0),
+        "_tiene_credito": credit_val is not None or (amount_val not in (None, 0) and credito != 0),
+        "_tiene_saldo": balance_val is not None,
     }
 
 
@@ -1077,14 +1094,14 @@ def escribir_estados_consolidados(
             ws,
             index,
             1,
-            transaction["banco"]
+            valor_o_nd(transaction["banco"])
         )
 
         escribir_celda_segura(
             ws,
             index,
             2,
-            transaction["cuenta"]
+            valor_o_nd(transaction["cuenta"])
         )
 
         cell = obtener_celda_segura(
@@ -1103,35 +1120,35 @@ def escribir_estados_consolidados(
             ws,
             index,
             4,
-            transaction["referencia"]
+            valor_o_nd(transaction["referencia"])
         )
 
         escribir_celda_segura(
             ws,
             index,
             5,
-            transaction["descripcion"]
+            valor_o_nd(transaction["descripcion"])
         )
 
         escribir_celda_segura(
             ws,
             index,
             6,
-            transaction["debito"]
+            transaction["debito"] if transaction.get("_tiene_debito") else "N/D"
         )
 
         escribir_celda_segura(
             ws,
             index,
             7,
-            transaction["credito"]
+            transaction["credito"] if transaction.get("_tiene_credito") else "N/D"
         )
 
         escribir_celda_segura(
             ws,
             index,
             8,
-            transaction["saldo"]
+            transaction["saldo"] if transaction.get("_tiene_saldo") else "N/D"
         )
 
 
@@ -1213,16 +1230,16 @@ def escribir_saldos_por_cuenta(
         saldo_explicito = primero.get("saldo_inicial_cuenta")
         if saldo_explicito is not None:
             saldo_inicial = saldo_explicito
-        elif primero.get("saldo") is not None:
+        elif primero.get("_tiene_saldo"):
             # saldo_nuevo = saldo_anterior + debito + credito
             saldo_inicial = primero["saldo"] - primero["debito"] - primero["credito"]
         else:
-            saldo_inicial = 0.0
+            saldo_inicial = "N/D"
 
-        saldo_final = ultimo.get("saldo", 0.0)
+        saldo_final = ultimo["saldo"] if ultimo.get("_tiene_saldo") else "N/D"
 
-        escribir_celda_segura(ws, row_number, 1, banco_corto(banco))
-        escribir_celda_segura(ws, row_number, 2, cuenta)
+        escribir_celda_segura(ws, row_number, 1, valor_o_nd(banco_corto(banco)))
+        escribir_celda_segura(ws, row_number, 2, valor_o_nd(cuenta))
         escribir_celda_segura(ws, row_number, 3, saldo_inicial)
         escribir_celda_segura(ws, row_number, 4, saldo_final)
         row_number += 1
@@ -1436,7 +1453,7 @@ def escribir_reporte_creditos(
                 ws,
                 header_account_row,
                 current_column,
-                cuenta
+                valor_o_nd(cuenta)
             )
 
             current_column += 1
@@ -1714,8 +1731,8 @@ def actualizar_tablero(
             report_columns[(clean_text(banco), str(cuenta).strip())] = col
 
     for index, (banco, cuenta) in enumerate(cuentas, start=cuenta_start):
-        escribir_celda_segura(ws, index, 6, banco)
-        escribir_celda_segura(ws, index, 7, cuenta)
+        escribir_celda_segura(ws, index, 6, valor_o_nd(banco))
+        escribir_celda_segura(ws, index, 7, valor_o_nd(cuenta))
 
         report_col = report_columns.get((clean_text(banco), cuenta))
         if report_col:
