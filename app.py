@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
-TEMPLATE_FILE = os.path.join(TEMPLATES_DIR, "plantilla.xlsx")
+TEMPLATE_FILE = os.path.join(TEMPLATES_DIR, "Consolidación Estados Financieros e Ingresos - Plantilla.xlsx")
 
 
 # ============================================================
