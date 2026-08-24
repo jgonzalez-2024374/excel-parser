@@ -1,14 +1,11 @@
-
 from flask import Flask, request, jsonify, send_file, after_this_request
 from openpyxl import load_workbook
-from openpyxl.formula.translate import Translator
 from copy import copy
 from datetime import datetime, date
 import os
 import tempfile
 import unicodedata
 import re
-import shutil
 
 app = Flask(__name__)
 
@@ -34,6 +31,85 @@ SHEET_TABLERO = "TABLERO CREDITOS"
 
 
 # ============================================================
+# FUNCIONES PARA CELDAS COMBINADAS
+# ============================================================
+
+def get_merged_range(ws, row, column):
+    """
+    Devuelve el rango combinado al que pertenece una celda.
+    Si no pertenece a ninguno, devuelve None.
+    """
+    for merged_range in ws.merged_cells.ranges:
+        if (
+            merged_range.min_row <= row <= merged_range.max_row
+            and merged_range.min_col <= column <= merged_range.max_col
+        ):
+            return merged_range
+
+    return None
+
+
+def es_celda_combinada(ws, row, column):
+    """
+    Indica si una celda pertenece a un rango combinado.
+    """
+    return get_merged_range(ws, row, column) is not None
+
+
+def es_inicio_celda_combinada(ws, row, column):
+    """
+    Indica si la celda es la esquina superior izquierda
+    de un rango combinado.
+    """
+    merged_range = get_merged_range(ws, row, column)
+
+    if merged_range is None:
+        return False
+
+    return (
+        merged_range.min_row == row
+        and merged_range.min_col == column
+    )
+
+
+def escribir_celda_segura(ws, row, column, value):
+    """
+    Escribe en una celda evitando errores con MergedCell.
+
+    Si la celda está combinada:
+    - Solo escribe si es la celda superior izquierda.
+    - Las demás celdas se ignoran.
+    """
+    merged_range = get_merged_range(ws, row, column)
+
+    if merged_range is not None:
+        if (
+            merged_range.min_row == row
+            and merged_range.min_col == column
+        ):
+            ws.cell(row=row, column=column).value = value
+
+        return False
+
+    ws.cell(row=row, column=column).value = value
+    return True
+
+
+def limpiar_celda_segura(ws, row, column):
+    """
+    Limpia una celda sin provocar errores con celdas combinadas.
+    """
+    merged_range = get_merged_range(ws, row, column)
+
+    if merged_range is not None:
+        # No tocar rangos combinados durante la limpieza.
+        return False
+
+    ws.cell(row=row, column=column).value = None
+    return True
+
+
+# ============================================================
 # INICIO
 # ============================================================
 
@@ -52,7 +128,6 @@ def home():
 # ============================================================
 
 def clean_text(value):
-
     if value is None:
         return ""
 
@@ -78,7 +153,6 @@ def clean_text(value):
 # ============================================================
 
 def clean_number(value):
-
     if value is None or value == "":
         return 0.0
 
@@ -87,27 +161,18 @@ def clean_number(value):
 
     text = str(value).strip()
 
-    # Quitar símbolos
     text = text.replace("Q", "")
     text = text.replace("$", "")
     text = text.replace("€", "")
     text = text.replace(" ", "")
 
-    # Paréntesis = negativo
     negative = False
 
     if text.startswith("(") and text.endswith(")"):
         negative = True
         text = text[1:-1]
 
-    # Manejar formatos:
-    # 1,234.56
-    # 1.234,56
-    # 1234,56
-    # 1234.56
-
     if "," in text and "." in text:
-
         if text.rfind(",") > text.rfind("."):
             text = text.replace(".", "")
             text = text.replace(",", ".")
@@ -118,7 +183,6 @@ def clean_number(value):
         text = text.replace(",", ".")
 
     try:
-
         number = float(text)
 
         if negative:
@@ -135,7 +199,6 @@ def clean_number(value):
 # ============================================================
 
 def clean_date(value):
-
     if value is None or value == "":
         return ""
 
@@ -150,17 +213,15 @@ def clean_date(value):
         )
 
     if isinstance(value, (int, float)):
-
-        # Excel serial date
         try:
             from openpyxl.utils.datetime import from_excel
             return from_excel(value)
+
         except Exception:
             return value
 
     text = str(value).strip()
 
-    # Intentar fechas comunes
     formatos = [
         "%d/%m/%Y",
         "%d-%m-%Y",
@@ -172,9 +233,9 @@ def clean_date(value):
     ]
 
     for formato in formatos:
-
         try:
             return datetime.strptime(text, formato)
+
         except Exception:
             pass
 
@@ -186,10 +247,8 @@ def clean_date(value):
 # ============================================================
 
 def detectar_banco(sheet_name, rows):
-
     texto_hoja = clean_text(sheet_name)
 
-    # Primero intentar por nombre de hoja
     bancos = [
         (
             [
@@ -203,7 +262,6 @@ def detectar_banco(sheet_name, rows):
             [
                 "g&t",
                 "g t",
-                "gyt",
                 "gyt",
                 "g&t continental",
                 "gyt continental"
@@ -255,21 +313,18 @@ def detectar_banco(sheet_name, rows):
         )
     ]
 
-    # Evitar que "bi" coincida accidentalmente dentro
-    # de otra palabra.
+    # Buscar por nombre de hoja
     for aliases, nombre in bancos:
-
         for alias in aliases:
 
             if alias == "bi":
-
                 if re.search(r"\bbi\b", texto_hoja):
                     return nombre
 
             elif alias in texto_hoja:
                 return nombre
 
-    # Buscar en las primeras filas
+    # Buscar en primeras filas
     for row in rows[:15]:
 
         for value in row:
@@ -288,7 +343,6 @@ def detectar_banco(sheet_name, rows):
                     elif alias in texto:
                         return nombre
 
-    # Si no se detecta, usar nombre de hoja
     return sheet_name.strip()
 
 
@@ -302,13 +356,16 @@ def detectar_cuenta(sheet_name, rows, header_index=None):
         r"cuenta\s*(?:no\.?|numero|número)?\s*[:#-]?\s*([0-9][0-9\- ]{2,30})",
         r"no\.?\s*cuenta\s*[:#-]?\s*([0-9][0-9\- ]{2,30})",
         r"numero\s+de\s+cuenta\s*[:#-]?\s*([0-9][0-9\- ]{2,30})",
-        r"número\s+de\s+cuenta\s*[:#-]?\s*([0-9][0-9\- ]{2,30})",
+        r"número\s+de\s+cuenta\s*[:#-]?\s*([0-9][0-9\- ]{2,30})"
     ]
 
     limite = 20
 
     if header_index is not None:
-        limite = min(header_index + 1, len(rows))
+        limite = min(
+            header_index + 1,
+            len(rows)
+        )
 
     for row in rows[:limite]:
 
@@ -341,8 +398,7 @@ def detectar_cuenta(sheet_name, rows, header_index=None):
                 if cuenta:
                     return cuenta
 
-    # Intentar encontrar un número de cuenta en el nombre
-    # de la hoja.
+    # Buscar número en nombre de hoja
     match = re.search(
         r"(?<!\d)(\d{3,20})(?!\d)",
         str(sheet_name)
@@ -457,7 +513,6 @@ def detectar_columnas(rows):
                 or texto == "saldo disponible / saldo / balance"
                 or "balance de transaccion" in texto
             ):
-
                 if texto == "saldo contable":
                     columnas["saldo"] = index
 
@@ -471,7 +526,6 @@ def detectar_columnas(rows):
         tiene_referencia = "referencia" in columnas
         tiene_fecha = "fecha" in columnas
 
-        # Condición principal
         if (
             tiene_descripcion
             and tiene_debito
@@ -579,8 +633,6 @@ def extraer_transaccion(
 
     fecha = clean_date(fecha)
 
-    # Ignorar filas que realmente no tengan
-    # información de movimiento.
     if (
         fecha == ""
         and not referencia
@@ -609,9 +661,7 @@ def procesar_hoja(worksheet):
 
     rows = []
 
-    for row in worksheet.iter_rows(
-        values_only=True
-    ):
+    for row in worksheet.iter_rows(values_only=True):
 
         values = [
             value if value is not None else ""
@@ -627,9 +677,7 @@ def procesar_hoja(worksheet):
     if not rows:
         return []
 
-    header_index, columns = detectar_columnas(
-        rows
-    )
+    header_index, columns = detectar_columnas(rows)
 
     if header_index is None:
         return []
@@ -647,9 +695,7 @@ def procesar_hoja(worksheet):
 
     transactions = []
 
-    for row in rows[
-        header_index + 1:
-    ]:
+    for row in rows[header_index + 1:]:
 
         transaction = extraer_transaccion(
             row,
@@ -659,9 +705,7 @@ def procesar_hoja(worksheet):
         )
 
         if transaction:
-            transactions.append(
-                transaction
-            )
+            transactions.append(transaction)
 
     return transactions
 
@@ -681,6 +725,15 @@ def copiar_estilo_fila(
         worksheet.max_column + 1
     ):
 
+        # Si la celda destino pertenece a un merge,
+        # no intentar modificarla.
+        if es_celda_combinada(
+            worksheet,
+            target_row,
+            column
+        ):
+            continue
+
         source = worksheet.cell(
             row=source_row,
             column=column
@@ -692,29 +745,20 @@ def copiar_estilo_fila(
         )
 
         if source.has_style:
-            target._style = copy(
-                source._style
-            )
+            target._style = copy(source._style)
 
         if source.number_format:
-            target.number_format = (
-                source.number_format
-            )
+            target.number_format = source.number_format
 
         if source.alignment:
-            target.alignment = copy(
-                source.alignment
-            )
+            target.alignment = copy(source.alignment)
 
         if source.protection:
-            target.protection = copy(
-                source.protection
-            )
+            target.protection = copy(source.protection)
 
 
 # ============================================================
 # LIMPIAR CONTENIDO DE FILAS
-# SIN ELIMINAR FORMATO
 # ============================================================
 
 def limpiar_filas(
@@ -738,10 +782,11 @@ def limpiar_filas(
             end_column + 1
         ):
 
-            worksheet.cell(
-                row=row,
-                column=column
-            ).value = None
+            limpiar_celda_segura(
+                worksheet,
+                row,
+                column
+            )
 
 
 # ============================================================
@@ -758,16 +803,11 @@ def escribir_estados_consolidados(
             f"No existe la hoja '{SHEET_ESTADOS}'"
         )
 
-    ws = workbook[
-        SHEET_ESTADOS
-    ]
+    ws = workbook[SHEET_ESTADOS]
 
-    # La plantilla tiene encabezados en fila 1.
     header_row = 1
     start_row = 2
 
-    # Eliminar datos anteriores.
-    # No eliminamos filas ni estilos.
     limpiar_filas(
         ws,
         start_row,
@@ -776,9 +816,6 @@ def escribir_estados_consolidados(
         8
     )
 
-    # Si hay más movimientos que filas
-    # existentes, crear nuevas filas copiando
-    # el formato de la fila 2.
     required_last_row = (
         start_row
         + len(transactions)
@@ -800,85 +837,87 @@ def escribir_estados_consolidados(
                 row
             )
 
-            # Altura de fila
-            ws.row_dimensions[
-                row
-            ].height = ws.row_dimensions[
-                start_row
-            ].height
+            ws.row_dimensions[row].height = (
+                ws.row_dimensions[start_row].height
+            )
 
-    # Escribir movimientos
     for index, transaction in enumerate(
         transactions,
         start=start_row
     ):
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            1
-        ).value = transaction[
-            "banco"
-        ]
+            1,
+            transaction["banco"]
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            2
-        ).value = transaction[
-            "cuenta"
-        ]
+            2,
+            transaction["cuenta"]
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            3
-        ).value = transaction[
-            "fecha"
-        ]
+            3,
+            transaction["fecha"]
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            4
-        ).value = transaction[
-            "referencia"
-        ]
+            4,
+            transaction["referencia"]
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            5
-        ).value = transaction[
-            "descripcion"
-        ]
+            5,
+            transaction["descripcion"]
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            6
-        ).value = transaction[
-            "debito"
-        ]
+            6,
+            transaction["debito"]
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            7
-        ).value = transaction[
-            "credito"
-        ]
+            7,
+            transaction["credito"]
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            8
-        ).value = transaction[
-            "saldo"
-        ]
+            8,
+            transaction["saldo"]
+        )
 
-    # Formato de fecha
-    for row in range(
-        start_row,
-        required_last_row + 1
-    ):
+    if transactions:
 
-        ws.cell(
-            row,
-            3
-        ).number_format = "dd/mm/yyyy"
+        for row in range(
+            start_row,
+            required_last_row + 1
+        ):
+
+            if not es_celda_combinada(
+                ws,
+                row,
+                3
+            ):
+                ws.cell(
+                    row,
+                    3
+                ).number_format = "dd/mm/yyyy"
 
 
 # ============================================================
@@ -930,25 +969,16 @@ def escribir_saldos_por_cuenta(
             f"No existe la hoja '{SHEET_SALDOS}'"
         )
 
-    ws = workbook[
-        SHEET_SALDOS
-    ]
+    ws = workbook[SHEET_SALDOS]
 
-    header_row = 4
     start_row = 5
 
-    # Agrupar por banco + cuenta
     cuentas = {}
 
     for transaction in transactions:
 
-        banco = transaction[
-            "banco"
-        ]
-
-        cuenta = transaction[
-            "cuenta"
-        ]
+        banco = transaction["banco"]
+        cuenta = transaction["cuenta"]
 
         clave = (
             banco,
@@ -958,11 +988,8 @@ def escribir_saldos_por_cuenta(
         if clave not in cuentas:
             cuentas[clave] = []
 
-        cuentas[clave].append(
-            transaction
-        )
+        cuentas[clave].append(transaction)
 
-    # Limpiar contenido existente.
     limpiar_filas(
         ws,
         start_row,
@@ -992,7 +1019,6 @@ def escribir_saldos_por_cuenta(
                 row
             )
 
-    # Escribir una fila por cuenta
     row_number = start_row
 
     for (
@@ -1000,7 +1026,6 @@ def escribir_saldos_por_cuenta(
         cuenta
     ), movimientos in cuentas.items():
 
-        # Ordenar por fecha
         movimientos = sorted(
             movimientos,
             key=lambda x: (
@@ -1016,35 +1041,36 @@ def escribir_saldos_por_cuenta(
         if not movimientos:
             continue
 
-        saldo_inicial = movimientos[0][
-            "saldo"
-        ]
+        saldo_inicial = movimientos[0]["saldo"]
+        saldo_final = movimientos[-1]["saldo"]
 
-        saldo_final = movimientos[-1][
-            "saldo"
-        ]
-
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             row_number,
-            1
-        ).value = banco_corto(
-            banco
+            1,
+            banco_corto(banco)
         )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             row_number,
-            2
-        ).value = cuenta
+            2,
+            cuenta
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             row_number,
-            3
-        ).value = saldo_inicial
+            3,
+            saldo_inicial
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             row_number,
-            4
-        ).value = saldo_final
+            4,
+            saldo_final
+        )
 
         row_number += 1
 
@@ -1063,25 +1089,14 @@ def escribir_reporte_creditos(
             f"No existe la hoja '{SHEET_REPORTE}'"
         )
 
-    ws = workbook[
-        SHEET_REPORTE
-    ]
-
-    # --------------------------------------------------------
-    # Agrupar:
-    #
-    # fecha -> banco -> cuenta -> crédito
-    # --------------------------------------------------------
+    ws = workbook[SHEET_REPORTE]
 
     data = {}
-
     cuentas = {}
 
     for transaction in transactions:
 
-        fecha = transaction[
-            "fecha"
-        ]
+        fecha = transaction["fecha"]
 
         if not isinstance(
             fecha,
@@ -1091,23 +1106,16 @@ def escribir_reporte_creditos(
 
         fecha_key = (
             fecha.date()
-            if isinstance(
-                fecha,
-                datetime
-            )
+            if isinstance(fecha, datetime)
             else fecha
         )
 
         banco = banco_corto(
-            transaction[
-                "banco"
-            ]
+            transaction["banco"]
         )
 
         cuenta = str(
-            transaction[
-                "cuenta"
-            ]
+            transaction["cuenta"]
         )
 
         clave = (
@@ -1115,38 +1123,21 @@ def escribir_reporte_creditos(
             cuenta
         )
 
-        cuentas[
-            clave
-        ] = True
+        cuentas[clave] = True
 
         if fecha_key not in data:
-            data[
-                fecha_key
-            ] = {}
+            data[fecha_key] = {}
 
-        if banco not in data[
-            fecha_key
-        ]:
-            data[
-                fecha_key
-            ][banco] = {}
+        if banco not in data[fecha_key]:
+            data[fecha_key][banco] = {}
 
-        if cuenta not in data[
-            fecha_key
-        ][banco]:
-            data[
-                fecha_key
-            ][banco][cuenta] = 0.0
+        if cuenta not in data[fecha_key][banco]:
+            data[fecha_key][banco][cuenta] = 0.0
 
-        data[
-            fecha_key
-        ][banco][cuenta] += (
-            transaction[
-                "credito"
-            ]
+        data[fecha_key][banco][cuenta] += (
+            transaction["credito"]
         )
 
-    # Ordenar cuentas
     cuentas_ordenadas = sorted(
         cuentas.keys(),
         key=lambda x: (
@@ -1155,15 +1146,10 @@ def escribir_reporte_creditos(
         )
     )
 
-    # --------------------------------------------------------
-    # Encabezados existentes
-    # --------------------------------------------------------
-
     header_bank_row = 3
     header_account_row = 4
     start_row = 5
 
-    # Limpiar área
     limpiar_filas(
         ws,
         header_bank_row,
@@ -1175,33 +1161,28 @@ def escribir_reporte_creditos(
         )
     )
 
-    # Restaurar textos principales
-    ws.cell(
+    escribir_celda_segura(
+        ws,
         header_bank_row,
-        1
-    ).value = "BANCO"
+        1,
+        "BANCO"
+    )
 
-    ws.cell(
+    escribir_celda_segura(
+        ws,
         header_account_row,
-        1
-    ).value = "Fecha"
-
-    # --------------------------------------------------------
-    # Crear columnas dinámicamente
-    # --------------------------------------------------------
+        1,
+        "Fecha"
+    )
 
     column_map = {}
-
     current_column = 2
-
     bancos_en_orden = []
 
     for banco, cuenta in cuentas_ordenadas:
 
         if banco not in bancos_en_orden:
-            bancos_en_orden.append(
-                banco
-            )
+            bancos_en_orden.append(banco)
 
     for banco in bancos_en_orden:
 
@@ -1223,40 +1204,40 @@ def escribir_reporte_creditos(
                 )
             ] = current_column
 
-            ws.cell(
+            escribir_celda_segura(
+                ws,
                 header_bank_row,
-                current_column
-            ).value = banco
+                current_column,
+                banco
+            )
 
-            ws.cell(
+            escribir_celda_segura(
+                ws,
                 header_account_row,
-                current_column
-            ).value = cuenta
+                current_column,
+                cuenta
+            )
 
             current_column += 1
 
     total_column = current_column
-    cuentas_abono_column = (
-        current_column + 1
+    cuentas_abono_column = current_column + 1
+
+    escribir_celda_segura(
+        ws,
+        header_account_row,
+        total_column,
+        "TOTAL CRÉDITOS"
     )
 
-    ws.cell(
+    escribir_celda_segura(
+        ws,
         header_account_row,
-        total_column
-    ).value = "TOTAL CRÉDITOS"
-
-    ws.cell(
-        header_account_row,
-        cuentas_abono_column
-    ).value = "CUENTAS CON ABONO"
-
-    # --------------------------------------------------------
-    # Fechas
-    # --------------------------------------------------------
-
-    fechas = sorted(
-        data.keys()
+        cuentas_abono_column,
+        "CUENTAS CON ABONO"
     )
+
+    fechas = sorted(data.keys())
 
     if not fechas:
         return
@@ -1282,28 +1263,31 @@ def escribir_reporte_creditos(
                 row
             )
 
-    # --------------------------------------------------------
-    # Escribir datos diarios
-    # --------------------------------------------------------
-
     for index, fecha in enumerate(
         fechas,
         start=start_row
     ):
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            1
-        ).value = datetime(
-            fecha.year,
-            fecha.month,
-            fecha.day
+            1,
+            datetime(
+                fecha.year,
+                fecha.month,
+                fecha.day
+            )
         )
 
-        ws.cell(
+        if not es_celda_combinada(
+            ws,
             index,
             1
-        ).number_format = "dd/mm/yyyy"
+        ):
+            ws.cell(
+                index,
+                1
+            ).number_format = "dd/mm/yyyy"
 
         total = 0.0
         cuentas_con_abono = 0
@@ -1312,44 +1296,46 @@ def escribir_reporte_creditos(
 
             banco, cuenta = clave
 
-            valor = data.get(
-                fecha,
-                {}
-            ).get(
-                banco,
-                {}
-            ).get(
-                cuenta,
-                0.0
+            valor = (
+                data
+                .get(fecha, {})
+                .get(banco, {})
+                .get(cuenta, 0.0)
             )
 
-            # Si hubo crédito, escribirlo.
-            # Si no hubo, dejar vacío.
             if valor != 0:
-                ws.cell(
+
+                escribir_celda_segura(
+                    ws,
                     index,
-                    column
-                ).value = valor
+                    column,
+                    valor
+                )
 
                 cuentas_con_abono += 1
-
                 total += valor
 
             else:
-                ws.cell(
+
+                limpiar_celda_segura(
+                    ws,
                     index,
                     column
-                ).value = None
+                )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            total_column
-        ).value = total
+            total_column,
+            total
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            cuentas_abono_column
-        ).value = cuentas_con_abono
+            cuentas_abono_column,
+            cuentas_con_abono
+        )
 
 
 # ============================================================
@@ -1367,20 +1353,13 @@ def actualizar_tablero(
     if SHEET_REPORTE not in workbook.sheetnames:
         return
 
-    ws = workbook[
-        SHEET_TABLERO
-    ]
-
-    reporte = workbook[
-        SHEET_REPORTE
-    ]
+    ws = workbook[SHEET_TABLERO]
+    reporte = workbook[SHEET_REPORTE]
 
     # --------------------------------------------------------
-    # Valores de selección
+    # FECHAS Y FILTROS
     # --------------------------------------------------------
 
-    # Mantener las fechas de la plantilla si existen.
-    # Si no existen, utilizar primera/última fecha.
     fechas = [
         transaction["fecha"]
         for transaction in transactions
@@ -1392,19 +1371,14 @@ def actualizar_tablero(
 
     if fechas:
 
-        fechas = sorted(
-            fechas
-        )
+        fechas = sorted(fechas)
 
         fecha_min = fechas[0]
         fecha_max = fechas[-1]
 
-        if isinstance(
-            fecha_min,
-            date
-        ) and not isinstance(
-            fecha_min,
-            datetime
+        if (
+            isinstance(fecha_min, date)
+            and not isinstance(fecha_min, datetime)
         ):
             fecha_min = datetime(
                 fecha_min.year,
@@ -1412,12 +1386,9 @@ def actualizar_tablero(
                 fecha_min.day
             )
 
-        if isinstance(
-            fecha_max,
-            date
-        ) and not isinstance(
-            fecha_max,
-            datetime
+        if (
+            isinstance(fecha_max, date)
+            and not isinstance(fecha_max, datetime)
         ):
             fecha_max = datetime(
                 fecha_max.year,
@@ -1425,27 +1396,49 @@ def actualizar_tablero(
                 fecha_max.day
             )
 
-        ws["A5"] = fecha_min
-        ws["C5"] = fecha_max
+        escribir_celda_segura(
+            ws,
+            5,
+            1,
+            fecha_min
+        )
 
-        ws["A5"].number_format = "dd/mm/yyyy"
-        ws["C5"].number_format = "dd/mm/yyyy"
+        escribir_celda_segura(
+            ws,
+            5,
+            3,
+            fecha_max
+        )
 
-    ws["E5"] = "TODAS"
-    ws["G5"] = "TODOS"
+        if not es_celda_combinada(ws, 5, 1):
+            ws["A5"].number_format = "dd/mm/yyyy"
+
+        if not es_celda_combinada(ws, 5, 3):
+            ws["C5"].number_format = "dd/mm/yyyy"
+
+    escribir_celda_segura(
+        ws,
+        5,
+        5,
+        "TODAS"
+    )
+
+    escribir_celda_segura(
+        ws,
+        5,
+        7,
+        "TODOS"
+    )
 
     # --------------------------------------------------------
-    # Detectar filas de evolución
+    # EVOLUCIÓN
     # --------------------------------------------------------
 
     report_start = 5
-    report_end = (
-        reporte.max_row
-    )
+    report_end = reporte.max_row
 
     tablero_start = 15
 
-    # Limpiar valores/fórmulas de evolución
     for row in range(
         tablero_start,
         max(
@@ -1454,19 +1447,13 @@ def actualizar_tablero(
         ) + 1
     ):
 
-        for col in range(
-            1,
-            5
-        ):
+        for col in range(1, 5):
 
-            ws.cell(
+            limpiar_celda_segura(
+                ws,
                 row,
                 col
-            ).value = None
-
-    # --------------------------------------------------------
-    # Fórmulas de evolución
-    # --------------------------------------------------------
+            )
 
     max_evolution_rows = max(
         19,
@@ -1498,92 +1485,105 @@ def actualizar_tablero(
         max_evolution_rows
     ):
 
-        row = (
-            tablero_start + i
+        row = tablero_start + i
+        report_row = report_start + i
+
+        if report_row > report_end:
+            continue
+
+        # Fecha
+        formula_fecha = (
+            f'=IF(AND('
+            f"'{SHEET_REPORTE}'!A{report_row}>=$A$5,"
+            f"'{SHEET_REPORTE}'!A{report_row}<=$C$5),"
+            f"'{SHEET_REPORTE}'!A{report_row},"
+            f'""'
+            f')'
         )
 
-        report_row = (
-            report_start + i
+        escribir_celda_segura(
+            ws,
+            row,
+            1,
+            formula_fecha
         )
 
-        if report_row <= report_end:
+        # Crédito seleccionado
+        formula_credito = (
+            f'=IF(A{row}="",0,'
+            f'IF($E$5<>"TODAS",'
+            f'IFERROR('
+            f"INDEX('{SHEET_REPORTE}'!$B$5:$I${report_end},"
+            f"MATCH(A{row},'{SHEET_REPORTE}'!$A$5:$A${report_end},0),"
+            f"MATCH($E$5,'{SHEET_REPORTE}'!$B$4:$I$4,0)"
+            f'),0),'
+            f'IF($G$5="TODOS",'
+            f'IFERROR('
+            f"SUMIF('{SHEET_REPORTE}'!$A$5:$A${report_end},"
+            f"A{row},"
+            f"'{SHEET_REPORTE}'!$J$5:$J${report_end}"
+            f'),0),0)))'
+        )
 
-            # Fecha
-            ws.cell(
+        escribir_celda_segura(
+            ws,
+            row,
+            2,
+            formula_credito
+        )
+
+        # Variación diaria
+        if i == 0:
+
+            escribir_celda_segura(
+                ws,
                 row,
-                1
-            ).value = (
-                f'=IF(AND(\'{SHEET_REPORTE}\'!A{report_row}>=$A$5,'
-                f'\'{SHEET_REPORTE}\'!A{report_row}<=$C$5),'
-                f'\'{SHEET_REPORTE}\'!A{report_row},"")'
+                3,
+                0
             )
 
-            # Crédito seleccionado
-            ws.cell(
+        else:
+
+            escribir_celda_segura(
+                ws,
                 row,
-                2
-            ).value = (
-                f'=IF(A{row}="",0,'
-                f'IF($E$5<>"TODAS",'
-                f'IFERROR(INDEX(\'{SHEET_REPORTE}\'!$B$5:$I${report_end},'
-                f'MATCH(A{row},\'{SHEET_REPORTE}\'!$A$5:$A${report_end},0),'
-                f'MATCH($E$5,\'{SHEET_REPORTE}\'!$B$4:$I$4,0)),0),'
-                f'IF($G$5="TODOS",'
-                f'IFERROR(SUMIF(\'{SHEET_REPORTE}\'!$A$5:$A${report_end},'
-                f'A{row},\'{SHEET_REPORTE}\'!$J$5:$J${report_end}),0),0)))'
+                3,
+                f"=B{row}-B{row - 1}"
             )
 
-            # Variación diaria
-            if i == 0:
+        # Cuentas con abono
+        formula_cuentas = (
+            f'=IF(A{row}="",0,'
+            f'IF($G$5="TODOS",'
+            f'IFERROR('
+            f"INDEX('{SHEET_REPORTE}'!$K$5:$K${report_end},"
+            f"MATCH(A{row},'{SHEET_REPORTE}'!$A$5:$A${report_end},0)"
+            f'),0),'
+            f'IF(B{row}>0,1,0)))'
+        )
 
-                ws.cell(
-                    row,
-                    3
-                ).value = 0
-
-            else:
-
-                ws.cell(
-                    row,
-                    3
-                ).value = (
-                    f'=B{row}-B{row - 1}'
-                )
-
-            # Cuentas con abono
-            ws.cell(
-                row,
-                4
-            ).value = (
-                f'=IF(A{row}="",0,'
-                f'IF($G$5="TODOS",'
-                f'IFERROR(INDEX(\'{SHEET_REPORTE}\'!$K$5:$K${report_end},'
-                f'MATCH(A{row},\'{SHEET_REPORTE}\'!$A$5:$A${report_end},0)),0),'
-                f'IF(B{row}>0,1,0)))'
-            )
+        escribir_celda_segura(
+            ws,
+            row,
+            4,
+            formula_cuentas
+        )
 
     # --------------------------------------------------------
     # CRÉDITOS POR CUENTA
     # --------------------------------------------------------
 
-    # Obtener cuentas únicas
     cuentas = []
 
     for transaction in transactions:
 
         clave = (
-            banco_corto(
-                transaction["banco"]
-            ),
-            str(
-                transaction["cuenta"]
-            )
+            banco_corto(transaction["banco"]),
+            str(transaction["cuenta"])
         )
 
         if clave not in cuentas:
-            cuentas.append(
-                clave
-            )
+            cuentas.append(clave)
 
     cuentas = sorted(
         cuentas,
@@ -1595,7 +1595,6 @@ def actualizar_tablero(
 
     cuenta_start = 15
 
-    # Limpiar columnas F:H
     for row in range(
         cuenta_start,
         max(
@@ -1604,15 +1603,13 @@ def actualizar_tablero(
         ) + 1
     ):
 
-        for col in range(
-            6,
-            9
-        ):
+        for col in range(6, 9):
 
-            ws.cell(
+            limpiar_celda_segura(
+                ws,
                 row,
                 col
-            ).value = None
+            )
 
     cuenta_end = (
         cuenta_start
@@ -1635,8 +1632,10 @@ def actualizar_tablero(
                 row
             )
 
-    # Las columnas del reporte empiezan en B.
-    # Construir mapa.
+    # --------------------------------------------------------
+    # MAPA DE COLUMNAS DEL REPORTE
+    # --------------------------------------------------------
+
     report_columns = {}
 
     for col in range(
@@ -1663,6 +1662,10 @@ def actualizar_tablero(
                 )
             ] = col
 
+    # --------------------------------------------------------
+    # ESCRIBIR CUENTAS
+    # --------------------------------------------------------
+
     for index, (
         banco,
         cuenta
@@ -1671,15 +1674,19 @@ def actualizar_tablero(
         start=cuenta_start
     ):
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            6
-        ).value = banco
+            6,
+            banco
+        )
 
-        ws.cell(
+        escribir_celda_segura(
+            ws,
             index,
-            7
-        ).value = cuenta
+            7,
+            cuenta
+        )
 
         report_col = report_columns.get(
             (
@@ -1690,26 +1697,32 @@ def actualizar_tablero(
 
         if report_col:
 
-            col_letter = (
-                reporte.cell(
-                    1,
-                    report_col
-                ).column_letter
-            )
+            col_letter = reporte.cell(
+                1,
+                report_col
+            ).column_letter
 
-            ws.cell(
-                index,
-                8
-            ).value = (
+            formula = (
                 f'=IF(AND('
                 f'OR($G$5="TODOS",TRIM($G$5)=TRIM(F{index})),'
                 f'OR($E$5="TODAS",TEXT($E$5,"0")=TEXT(G{index},"0"))'
                 f'),'
-                f'SUMIFS(\'{SHEET_REPORTE}\'!'
+                f'SUMIFS('
+                f"'{SHEET_REPORTE}'!"
                 f'${col_letter}$5:${col_letter}${report_end},'
-                f'\'{SHEET_REPORTE}\'!$A$5:$A${report_end},">="&$A$5,'
-                f'\'{SHEET_REPORTE}\'!$A$5:$A${report_end},"<="&$C$5),'
+                f"'{SHEET_REPORTE}'!"
+                f'$A$5:$A${report_end},">="&$A$5,'
+                f"'{SHEET_REPORTE}'!"
+                f'$A$5:$A${report_end},"<="&$C$5'
+                f'),'
                 f'0)'
+            )
+
+            escribir_celda_segura(
+                ws,
+                index,
+                8,
+                formula
             )
 
 
@@ -1722,62 +1735,44 @@ def insertar_en_plantilla(
     output_path
 ):
 
-    if not os.path.exists(
-        TEMPLATE_FILE
-    ):
+    if not os.path.exists(TEMPLATE_FILE):
 
         raise Exception(
             "No existe la plantilla: "
             + TEMPLATE_FILE
         )
 
-    # Abrir plantilla real
     workbook = load_workbook(
         TEMPLATE_FILE
     )
 
     try:
 
-        # ----------------------------------------------------
         # 1. ESTADOS CONSOLIDADOS
-        # ----------------------------------------------------
-
         escribir_estados_consolidados(
             workbook,
             transactions
         )
 
-        # ----------------------------------------------------
         # 2. SALDOS POR CUENTA
-        # ----------------------------------------------------
-
         escribir_saldos_por_cuenta(
             workbook,
             transactions
         )
 
-        # ----------------------------------------------------
         # 3. REPORTE CREDITOS DIARIOS
-        # ----------------------------------------------------
-
         escribir_reporte_creditos(
             workbook,
             transactions
         )
 
-        # ----------------------------------------------------
         # 4. TABLERO CREDITOS
-        # ----------------------------------------------------
-
         actualizar_tablero(
             workbook,
             transactions
         )
 
-        # ----------------------------------------------------
         # Guardar
-        # ----------------------------------------------------
-
         workbook.save(
             output_path
         )
@@ -1804,9 +1799,7 @@ def process_excel():
             "error": "No se recibió ningún archivo"
         }), 400
 
-    file = request.files[
-        "file"
-    ]
+    file = request.files["file"]
 
     if not file.filename:
 
@@ -1815,18 +1808,14 @@ def process_excel():
             "error": "El archivo no tiene nombre"
         }), 400
 
-    if not file.filename.lower().endswith(
-        ".xlsx"
-    ):
+    if not file.filename.lower().endswith(".xlsx"):
 
         return jsonify({
             "success": False,
             "error": "El archivo debe ser .xlsx"
         }), 400
 
-    if not os.path.exists(
-        TEMPLATE_FILE
-    ):
+    if not os.path.exists(TEMPLATE_FILE):
 
         return jsonify({
             "success": False,
@@ -1848,10 +1837,7 @@ def process_excel():
             suffix=".xlsx"
         ) as temp:
 
-            file.save(
-                temp.name
-            )
-
+            file.save(temp.name)
             input_path = temp.name
 
         # ====================================================
@@ -1865,7 +1851,6 @@ def process_excel():
         )
 
         all_transactions = []
-
         processed_sheets = []
 
         # ====================================================
@@ -1886,9 +1871,7 @@ def process_excel():
 
                 processed_sheets.append({
                     "name": worksheet.title,
-                    "transactions": len(
-                        transactions
-                    )
+                    "transactions": len(transactions)
                 })
 
         workbook.close()
@@ -1937,10 +1920,7 @@ def process_excel():
             and os.path.exists(input_path)
         ):
 
-            os.remove(
-                input_path
-            )
-
+            os.remove(input_path)
             input_path = None
 
         # ====================================================
@@ -1954,14 +1934,10 @@ def process_excel():
 
                 if (
                     output_path
-                    and os.path.exists(
-                        output_path
-                    )
+                    and os.path.exists(output_path)
                 ):
 
-                    os.remove(
-                        output_path
-                    )
+                    os.remove(output_path)
 
             except Exception:
                 pass
@@ -1993,16 +1969,11 @@ def process_excel():
 
         if (
             input_path
-            and os.path.exists(
-                input_path
-            )
+            and os.path.exists(input_path)
         ):
 
             try:
-
-                os.remove(
-                    input_path
-                )
+                os.remove(input_path)
 
             except Exception:
                 pass
@@ -2024,4 +1995,3 @@ if __name__ == "__main__":
         ),
         debug=False
     )
-
