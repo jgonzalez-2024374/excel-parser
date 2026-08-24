@@ -132,7 +132,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-2.0"
+PARSER_VERSION = "universal-3.0-dynamic-charts"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -1253,217 +1253,275 @@ def escribir_reporte_creditos(
     workbook,
     transactions
 ):
+    """
+    Construye el REPORTE CREDITOS DIARIOS sin encoger la plantilla.
+
+    Regla importante:
+    - La plantilla define un ancho mínimo de columnas de cuentas.
+    - Si el archivo trae menos cuentas, se conservan columnas finales de la
+      plantilla para que TOTAL CRÉDITOS y CUENTAS CON ABONO no se desplacen
+      hacia la izquierda ni hereden formatos de moneda incorrectos.
+    - Si el archivo trae más cuentas que la plantilla, el reporte se expande
+      y los dos campos de resumen se mueven al final con su formato correcto.
+    """
 
     if SHEET_REPORTE not in workbook.sheetnames:
+        raise Exception(f"No existe la hoja '{SHEET_REPORTE}'")
 
-        raise Exception(
-            f"No existe la hoja '{SHEET_REPORTE}'"
-        )
-
-    ws = workbook[
-        SHEET_REPORTE
-    ]
+    ws = workbook[SHEET_REPORTE]
 
     data = {}
     cuentas = {}
 
     for transaction in transactions:
-
         fecha = transaction["fecha"]
 
-        if not isinstance(
-            fecha,
-            (datetime, date)
-        ):
+        if not isinstance(fecha, (datetime, date)):
             continue
 
-        fecha_key = (
-            fecha.date()
-            if isinstance(
-                fecha,
-                datetime
-            )
-            else fecha
-        )
-
-        banco = banco_corto(
-            transaction["banco"]
-        )
-
-        cuenta = str(
-            transaction["cuenta"]
-        )
-
-        clave = (
-            banco,
-            cuenta
-        )
+        fecha_key = fecha.date() if isinstance(fecha, datetime) else fecha
+        banco = banco_corto(transaction["banco"])
+        cuenta = str(transaction["cuenta"])
+        clave = (banco, cuenta)
 
         cuentas[clave] = True
+        data.setdefault(fecha_key, {}).setdefault(banco, {}).setdefault(cuenta, 0.0)
+        data[fecha_key][banco][cuenta] += transaction["credito"]
 
-        if fecha_key not in data:
-
-            data[fecha_key] = {}
-
-        if banco not in data[fecha_key]:
-
-            data[fecha_key][banco] = {}
-
-        if cuenta not in data[
-            fecha_key
-        ][banco]:
-
-            data[
-                fecha_key
-            ][banco][cuenta] = 0.0
-
-        data[
-            fecha_key
-        ][banco][cuenta] += (
-            transaction["credito"]
-        )
-
-    cuentas_ordenadas = sorted(
-        cuentas.keys(),
-        key=lambda x: (
-            x[0],
-            x[1]
-        )
-    )
+    cuentas_ordenadas = sorted(cuentas.keys(), key=lambda x: (x[0], x[1]))
 
     header_bank_row = 3
     header_account_row = 4
     start_row = 5
 
-    limpiar_filas(
-        ws,
-        header_bank_row,
-        ws.max_row,
-        1,
-        max(
-            ws.max_column,
-            11
-        )
-    )
+    # --------------------------------------------------------
+    # 1) LEER LA ESTRUCTURA ORIGINAL DE LA PLANTILLA
+    #    antes de limpiar cualquier celda.
+    # --------------------------------------------------------
+
+    template_total_col = None
+    template_count_col = None
+
+    for col in range(2, ws.max_column + 1):
+        header = clean_text(ws.cell(row=header_account_row, column=col).value)
+
+        if template_total_col is None and "total" in header and (
+            "credito" in header or "credit" in header
+        ):
+            template_total_col = col
+
+        if template_count_col is None and "cuentas" in header and "abono" in header:
+            template_count_col = col
+
+    # Fallback defensivo para plantillas equivalentes.
+    if template_total_col is None:
+        template_total_col = max(3, ws.max_column - 1)
+
+    if template_count_col is None:
+        template_count_col = template_total_col + 1
+
+    template_last_account_col = max(2, template_total_col - 1)
+    template_account_slots = max(0, template_total_col - 2)
+
+    # Guardar el banco de cada columna de cuenta. En encabezados combinados,
+    # openpyxl solo conserva el valor en la primera celda; propagamos ese banco
+    # a las columnas siguientes del mismo bloque.
+    template_accounts = []
+    banco_actual = ""
+
+    for col in range(2, template_total_col):
+        banco_cell = ws.cell(row=header_bank_row, column=col)
+        banco_valor = banco_cell.value
+
+        if banco_valor not in (None, ""):
+            banco_actual = str(banco_valor).strip()
+
+        cuenta_valor = ws.cell(row=header_account_row, column=col).value
+
+        if cuenta_valor not in (None, ""):
+            template_accounts.append((banco_actual, str(cuenta_valor).strip()))
 
     # --------------------------------------------------------
-    # IMPORTANTE:
-    # Descombinar únicamente el área dinámica del reporte.
-    #
-    # Esto evita que intentemos escribir sobre MergedCell.
+    # 2) DEFINIR LAS CUENTAS QUE SE MOSTRARÁN
+    # --------------------------------------------------------
+
+    # El archivo de entrada manda en las primeras columnas.
+    display_accounts = list(cuentas_ordenadas)
+
+    # Si trae menos cuentas que el diseño base, NO encogemos la hoja.
+    # Conservamos las últimas cuentas de la plantilla como columnas de relleno.
+    # Esto mantiene las columnas de resumen en su sitio original (J/K en la
+    # plantilla actual) y evita que CUENTAS CON ABONO se vea como moneda.
+    if len(display_accounts) < template_account_slots:
+        needed = template_account_slots - len(display_accounts)
+        incoming_keys = {
+            (clean_text(b), str(c).strip())
+            for b, c in display_accounts
+        }
+
+        candidates = [
+            pair for pair in template_accounts
+            if (clean_text(pair[0]), str(pair[1]).strip()) not in incoming_keys
+        ]
+
+        padding = candidates[-needed:] if needed > 0 else []
+
+        # Si una plantilla extraña no tuviera suficientes encabezados,
+        # completamos con N/D para conservar el ancho, sin inventar cuentas.
+        while len(padding) < needed:
+            padding.insert(0, ("", "N/D"))
+
+        display_accounts.extend(padding)
+
+    # Si vienen más cuentas que la plantilla, simplemente expandimos.
+    total_column = 2 + len(display_accounts)
+    cuentas_abono_column = total_column + 1
+
+    # --------------------------------------------------------
+    # 3) PREPARAR ESTILOS CUANDO EL REPORTE SE EXPANDE
+    # --------------------------------------------------------
+
+    # Copiar estilo de una columna a otra, fila por fila.
+    def copiar_estilo_columna(source_col, target_col, last_row):
+        if source_col == target_col:
+            return
+
+        for row in range(1, last_row + 1):
+            source = ws.cell(row=row, column=source_col)
+            target = ws.cell(row=row, column=target_col)
+
+            if es_celda_combinada(source) or es_celda_combinada(target):
+                continue
+
+            if source.has_style:
+                target._style = copy(source._style)
+
+            if source.number_format:
+                target.number_format = source.number_format
+
+            if source.alignment:
+                target.alignment = copy(source.alignment)
+
+            if source.protection:
+                target.protection = copy(source.protection)
+
+    fechas = sorted(data.keys())
+
+    if not fechas:
+        return
+
+    required_last_row = start_row + len(fechas) - 1
+    style_last_row = max(ws.max_row, required_last_row)
+
+    # Si las cuentas ocupan las columnas donde antes estaban TOTAL/CUENTAS,
+    # convertir esas columnas a estilo de cuenta.
+    if total_column > template_total_col:
+        for col in range(template_total_col, total_column):
+            copiar_estilo_columna(template_last_account_col, col, style_last_row)
+
+        # Llevar los estilos originales de TOTAL y CUENTAS al nuevo extremo.
+        copiar_estilo_columna(template_total_col, total_column, style_last_row)
+        copiar_estilo_columna(template_count_col, cuentas_abono_column, style_last_row)
+
+    # --------------------------------------------------------
+    # 4) DESCOMBINAR SOLO EL ENCABEZADO DINÁMICO
     # --------------------------------------------------------
 
     merges_to_remove = []
 
-    for merged_range in list(
-        ws.merged_cells.ranges
-    ):
-
+    for merged_range in list(ws.merged_cells.ranges):
         min_col = merged_range.min_col
         max_col = merged_range.max_col
         min_row = merged_range.min_row
         max_row = merged_range.max_row
-
-        # Rangos que afectan filas 3-4 del reporte
 
         if (
             min_row <= header_account_row
             and max_row >= header_bank_row
             and max_col >= 2
         ):
-
-            merges_to_remove.append(
-                str(merged_range)
-            )
+            merges_to_remove.append(str(merged_range))
 
     for merged_range in merges_to_remove:
-
         try:
-
-            ws.unmerge_cells(
-                merged_range
-            )
-
+            ws.unmerge_cells(merged_range)
         except Exception:
-
             pass
 
-    # Restaurar encabezados
+    # --------------------------------------------------------
+    # 5) LIMPIAR VALORES, NO ESTILOS
+    # --------------------------------------------------------
 
-    escribir_celda_segura(
+    clear_to_col = max(ws.max_column, cuentas_abono_column)
+
+    limpiar_filas(
         ws,
         header_bank_row,
+        max(ws.max_row, required_last_row),
         1,
-        "BANCO"
+        clear_to_col
     )
 
-    escribir_celda_segura(
-        ws,
-        header_account_row,
-        1,
-        "Fecha"
-    )
+    # Restaurar encabezados base.
+    escribir_celda_segura(ws, header_bank_row, 1, "BANCO")
+    escribir_celda_segura(ws, header_account_row, 1, "Fecha")
 
     # --------------------------------------------------------
-    # Crear columnas
+    # 6) CREAR ENCABEZADOS DE CUENTAS Y AGRUPAR BANCOS
     # --------------------------------------------------------
 
     column_map = {}
 
-    current_column = 2
+    for offset, (banco, cuenta) in enumerate(display_accounts):
+        col = 2 + offset
+        cuenta_texto = valor_o_nd(cuenta)
 
-    bancos_en_orden = []
+        escribir_celda_segura(ws, header_account_row, col, cuenta_texto)
 
-    for banco, cuenta in cuentas_ordenadas:
+        # Solo las cuentas realmente presentes en el archivo fuente entran al
+        # mapa de datos. Las columnas conservadas de plantilla quedan vacías.
+        incoming_key = (banco, cuenta)
+        if incoming_key in cuentas:
+            column_map[incoming_key] = col
 
-        if banco not in bancos_en_orden:
+    # Agrupar encabezados contiguos del mismo banco, igual que la plantilla.
+    if display_accounts:
+        group_start = 0
 
-            bancos_en_orden.append(
-                banco
-            )
+        while group_start < len(display_accounts):
+            banco = display_accounts[group_start][0]
+            group_end = group_start
 
-    for banco in bancos_en_orden:
+            while (
+                group_end + 1 < len(display_accounts)
+                and clean_text(display_accounts[group_end + 1][0]) == clean_text(banco)
+            ):
+                group_end += 1
 
-        cuentas_banco = [
-            cuenta
-            for (
-                banco_actual,
-                cuenta
-            ) in cuentas_ordenadas
-            if banco_actual == banco
-        ]
-
-        for cuenta in cuentas_banco:
-
-            column_map[
-                (
-                    banco,
-                    cuenta
-                )
-            ] = current_column
+            start_col = 2 + group_start
+            end_col = 2 + group_end
 
             escribir_celda_segura(
                 ws,
                 header_bank_row,
-                current_column,
-                banco
+                start_col,
+                valor_o_nd(banco) if banco else "N/D"
             )
 
-            escribir_celda_segura(
-                ws,
-                header_account_row,
-                current_column,
-                valor_o_nd(cuenta)
-            )
+            if end_col > start_col:
+                try:
+                    ws.merge_cells(
+                        start_row=header_bank_row,
+                        start_column=start_col,
+                        end_row=header_bank_row,
+                        end_column=end_col
+                    )
+                except Exception:
+                    pass
 
-            current_column += 1
+            group_start = group_end + 1
 
-    total_column = current_column
-
-    cuentas_abono_column = (
-        current_column + 1
-    )
-
+    # Resúmenes SIEMPRE al final del ancho lógico del reporte.
     escribir_celda_segura(
         ws,
         header_account_row,
@@ -1478,113 +1536,248 @@ def escribir_reporte_creditos(
         "CUENTAS CON ABONO"
     )
 
-    fechas = sorted(
-        data.keys()
-    )
-
-    if not fechas:
-        return
-
-    required_last_row = (
-        start_row
-        + len(fechas)
-        - 1
-    )
+    # --------------------------------------------------------
+    # 7) ASEGURAR FILAS SUFICIENTES
+    # --------------------------------------------------------
 
     if required_last_row > ws.max_row:
-
         old_max_row = ws.max_row
 
-        for row in range(
-            old_max_row + 1,
-            required_last_row + 1
-        ):
-
-            copiar_estilo_fila(
-                ws,
-                start_row,
-                row
-            )
+        for row in range(old_max_row + 1, required_last_row + 1):
+            copiar_estilo_fila(ws, start_row, row)
 
     # --------------------------------------------------------
-    # Escribir datos
+    # 8) ESCRIBIR DATOS
     # --------------------------------------------------------
 
-    for index, fecha in enumerate(
-        fechas,
-        start=start_row
-    ):
-
-        fecha_cell = obtener_celda_segura(
-            ws,
-            index,
-            1
-        )
+    for index, fecha in enumerate(fechas, start=start_row):
+        fecha_cell = obtener_celda_segura(ws, index, 1)
 
         if fecha_cell:
-
-            fecha_cell.value = datetime(
-                fecha.year,
-                fecha.month,
-                fecha.day
-            )
-
-            fecha_cell.number_format = (
-                "dd/mm/yyyy"
-            )
+            fecha_cell.value = datetime(fecha.year, fecha.month, fecha.day)
+            fecha_cell.number_format = "dd/mm/yyyy"
 
         total = 0.0
         cuentas_con_abono = 0
 
-        for clave, column in column_map.items():
+        # Primero dejar vacías todas las columnas de cuenta del día.
+        for col in range(2, total_column):
+            limpiar_celda_segura(ws, index, col)
 
+        # Después escribir solamente valores reales del archivo fuente.
+        for clave, column in column_map.items():
             banco, cuenta = clave
 
-            valor = data.get(
-                fecha,
-                {}
-            ).get(
-                banco,
-                {}
-            ).get(
-                cuenta,
-                0.0
-            )
+            valor = data.get(fecha, {}).get(banco, {}).get(cuenta, 0.0)
 
             if valor != 0:
-
-                escribir_celda_segura(
-                    ws,
-                    index,
-                    column,
-                    valor
-                )
-
+                escribir_celda_segura(ws, index, column, valor)
                 cuentas_con_abono += 1
-
                 total += valor
 
-            else:
+        escribir_celda_segura(ws, index, total_column, total)
+        escribir_celda_segura(ws, index, cuentas_abono_column, cuentas_con_abono)
 
-                limpiar_celda_segura(
-                    ws,
-                    index,
-                    column
+        # Forzar formato entero para CUENTAS CON ABONO.
+        count_cell = obtener_celda_segura(ws, index, cuentas_abono_column)
+        if count_cell:
+            count_cell.number_format = "0"
+
+
+# ============================================================
+# GRÁFICAS DINÁMICAS DEL TABLERO
+# ============================================================
+
+def ultima_fila_con_valor(worksheet, column, start_row):
+    """Devuelve la última fila con contenido real en una columna."""
+    last_row = start_row - 1
+
+    for row in range(start_row, worksheet.max_row + 1):
+        value = worksheet.cell(row=row, column=column).value
+        if value not in (None, ""):
+            last_row = row
+
+    return last_row
+
+
+def _obtener_formula_fuente(data_source):
+    """Lee la fórmula de origen de categorías/valores de una serie."""
+    if data_source is None:
+        return ""
+
+    for attr in ("strRef", "numRef", "multiLvlStrRef"):
+        ref = getattr(data_source, attr, None)
+        if ref is not None:
+            formula = getattr(ref, "f", None)
+            if formula:
+                return str(formula)
+
+    return ""
+
+
+def _actualizar_formula_fuente(data_source, formula):
+    """
+    Cambia el rango de una serie existente y elimina el cache viejo
+    del gráfico para obligar a Excel/Google Sheets a leer los datos nuevos.
+    """
+    if data_source is None:
+        return False
+
+    for attr in ("strRef", "numRef", "multiLvlStrRef"):
+        ref = getattr(data_source, attr, None)
+        if ref is None:
+            continue
+
+        ref.f = formula
+
+        # Muy importante: no conservar datos cacheados de la plantilla.
+        for cache_attr in (
+            "strCache",
+            "numCache",
+            "multiLvlStrCache"
+        ):
+            if hasattr(ref, cache_attr):
+                try:
+                    setattr(ref, cache_attr, None)
+                except Exception:
+                    pass
+
+        return True
+
+    return False
+
+
+def actualizar_graficas_dinamicas(
+    worksheet,
+    evolution_end,
+    cuenta_end,
+    cantidad_cuentas
+):
+    """
+    Adapta las dos gráficas de TABLERO CREDITOS a los datos reales.
+
+    - Evolución: A15:B<última fecha real>
+    - Créditos por cuenta: G15:H<última cuenta real>
+    - Elimina cache de la plantilla para evitar que aparezcan bancos viejos.
+    - Aumenta el ancho de la gráfica de cuentas cuando hay muchas cuentas.
+    """
+    charts = getattr(worksheet, "_charts", [])
+
+    if not charts:
+        return
+
+    sheet_ref = worksheet.title.replace("'", "''")
+
+    evolution_end = max(15, evolution_end)
+    cuenta_end = max(15, cuenta_end)
+    cantidad_cuentas = max(1, cantidad_cuentas)
+
+    evolution_cat = f"'{sheet_ref}'!$A$15:$A${evolution_end}"
+    evolution_val = f"'{sheet_ref}'!$B$15:$B${evolution_end}"
+
+    account_cat = f"'{sheet_ref}'!$G$15:$G${cuenta_end}"
+    account_val = f"'{sheet_ref}'!$H$15:$H${cuenta_end}"
+
+    evolution_updated = False
+    accounts_updated = False
+
+    for chart in charts:
+        series_list = getattr(chart, "series", [])
+
+        for series in series_list:
+            current_cat = _obtener_formula_fuente(
+                getattr(series, "cat", None)
+            )
+            current_val = _obtener_formula_fuente(
+                getattr(series, "val", None)
+            )
+
+            current = f"{current_cat} {current_val}".upper()
+
+            # Gráfica 1: Evolución del crédito seleccionado.
+            if "$A$15" in current or "$B$15" in current:
+                _actualizar_formula_fuente(
+                    getattr(series, "cat", None),
+                    evolution_cat
                 )
+                _actualizar_formula_fuente(
+                    getattr(series, "val", None),
+                    evolution_val
+                )
+                evolution_updated = True
 
-        escribir_celda_segura(
-            ws,
-            index,
-            total_column,
-            total
-        )
+            # Gráfica 2: Créditos por cuenta en el rango.
+            elif "$G$15" in current or "$H$15" in current:
+                _actualizar_formula_fuente(
+                    getattr(series, "cat", None),
+                    account_cat
+                )
+                _actualizar_formula_fuente(
+                    getattr(series, "val", None),
+                    account_val
+                )
+                accounts_updated = True
 
-        escribir_celda_segura(
-            ws,
-            index,
-            cuentas_abono_column,
-            cuentas_con_abono
-        )
+                # Con más cuentas, hacer la gráfica más ancha para que
+                # no desaparezcan o se amontonen las etiquetas.
+                try:
+                    if cantidad_cuentas <= 8:
+                        chart.width = 15.0
+                    else:
+                        chart.width = min(
+                            32.0,
+                            15.0 + ((cantidad_cuentas - 8) * 1.15)
+                        )
+
+                    chart.height = 8.0
+
+                    # Reducir el espacio entre columnas cuando hay muchas.
+                    if hasattr(chart, "gapWidth"):
+                        chart.gapWidth = max(
+                            35,
+                            int(150 * 8 / cantidad_cuentas)
+                        )
+                except Exception:
+                    pass
+
+    # Fallback por orden de la plantilla si alguna referencia original
+    # fue cambiada manualmente y no se pudo identificar por su rango.
+    if not evolution_updated and len(charts) >= 1:
+        try:
+            series = charts[0].series[0]
+            _actualizar_formula_fuente(series.cat, evolution_cat)
+            _actualizar_formula_fuente(series.val, evolution_val)
+        except Exception:
+            pass
+
+    if not accounts_updated and len(charts) >= 2:
+        try:
+            chart = charts[1]
+            series = chart.series[0]
+            _actualizar_formula_fuente(series.cat, account_cat)
+            _actualizar_formula_fuente(series.val, account_val)
+
+            if cantidad_cuentas <= 8:
+                chart.width = 15.0
+            else:
+                chart.width = min(
+                    32.0,
+                    15.0 + ((cantidad_cuentas - 8) * 1.15)
+                )
+        except Exception:
+            pass
+
+
+def forzar_recalculo_excel(workbook):
+    """Marca el libro para recalcular fórmulas y gráficos al abrirlo."""
+    try:
+        calculation = getattr(workbook, "calculation", None)
+        if calculation is not None:
+            calculation.calcMode = "auto"
+            calculation.fullCalcOnLoad = True
+            calculation.forceFullCalc = True
+    except Exception:
+        pass
 
 
 # ============================================================
@@ -1649,7 +1842,16 @@ def actualizar_tablero(
     count_letter = get_column_letter(count_col)
 
     report_start = 5
-    report_end = reporte.max_row
+    # No usar max_row porque la plantilla conserva filas con estilo aunque estén vacías.
+    # Tomamos únicamente hasta la última fecha realmente escrita.
+    report_end = ultima_fila_con_valor(
+        reporte,
+        1,
+        report_start
+    )
+    if report_end < report_start:
+        return
+
     tablero_start = 15
 
     for row in range(tablero_start, max(ws.max_row, tablero_start + 100) + 1):
@@ -1746,6 +1948,20 @@ def actualizar_tablero(
             )
             escribir_celda_segura(ws, index, 8, formula)
 
+    # --------------------------------------------------------
+    # ACTUALIZAR RANGOS DE LAS GRÁFICAS
+    # --------------------------------------------------------
+    # Evolución usa solo las fechas realmente existentes.
+    evolution_rows = max(1, report_end - report_start + 1)
+    evolution_end = tablero_start + evolution_rows - 1
+
+    actualizar_graficas_dinamicas(
+        ws,
+        evolution_end,
+        cuenta_end,
+        len(cuentas)
+    )
+
 
 # ============================================================
 # PROCESAR PLANTILLA COMPLETA
@@ -1794,6 +2010,9 @@ def insertar_en_plantilla(
             workbook,
             transactions
         )
+
+        # Recalcular fórmulas/gráficas al abrir el resultado.
+        forzar_recalculo_excel(workbook)
 
         workbook.save(
             output_path
