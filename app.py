@@ -80,7 +80,7 @@ DASHBOARD_CACHE = {
 
 
 # Versión del generador del dashboard descargable.
-DASHBOARD_ATTACHMENT_VERSION = "jinja-symbol-only-2.1"
+DASHBOARD_ATTACHMENT_VERSION = "jinja-symbol-only-2.2"
 
 
 # ============================================================
@@ -300,7 +300,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.0-dynamic-charts"
+PARSER_VERSION = "universal-3.1-dynamic-currency-excel"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -529,7 +529,7 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
         normal = clean_text(raw)
 
         # Códigos y nombres explícitos
-        if re.search(r"\bGTQ\b|\bQUETZAL(?:ES)?\b", normal, re.I):
+        if re.search(r"\bGTQ\b|\bQTZ\b|\bQUETZAL(?:ES)?\b", normal, re.I):
             scores["GTQ"] += 100 * peso
 
         if re.search(r"\bUSD\b|\bD[OÓ]LAR(?:ES)?\b|\bDOLLAR(?:S)?\b", raw, re.I):
@@ -576,7 +576,7 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
             fmt = str(cell.number_format or "")
             fmt_up = fmt.upper()
 
-            if "GTQ" in fmt_up or re.search(r'(^|[^A-Z])Q([^A-Z]|$)', fmt_up):
+            if "GTQ" in fmt_up or "QTZ" in fmt_up or re.search(r'(^|[^A-Z])Q([^A-Z]|$)', fmt_up):
                 scores["GTQ"] += 10
 
             if "USD" in fmt_up or "US$" in fmt_up:
@@ -599,6 +599,517 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
         return "N/D"
 
     return ranking[0][0]
+
+
+
+def normalizar_codigo_moneda(moneda):
+    """
+    Normaliza códigos de moneda únicamente para formato visual.
+    No convierte valores ni modifica cálculos.
+    """
+    texto = str(moneda or "").strip().upper()
+
+    aliases = {
+        "GTQ": "GTQ",
+        "QTZ": "GTQ",
+        "Q": "GTQ",
+        "QUETZAL": "GTQ",
+        "QUETZALES": "GTQ",
+        "USD": "USD",
+        "US$": "USD",
+        "$": "USD",
+        "DOLAR": "USD",
+        "DÓLAR": "USD",
+        "DOLARES": "USD",
+        "DÓLARES": "USD",
+        "EUR": "EUR",
+        "EURO": "EUR",
+        "EUROS": "EUR",
+        "SVC": "SVC",
+        "COLON": "SVC",
+        "COLÓN": "SVC",
+        "COLONES": "SVC",
+    }
+
+    return aliases.get(texto, texto if texto in {"GTQ", "USD", "EUR", "SVC"} else "N/D")
+
+
+def formato_moneda_excel(moneda):
+    """
+    Devuelve el formato numérico de Excel según la moneda detectada.
+    Se cambia únicamente la presentación, nunca el valor.
+    """
+    codigo = normalizar_codigo_moneda(moneda)
+
+    formatos = {
+        "GTQ": '"Q" #,##0.00;[Red]-"Q" #,##0.00',
+        "USD": '"$" #,##0.00;[Red]-"$" #,##0.00',
+        "EUR": '"€" #,##0.00;[Red]-"€" #,##0.00',
+        "SVC": '"₡" #,##0.00;[Red]-"₡" #,##0.00',
+    }
+
+    return formatos.get(
+        codigo,
+        '#,##0.00;[Red]-#,##0.00'
+    )
+
+
+def moneda_unica_transacciones(transactions):
+    """
+    Devuelve una moneda solo cuando todas las transacciones identificadas
+    corresponden a la misma moneda.
+
+    Si hubiera varias monedas, devuelve MULTI para no colocar un símbolo
+    incorrecto en totales consolidados.
+    """
+    monedas = {
+        normalizar_codigo_moneda(
+            transaction.get("moneda")
+        )
+        for transaction in transactions
+        if normalizar_codigo_moneda(
+            transaction.get("moneda")
+        ) != "N/D"
+    }
+
+    if len(monedas) == 1:
+        return next(iter(monedas))
+
+    if len(monedas) > 1:
+        return "MULTI"
+
+    return "N/D"
+
+
+def aplicar_formato_moneda_excel(
+    workbook,
+    transactions
+):
+    """
+    Aplica el símbolo de moneda al Excel FINAL.
+
+    IMPORTANTE:
+    - NO cambia importes.
+    - NO convierte monedas.
+    - NO cambia fórmulas.
+    - NO cambia sumas.
+    - Solo modifica number_format de celdas monetarias.
+    """
+
+    if not transactions:
+        return
+
+    moneda_general = moneda_unica_transacciones(
+        transactions
+    )
+
+    formato_general = formato_moneda_excel(
+        moneda_general
+    )
+
+    # --------------------------------------------------------
+    # MAPAS DE MONEDA POR CUENTA
+    # --------------------------------------------------------
+
+    moneda_por_cuenta_original = {}
+    moneda_por_cuenta_corta = {}
+
+    for transaction in transactions:
+
+        moneda = normalizar_codigo_moneda(
+            transaction.get("moneda")
+        )
+
+        banco_original = str(
+            transaction.get("banco", "")
+        ).strip()
+
+        banco_resumido = banco_corto(
+            banco_original
+        )
+
+        cuenta = str(
+            transaction.get("cuenta", "")
+        ).strip()
+
+        clave_original = (
+            banco_original,
+            cuenta
+        )
+
+        clave_corta = (
+            banco_resumido,
+            cuenta
+        )
+
+        if moneda != "N/D":
+            moneda_por_cuenta_original[
+                clave_original
+            ] = moneda
+
+            moneda_por_cuenta_corta[
+                clave_corta
+            ] = moneda
+
+    # --------------------------------------------------------
+    # 1) ESTADOS CONSOLIDADOS
+    #    Débito, Crédito, Saldo
+    # --------------------------------------------------------
+
+    if SHEET_ESTADOS in workbook.sheetnames:
+
+        ws = workbook[
+            SHEET_ESTADOS
+        ]
+
+        for row_number, transaction in enumerate(
+            transactions,
+            start=2
+        ):
+
+            formato = formato_moneda_excel(
+                transaction.get(
+                    "moneda"
+                )
+            )
+
+            for column in (
+                6,
+                7,
+                8
+            ):
+
+                cell = obtener_celda_segura(
+                    ws,
+                    row_number,
+                    column
+                )
+
+                if cell:
+                    cell.number_format = formato
+
+    # --------------------------------------------------------
+    # 2) SALDOS POR CUENTA
+    #    Saldo inicial y saldo final
+    # --------------------------------------------------------
+
+    if SHEET_SALDOS in workbook.sheetnames:
+
+        ws = workbook[
+            SHEET_SALDOS
+        ]
+
+        cuentas = {}
+
+        for transaction in transactions:
+
+            clave = (
+                transaction["banco"],
+                transaction["cuenta"]
+            )
+
+            cuentas.setdefault(
+                clave,
+                []
+            ).append(
+                transaction
+            )
+
+        row_number = 5
+
+        for (
+            banco,
+            cuenta
+        ), movimientos in cuentas.items():
+
+            moneda = moneda_por_cuenta_original.get(
+                (
+                    str(banco).strip(),
+                    str(cuenta).strip()
+                ),
+                "N/D"
+            )
+
+            formato = formato_moneda_excel(
+                moneda
+            )
+
+            for column in (
+                3,
+                4
+            ):
+
+                cell = obtener_celda_segura(
+                    ws,
+                    row_number,
+                    column
+                )
+
+                if cell:
+                    cell.number_format = formato
+
+            row_number += 1
+
+    # --------------------------------------------------------
+    # 3) REPORTE CRÉDITOS DIARIOS
+    #    Cada cuenta conserva la moneda de su banco.
+    # --------------------------------------------------------
+
+    if SHEET_REPORTE in workbook.sheetnames:
+
+        ws = workbook[
+            SHEET_REPORTE
+        ]
+
+        cuentas = sorted(
+            {
+                (
+                    banco_corto(
+                        transaction["banco"]
+                    ),
+                    str(
+                        transaction["cuenta"]
+                    )
+                )
+                for transaction in transactions
+            },
+            key=lambda item: (
+                item[0],
+                item[1]
+            )
+        )
+
+        # Fechas realmente procesadas.
+        fechas = {
+            (
+                transaction["fecha"].date()
+                if isinstance(
+                    transaction.get("fecha"),
+                    datetime
+                )
+                else transaction.get("fecha")
+            )
+            for transaction in transactions
+            if isinstance(
+                transaction.get("fecha"),
+                (datetime, date)
+            )
+        }
+
+        last_data_row = (
+            4 + len(fechas)
+            if fechas
+            else 4
+        )
+
+        # Las cuentas reales siempre empiezan desde la columna B
+        # en el mismo orden usado al crear el reporte.
+        for offset, (
+            banco,
+            cuenta
+        ) in enumerate(
+            cuentas
+        ):
+
+            column = 2 + offset
+
+            moneda = moneda_por_cuenta_corta.get(
+                (
+                    banco,
+                    cuenta
+                ),
+                "N/D"
+            )
+
+            formato = formato_moneda_excel(
+                moneda
+            )
+
+            for row in range(
+                5,
+                last_data_row + 1
+            ):
+
+                cell = obtener_celda_segura(
+                    ws,
+                    row,
+                    column
+                )
+
+                if cell:
+                    cell.number_format = formato
+
+        # Detectar columnas de TOTAL y CUENTAS CON ABONO.
+        total_col = None
+        count_col = None
+
+        for col in range(
+            2,
+            ws.max_column + 1
+        ):
+
+            header = clean_text(
+                ws.cell(
+                    row=4,
+                    column=col
+                ).value
+            )
+
+            if (
+                total_col is None
+                and "total" in header
+                and (
+                    "credito" in header
+                    or "credit" in header
+                )
+            ):
+                total_col = col
+
+            if (
+                count_col is None
+                and "cuentas" in header
+                and "abono" in header
+            ):
+                count_col = col
+
+        # El TOTAL recibe símbolo solo si existe una moneda única.
+        if total_col is not None:
+
+            for row in range(
+                5,
+                last_data_row + 1
+            ):
+
+                cell = obtener_celda_segura(
+                    ws,
+                    row,
+                    total_col
+                )
+
+                if cell:
+                    cell.number_format = formato_general
+
+        # La cantidad de cuentas nunca lleva moneda.
+        if count_col is not None:
+
+            for row in range(
+                5,
+                last_data_row + 1
+            ):
+
+                cell = obtener_celda_segura(
+                    ws,
+                    row,
+                    count_col
+                )
+
+                if cell:
+                    cell.number_format = "0"
+
+    # --------------------------------------------------------
+    # 4) TABLERO CRÉDITOS
+    # --------------------------------------------------------
+
+    if SHEET_TABLERO in workbook.sheetnames:
+
+        ws = workbook[
+            SHEET_TABLERO
+        ]
+
+        # Evolución: Crédito y Variación.
+        # Si todo el archivo corresponde a una moneda, se usa su símbolo.
+        for row in range(
+            15,
+            ws.max_row + 1
+        ):
+
+            for column in (
+                2,
+                3
+            ):
+
+                cell = obtener_celda_segura(
+                    ws,
+                    row,
+                    column
+                )
+
+                if cell:
+                    cell.number_format = formato_general
+
+        # Créditos por cuenta: columna H.
+        cuentas = sorted(
+            {
+                (
+                    banco_corto(
+                        transaction["banco"]
+                    ),
+                    str(
+                        transaction["cuenta"]
+                    )
+                )
+                for transaction in transactions
+            },
+            key=lambda item: (
+                item[0],
+                item[1]
+            )
+        )
+
+        for index, (
+            banco,
+            cuenta
+        ) in enumerate(
+            cuentas,
+            start=15
+        ):
+
+            moneda = moneda_por_cuenta_corta.get(
+                (
+                    banco,
+                    cuenta
+                ),
+                "N/D"
+            )
+
+            cell = obtener_celda_segura(
+                ws,
+                index,
+                8
+            )
+
+            if cell:
+                cell.number_format = formato_moneda_excel(
+                    moneda
+                )
+
+        # Los ejes monetarios de las gráficas también se adaptan
+        # cuando el libro utiliza una única moneda.
+        charts = getattr(
+            ws,
+            "_charts",
+            []
+        )
+
+        if moneda_general not in (
+            "N/D",
+            "MULTI"
+        ):
+
+            chart_format = formato_moneda_excel(
+                moneda_general
+            )
+
+            for chart in charts:
+
+                try:
+                    if hasattr(
+                        chart,
+                        "y_axis"
+                    ):
+                        chart.y_axis.numFmt = chart_format
+                except Exception:
+                    pass
 
 
 def _parse_text_date(text, expected_month=None, expected_year=None):
@@ -2273,6 +2784,14 @@ def insertar_en_plantilla(
 
         # 4
         actualizar_tablero(
+            workbook,
+            transactions
+        )
+
+        # 5
+        # Adaptar únicamente los símbolos/formato de moneda
+        # según lo detectado en los archivos bancarios.
+        aplicar_formato_moneda_excel(
             workbook,
             transactions
         )
