@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file, after_this_request
+from flask import render_template
 from openpyxl import load_workbook
 from openpyxl.formula.translate import Translator
 from openpyxl.utils import get_column_letter
@@ -10,6 +11,7 @@ import os
 import tempfile
 import unicodedata
 import re
+import json
 
 app = Flask(__name__)
 
@@ -39,6 +41,44 @@ SHEET_TABLERO = "TABLERO CREDITOS"
 
 
 # ============================================================
+# CONFIGURACIÓN DASHBOARD HTML
+# ============================================================
+
+DASHBOARD_TEMPLATE = os.path.join(
+    TEMPLATES_DIR,
+    "dashboard",
+    "index.html"
+)
+
+DASHBOARD_DATA_DIR = os.path.join(
+    BASE_DIR,
+    "data"
+)
+
+DASHBOARD_DATA_FILE = os.path.join(
+    DASHBOARD_DATA_DIR,
+    "dashboard_data.json"
+)
+
+os.makedirs(
+    DASHBOARD_DATA_DIR,
+    exist_ok=True
+)
+
+DASHBOARD_CACHE = {
+    "archivo": "",
+    "fecha_proceso": "",
+    "periodo": "",
+    "saldo_total": 0,
+    "total_creditos": 0,
+    "total_debitos": 0,
+    "cantidad_movimientos": 0,
+    "cantidad_bancos": 0,
+    "bancos": []
+}
+
+
+# ============================================================
 # INICIO
 # ============================================================
 
@@ -51,6 +91,57 @@ def home():
         "template_exists": os.path.exists(TEMPLATE_FILE),
         "endpoint": "/process-excel"
     })
+
+
+
+# ============================================================
+# DASHBOARD HTML
+# ============================================================
+
+@app.route(
+    "/dashboard",
+    methods=["GET"],
+    strict_slashes=False
+)
+def dashboard():
+
+    if not os.path.exists(
+        DASHBOARD_TEMPLATE
+    ):
+
+        return jsonify({
+            "success": False,
+            "error": "No existe index.html del dashboard",
+            "path": DASHBOARD_TEMPLATE
+        }), 404
+
+    return render_template(
+        "dashboard/index.html"
+    )
+
+
+@app.route(
+    "/data.json",
+    methods=["GET"]
+)
+@app.route(
+    "/dashboard/data.json",
+    methods=["GET"]
+)
+def dashboard_data_endpoint():
+
+    response = jsonify(
+        cargar_dashboard_data()
+    )
+
+    response.headers[
+        "Cache-Control"
+    ] = (
+        "no-store, no-cache, "
+        "must-revalidate, max-age=0"
+    )
+
+    return response
 
 
 # ============================================================
@@ -2024,6 +2115,335 @@ def insertar_en_plantilla(
 
 
 # ============================================================
+# DATOS PARA DASHBOARD HTML
+# ============================================================
+
+def fecha_dashboard(value):
+
+    if isinstance(
+        value,
+        datetime
+    ):
+
+        return value.strftime(
+            "%d/%m/%Y"
+        )
+
+    if isinstance(
+        value,
+        date
+    ):
+
+        return value.strftime(
+            "%d/%m/%Y"
+        )
+
+    return str(
+        value or ""
+    )
+
+
+def construir_dashboard_data(
+    transactions,
+    nombre_archivo=""
+):
+    """
+    Convierte las transacciones normalizadas del parser
+    en la estructura JSON utilizada por index.html.
+    """
+
+    bancos = {}
+    saldos_por_cuenta = {}
+    fechas = []
+
+    total_creditos = 0.0
+    total_debitos = 0.0
+
+    for transaction in transactions:
+
+        banco = str(
+            transaction.get(
+                "banco",
+                "BANCO NO IDENTIFICADO"
+            )
+        ).strip()
+
+        cuenta = str(
+            transaction.get(
+                "cuenta",
+                "N/D"
+            )
+        ).strip()
+
+        fecha = transaction.get(
+            "fecha"
+        )
+
+        if isinstance(
+            fecha,
+            (datetime, date)
+        ):
+
+            fechas.append(
+                fecha
+            )
+
+        credito = float(
+            transaction.get(
+                "credito",
+                0
+            ) or 0
+        )
+
+        debito = float(
+            transaction.get(
+                "debito",
+                0
+            ) or 0
+        )
+
+        total_creditos += abs(
+            credito
+        )
+
+        total_debitos += abs(
+            debito
+        )
+
+        if banco not in bancos:
+
+            bancos[banco] = {
+                "nombre": banco,
+                "saldo": 0.0,
+                "creditos": 0.0,
+                "debitos": 0.0,
+                "cantidad_movimientos": 0,
+                "movimientos": []
+            }
+
+        bancos[banco][
+            "creditos"
+        ] += abs(
+            credito
+        )
+
+        bancos[banco][
+            "debitos"
+        ] += abs(
+            debito
+        )
+
+        bancos[banco][
+            "cantidad_movimientos"
+        ] += 1
+
+        saldo_movimiento = None
+
+        if transaction.get(
+            "_tiene_saldo"
+        ):
+
+            saldo_movimiento = float(
+                transaction.get(
+                    "saldo",
+                    0
+                ) or 0
+            )
+
+        bancos[banco][
+            "movimientos"
+        ].append({
+            "fecha": fecha_dashboard(
+                fecha
+            ),
+            "cuenta": cuenta,
+            "referencia": str(
+                transaction.get(
+                    "referencia",
+                    ""
+                ) or ""
+            ),
+            "descripcion": str(
+                transaction.get(
+                    "descripcion",
+                    ""
+                ) or ""
+            ),
+            "debito": abs(
+                debito
+            ),
+            "credito": abs(
+                credito
+            ),
+            "saldo": saldo_movimiento
+        })
+
+        if transaction.get(
+            "_tiene_saldo"
+        ):
+
+            saldos_por_cuenta[
+                (
+                    banco,
+                    cuenta
+                )
+            ] = float(
+                transaction.get(
+                    "saldo",
+                    0
+                ) or 0
+            )
+
+    for (
+        banco,
+        cuenta
+    ), saldo in saldos_por_cuenta.items():
+
+        if banco in bancos:
+
+            bancos[banco][
+                "saldo"
+            ] += saldo
+
+    lista_bancos = list(
+        bancos.values()
+    )
+
+    lista_bancos.sort(
+        key=lambda item: item[
+            "nombre"
+        ]
+    )
+
+    saldo_total = sum(
+        banco["saldo"]
+        for banco in lista_bancos
+    )
+
+    periodo = ""
+
+    if fechas:
+
+        fechas_ordenadas = sorted(
+            fechas
+        )
+
+        fecha_inicio = fechas_ordenadas[
+            0
+        ]
+
+        fecha_final = fechas_ordenadas[
+            -1
+        ]
+
+        periodo = (
+            fecha_dashboard(
+                fecha_inicio
+            )
+            + " - "
+            + fecha_dashboard(
+                fecha_final
+            )
+        )
+
+    return {
+        "archivo": nombre_archivo,
+        "fecha_proceso": datetime.now().strftime(
+            "%d/%m/%Y %H:%M"
+        ),
+        "periodo": periodo,
+        "saldo_total": round(
+            saldo_total,
+            2
+        ),
+        "total_creditos": round(
+            total_creditos,
+            2
+        ),
+        "total_debitos": round(
+            total_debitos,
+            2
+        ),
+        "cantidad_movimientos": len(
+            transactions
+        ),
+        "cantidad_bancos": len(
+            lista_bancos
+        ),
+        "bancos": lista_bancos
+    }
+
+
+def guardar_dashboard_data(
+    data
+):
+
+    global DASHBOARD_CACHE
+
+    DASHBOARD_CACHE = data
+
+    try:
+
+        temporal = (
+            DASHBOARD_DATA_FILE
+            + ".tmp"
+        )
+
+        with open(
+            temporal,
+            "w",
+            encoding="utf-8"
+        ) as archivo:
+
+            json.dump(
+                data,
+                archivo,
+                ensure_ascii=False,
+                indent=2
+            )
+
+        os.replace(
+            temporal,
+            DASHBOARD_DATA_FILE
+        )
+
+    except Exception as error:
+
+        print(
+            "No se pudo guardar dashboard_data.json:",
+            str(error)
+        )
+
+
+def cargar_dashboard_data():
+
+    try:
+
+        if os.path.exists(
+            DASHBOARD_DATA_FILE
+        ):
+
+            with open(
+                DASHBOARD_DATA_FILE,
+                "r",
+                encoding="utf-8"
+            ) as archivo:
+
+                return json.load(
+                    archivo
+                )
+
+    except Exception as error:
+
+        print(
+            "Error leyendo dashboard_data.json:",
+            str(error)
+        )
+
+    return DASHBOARD_CACHE
+
+
+# ============================================================
 # PROCESAR EXCEL
 # ============================================================
 
@@ -2174,6 +2594,20 @@ def process_excel():
             output_path
         )
 
+
+        # ====================================================
+        # ACTUALIZAR DASHBOARD HTML
+        # ====================================================
+
+        dashboard_payload = construir_dashboard_data(
+            all_transactions,
+            file.filename
+        )
+
+        guardar_dashboard_data(
+            dashboard_payload
+        )
+
         # ====================================================
         # ELIMINAR INPUT
         # ====================================================
@@ -2240,6 +2674,29 @@ def process_excel():
             f"{item.get('name')}={item.get('transactions', 0)}"
             for item in processed_sheets
         )[:1500]
+
+        response.headers[
+            "X-Dashboard-URL"
+        ] = (
+            request.host_url.rstrip("/")
+            + "/dashboard"
+        )
+
+        response.headers[
+            "X-Dashboard-Banks"
+        ] = str(
+            dashboard_payload[
+                "cantidad_bancos"
+            ]
+        )
+
+        response.headers[
+            "X-Dashboard-Balance"
+        ] = str(
+            dashboard_payload[
+                "saldo_total"
+            ]
+        )
         return response
 
     except Exception as e:

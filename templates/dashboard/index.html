@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard Bancario</title>
+<style>
+:root{
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#17212b;
+  --muted:#667085;
+  --line:#e4e7ec;
+  --dark:#101828;
+  --dark2:#25364a;
+  --accent:#175cd3;
+  --success:#067647;
+  --danger:#b42318;
+  --warning:#b54708;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+header{
+  background:linear-gradient(120deg,var(--dark),var(--dark2));
+  color:#fff;
+  padding:28px;
+}
+.header-inner{
+  max-width:1450px;
+  margin:auto;
+  display:flex;
+  justify-content:space-between;
+  gap:20px;
+  align-items:center;
+}
+h1{margin:0;font-size:28px}
+.subtitle{margin:7px 0 0;color:#d0d5dd;font-size:13px}
+.badge{
+  padding:9px 13px;
+  border-radius:9px;
+  border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.1);
+  font-size:12px;
+}
+main{
+  max-width:1450px;
+  margin:22px auto;
+  padding:0 20px 40px;
+}
+.status{
+  display:none;
+  padding:12px 14px;
+  margin-bottom:16px;
+  border-radius:10px;
+  font-size:13px;
+}
+.status.error{
+  display:block;
+  background:#fef3f2;
+  color:var(--danger);
+  border:1px solid #fecdca;
+}
+.status.ok{
+  display:block;
+  background:#ecfdf3;
+  color:var(--success);
+  border:1px solid #abefc6;
+}
+.kpis{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:14px;
+}
+.kpi{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:17px;
+  box-shadow:0 4px 16px rgba(16,24,40,.05);
+}
+.kpi-label{
+  font-size:11px;
+  color:var(--muted);
+  text-transform:uppercase;
+  letter-spacing:.45px;
+}
+.kpi-value{
+  font-size:22px;
+  font-weight:800;
+  margin-top:8px;
+}
+.kpi-note{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:5px;
+}
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-top:16px;
+}
+.panel{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:18px;
+  box-shadow:0 4px 16px rgba(16,24,40,.05);
+}
+.panel h2{margin:0;font-size:17px}
+.panel-sub{font-size:12px;color:var(--muted);margin:5px 0 14px}
+.bank-bars{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.bank-row{
+  display:grid;
+  grid-template-columns:minmax(140px,1.3fr) 3fr minmax(100px,1fr);
+  gap:12px;
+  align-items:center;
+}
+.bank-name{
+  font-size:12px;
+  font-weight:700;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.track{
+  height:12px;
+  background:#eef2f6;
+  border-radius:99px;
+  overflow:hidden;
+}
+.fill{
+  height:100%;
+  border-radius:99px;
+}
+.bank-value{
+  text-align:right;
+  font-size:12px;
+  font-weight:800;
+}
+.summary-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+}
+.summary-table th,.summary-table td{
+  padding:9px 8px;
+  border-bottom:1px solid #edf0f3;
+  text-align:left;
+}
+.summary-table th{
+  background:#f8fafc;
+  color:#475467;
+  font-size:11px;
+}
+.num{
+  text-align:right!important;
+  font-variant-numeric:tabular-nums;
+}
+.section{
+  margin-top:16px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:14px;
+  box-shadow:0 4px 16px rgba(16,24,40,.05);
+  overflow:hidden;
+}
+.section-head{
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.section-head h2{margin:0;font-size:17px}
+.section-head p{margin:5px 0 0;font-size:12px;color:var(--muted)}
+.tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  padding:10px 12px 0;
+  border-bottom:1px solid var(--line);
+}
+.tab{
+  border:0;
+  background:transparent;
+  padding:10px 12px;
+  cursor:pointer;
+  font-weight:700;
+  color:#667085;
+  border-bottom:3px solid transparent;
+}
+.tab.active{
+  color:#101828;
+  border-bottom-color:#101828;
+}
+.tab-panel{
+  display:none;
+  padding:14px;
+}
+.tab-panel.active{display:block}
+.toolbar{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:10px;
+}
+.search{
+  padding:9px 11px;
+  border:1px solid #d0d5dd;
+  border-radius:8px;
+  min-width:260px;
+  flex:1;
+  max-width:430px;
+}
+.btn{
+  border:1px solid #d0d5dd;
+  background:#fff;
+  border-radius:8px;
+  padding:9px 11px;
+  cursor:pointer;
+  font-weight:700;
+  font-size:12px;
+}
+.table-wrap{
+  overflow:auto;
+  max-height:520px;
+  border:1px solid var(--line);
+  border-radius:9px;
+}
+.detail-table{
+  border-collapse:collapse;
+  width:100%;
+  min-width:850px;
+  font-size:11px;
+}
+.detail-table th,.detail-table td{
+  padding:7px 8px;
+  border-bottom:1px solid #edf0f3;
+  border-right:1px solid #f2f4f7;
+  white-space:nowrap;
+  text-align:left;
+}
+.detail-table th{
+  position:sticky;
+  top:0;
+  background:#eef2f7;
+  z-index:2;
+}
+.detail-table tr:nth-child(even) td{background:#fafbfc}
+.meta{
+  margin-top:16px;
+  text-align:center;
+  color:var(--muted);
+  font-size:11px;
+}
+@media(max-width:1100px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .grid{grid-template-columns:1fr}
+}
+@media(max-width:650px){
+  .header-inner{flex-direction:column;align-items:flex-start}
+  .kpis{grid-template-columns:1fr}
+  .bank-row{grid-template-columns:1fr}
+  .bank-value{text-align:left}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div>
+      <h1>Dashboard Bancario</h1>
+      <p class="subtitle">Consolidado automático de saldos y movimientos bancarios.</p>
+    </div>
+    <div class="badge" id="periodBadge">Sin datos</div>
+  </div>
+</header>
+
+<main>
+  <div id="status" class="status"></div>
+
+  <section class="kpis">
+    <div class="kpi">
+      <div class="kpi-label">Saldo consolidado</div>
+      <div class="kpi-value" id="kpiSaldo">—</div>
+      <div class="kpi-note">Suma de saldos finales</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Créditos / ingresos</div>
+      <div class="kpi-value" id="kpiCreditos">—</div>
+      <div class="kpi-note">Total de abonos</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Débitos / egresos</div>
+      <div class="kpi-value" id="kpiDebitos">—</div>
+      <div class="kpi-note">Total de cargos</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Movimientos</div>
+      <div class="kpi-value" id="kpiMovimientos">—</div>
+      <div class="kpi-note">Registros procesados</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Bancos</div>
+      <div class="kpi-value" id="kpiBancos">—</div>
+      <div class="kpi-note">Entidades detectadas</div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Saldo por banco</h2>
+      <div class="panel-sub">Comparación de los saldos finales reportados.</div>
+      <div id="bankBars" class="bank-bars"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Resumen por banco</h2>
+      <div class="panel-sub">Créditos, débitos, movimientos y saldo.</div>
+      <div class="table-wrap" style="max-height:350px">
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Banco</th>
+              <th>Mov.</th>
+              <th>Créditos</th>
+              <th>Débitos</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody id="summaryBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>Detalle de movimientos</h2>
+      <p>Selecciona un banco para consultar su detalle.</p>
+    </div>
+    <div id="tabs" class="tabs"></div>
+    <div id="tabPanels"></div>
+  </section>
+
+  <div class="meta" id="metaInfo"></div>
+</main>
+
+<script>
+const palette = [
+  '#175cd3','#067647','#b54708','#7f56d9','#c11574',
+  '#026aa2','#b42318','#344054','#039855','#93370d'
+];
+
+function money(v){
+  const n = Number(v || 0);
+  return new Intl.NumberFormat('en-US',{
+    style:'currency',
+    currency:'USD',
+    maximumFractionDigits:2
+  }).format(n);
+}
+
+function number(v){
+  return new Intl.NumberFormat('en-US').format(Number(v || 0));
+}
+
+function escapeHtml(v){
+  return String(v ?? '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+  }[ch]));
+}
+
+function showStatus(message, type='ok'){
+  const el = document.getElementById('status');
+  el.className = 'status ' + type;
+  el.textContent = message;
+}
+
+function renderDashboard(data){
+  const bancos = Array.isArray(data.bancos) ? data.bancos : [];
+
+  const saldoTotal = data.saldo_total ??
+    bancos.reduce((a,b)=>a+Number(b.saldo || 0),0);
+
+  const creditosTotal = data.total_creditos ??
+    bancos.reduce((a,b)=>a+Number(b.creditos || 0),0);
+
+  const debitosTotal = data.total_debitos ??
+    bancos.reduce((a,b)=>a+Number(b.debitos || 0),0);
+
+  const movimientosTotal = data.cantidad_movimientos ??
+    bancos.reduce((a,b)=>a+(Array.isArray(b.movimientos) ? b.movimientos.length : Number(b.cantidad_movimientos || 0)),0);
+
+  document.getElementById('kpiSaldo').textContent = money(saldoTotal);
+  document.getElementById('kpiCreditos').textContent = money(creditosTotal);
+  document.getElementById('kpiDebitos').textContent = money(debitosTotal);
+  document.getElementById('kpiMovimientos').textContent = number(movimientosTotal);
+  document.getElementById('kpiBancos').textContent = bancos.length;
+
+  document.getElementById('periodBadge').textContent =
+    data.periodo || data.fecha_proceso || 'Actualizado';
+
+  document.getElementById('metaInfo').textContent =
+    `${data.archivo || 'Archivo bancario'}${data.fecha_proceso ? ' · Procesado: ' + data.fecha_proceso : ''}`;
+
+  const maxBalance = Math.max(...bancos.map(b=>Math.abs(Number(b.saldo || 0))),1);
+  const bankBars = document.getElementById('bankBars');
+  bankBars.innerHTML = '';
+
+  bancos.forEach((b,i)=>{
+    const saldo = Number(b.saldo || 0);
+    const pct = Math.abs(saldo)/maxBalance*100;
+
+    bankBars.insertAdjacentHTML('beforeend', `
+      <div class="bank-row">
+        <div class="bank-name" title="${escapeHtml(b.nombre)}">${escapeHtml(b.nombre)}</div>
+        <div class="track">
+          <div class="fill" style="width:${pct.toFixed(2)}%;background:${palette[i%palette.length]}"></div>
+        </div>
+        <div class="bank-value">${money(saldo)}</div>
+      </div>
+    `);
+  });
+
+  const summaryBody = document.getElementById('summaryBody');
+  summaryBody.innerHTML = bancos.map(b=>{
+    const movs = Array.isArray(b.movimientos)
+      ? b.movimientos.length
+      : Number(b.cantidad_movimientos || 0);
+
+    return `
+      <tr>
+        <td>${escapeHtml(b.nombre)}</td>
+        <td class="num">${number(movs)}</td>
+        <td class="num">${money(b.creditos || 0)}</td>
+        <td class="num">${money(b.debitos || 0)}</td>
+        <td class="num">${money(b.saldo || 0)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const tabs = document.getElementById('tabs');
+  const panels = document.getElementById('tabPanels');
+
+  tabs.innerHTML = '';
+  panels.innerHTML = '';
+
+  bancos.forEach((b,i)=>{
+    tabs.insertAdjacentHTML('beforeend', `
+      <button class="tab ${i===0?'active':''}" data-target="panel-${i}">
+        ${escapeHtml(b.nombre)}
+      </button>
+    `);
+
+    const movimientos = Array.isArray(b.movimientos) ? b.movimientos : [];
+
+    const rows = movimientos.map(m=>`
+      <tr>
+        <td>${escapeHtml(m.fecha || '')}</td>
+        <td>${escapeHtml(m.referencia || '')}</td>
+        <td>${escapeHtml(m.descripcion || '')}</td>
+        <td class="num">${Number(m.debito || 0) ? money(m.debito) : ''}</td>
+        <td class="num">${Number(m.credito || 0) ? money(m.credito) : ''}</td>
+        <td class="num">${m.saldo !== null && m.saldo !== undefined && m.saldo !== '' ? money(m.saldo) : ''}</td>
+      </tr>
+    `).join('');
+
+    panels.insertAdjacentHTML('beforeend', `
+      <div class="tab-panel ${i===0?'active':''}" id="panel-${i}">
+        <div class="toolbar">
+          <input class="search" placeholder="Buscar..." data-table="table-${i}">
+          <button class="btn" onclick="downloadCSV('table-${i}','${escapeHtml(b.nombre).replace(/'/g,"\\'")}')">
+            Exportar CSV
+          </button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="detail-table" id="table-${i}">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Referencia</th>
+                <th>Descripción</th>
+                <th>Débito</th>
+                <th>Crédito</th>
+                <th>Saldo</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    `);
+  });
+
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.target).classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.search').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      const q = inp.value.toLowerCase();
+      document.querySelectorAll(`#${inp.dataset.table} tbody tr`).forEach(tr=>{
+        tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  });
+
+  showStatus(`Dashboard actualizado correctamente con ${bancos.length} banco(s).`,'ok');
+}
+
+async function loadData(){
+  try{
+    const response = await fetch('./data.json?ts=' + Date.now(), {cache:'no-store'});
+    if(!response.ok) throw new Error('No se pudo leer data.json');
+    const data = await response.json();
+    renderDashboard(data);
+  }catch(error){
+    console.error(error);
+    showStatus(
+      'No se pudo cargar data.json. Verifica que exista en el repositorio y que el sitio esté publicado por HTTP/HTTPS.',
+      'error'
+    );
+  }
+}
+
+function downloadCSV(tableId, bankName){
+  const table = document.getElementById(tableId);
+  const rows = [...table.querySelectorAll('tr')].filter(r=>r.style.display!=='none');
+
+  const csv = rows.map(row =>
+    [...row.querySelectorAll('th,td')]
+      .map(cell => `"${cell.innerText.replace(/"/g,'""')}"`)
+      .join(',')
+  ).join('\n');
+
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = bankName.replace(/[^\wáéíóúñÁÉÍÓÚÑ-]+/g,'_') + '_movimientos.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+loadData();
+</script>
+</body>
+</html>
