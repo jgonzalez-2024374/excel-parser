@@ -80,7 +80,7 @@ DASHBOARD_CACHE = {
 
 
 # Versión del generador del dashboard descargable.
-DASHBOARD_ATTACHMENT_VERSION = "jinja-embedded-2.0"
+DASHBOARD_ATTACHMENT_VERSION = "jinja-currency-3.0"
 
 
 # ============================================================
@@ -504,6 +504,147 @@ def valor_o_nd(value):
 def clean_number(value):
     parsed = parse_number(value)
     return parsed if parsed is not None else 0.0
+
+
+def normalizar_moneda(value):
+    """Normaliza nombres/códigos de moneda para el dashboard."""
+    text = clean_text(value).upper().strip()
+
+    aliases = {
+        "GTQ": "GTQ",
+        "Q": "GTQ",
+        "QUETZAL": "GTQ",
+        "QUETZALES": "GTQ",
+        "USD": "USD",
+        "US$": "USD",
+        "$": "USD",
+        "DOLAR": "USD",
+        "DOLARES": "USD",
+        "DOLLAR": "USD",
+        "DOLLARS": "USD",
+        "EUR": "EUR",
+        "EURO": "EUR",
+        "EUROS": "EUR",
+        "SVC": "SVC",
+        "COLON": "SVC",
+        "COLONES": "SVC",
+    }
+
+    return aliases.get(text, text if text in {"GTQ", "USD", "EUR", "SVC"} else "N/D")
+
+
+def detectar_moneda(worksheet, rows=None, header_index=None):
+    """
+    Detecta la moneda de una hoja bancaria sin alterar los importes.
+
+    Prioridad:
+    1. Código/nombre explícito: GTQ, USD, EUR, SVC, quetzales, dólares...
+    2. Símbolos monetarios en textos: Q, US$, $, €.
+    3. Formato numérico de Excel.
+    """
+
+    scores = {
+        "GTQ": 0,
+        "USD": 0,
+        "EUR": 0,
+        "SVC": 0,
+    }
+
+    def score_text(value, weight=1):
+        if value in (None, ""):
+            return
+
+        raw = str(value).strip()
+        if not raw:
+            return
+
+        normalized = clean_text(raw)
+
+        # Indicadores explícitos — alta confianza.
+        if re.search(r"\bgtq\b|\bquetzal(?:es)?\b", normalized, re.I):
+            scores["GTQ"] += 100 * weight
+
+        if re.search(r"\busd\b|\bd[oó]lar(?:es)?\b|\bdollar(?:s)?\b", raw, re.I):
+            scores["USD"] += 100 * weight
+
+        if re.search(r"\beur\b|\beuro(?:s)?\b", normalized, re.I):
+            scores["EUR"] += 100 * weight
+
+        if re.search(r"\bsvc\b", normalized, re.I):
+            scores["SVC"] += 100 * weight
+
+        # Símbolos acompañando importes.
+        if re.search(r"(?<![A-Za-z])Q\s*[-+]?\s*\d", raw, re.I):
+            scores["GTQ"] += 45 * weight
+
+        if re.search(r"US\s*\$\s*[-+]?\s*\d", raw, re.I):
+            scores["USD"] += 60 * weight
+        elif re.search(r"\$\s*[-+]?\s*\d", raw):
+            scores["USD"] += 25 * weight
+
+        if re.search(r"€\s*[-+]?\s*\d", raw):
+            scores["EUR"] += 60 * weight
+
+    # Nombre de hoja y encabezados.
+    score_text(worksheet.title, 2)
+
+    if rows is None:
+        rows = []
+
+    max_rows = min(len(rows), max((header_index or 0) + 8, 35))
+
+    for row in rows[:max_rows]:
+        for value in row:
+            score_text(value, 1)
+
+    # Revisar formatos monetarios del Excel.
+    # Se limita el recorrido para no penalizar archivos grandes.
+    max_excel_rows = min(worksheet.max_row, max(max_rows + 25, 60))
+    max_excel_cols = min(worksheet.max_column, 40)
+
+    for row in worksheet.iter_rows(
+        min_row=1,
+        max_row=max_excel_rows,
+        min_col=1,
+        max_col=max_excel_cols
+    ):
+        for cell in row:
+            fmt = str(cell.number_format or "")
+
+            if not fmt:
+                continue
+
+            fmt_upper = fmt.upper()
+
+            if "GTQ" in fmt_upper or re.search(r'(^|[^A-Z])Q([^A-Z]|$)', fmt_upper):
+                scores["GTQ"] += 12
+
+            if "USD" in fmt_upper or "US$" in fmt_upper:
+                scores["USD"] += 15
+            elif "$" in fmt:
+                scores["USD"] += 5
+
+            if "EUR" in fmt_upper or "€" in fmt:
+                scores["EUR"] += 15
+
+            if "SVC" in fmt_upper:
+                scores["SVC"] += 15
+
+    ordered = sorted(
+        scores.items(),
+        key=lambda item: item[1],
+        reverse=True
+    )
+
+    if not ordered or ordered[0][1] <= 0:
+        return "N/D"
+
+    # Si hay un empate real entre dos monedas con evidencia,
+    # no inventar una moneda.
+    if len(ordered) > 1 and ordered[0][1] == ordered[1][1]:
+        return "N/D"
+
+    return ordered[0][0]
 
 
 def _parse_text_date(text, expected_month=None, expected_year=None):
@@ -1067,6 +1208,7 @@ def procesar_hoja(worksheet):
 
     banco = detectar_banco(worksheet.title, rows)
     cuenta = detectar_cuenta(worksheet.title, rows, header_index)
+    moneda = detectar_moneda(worksheet, rows, header_index)
     expected_month, expected_year = detectar_periodo(rows, worksheet.title)
     saldo_inicial = detectar_saldo_inicial(rows, header_index)
 
@@ -1089,6 +1231,7 @@ def procesar_hoja(worksheet):
         )
 
         if transaction:
+            transaction["moneda"] = moneda
             transactions.append(transaction)
             previous_date = transaction["fecha"]
             if transaction["saldo"] != 0 or get_column(row, columns, "saldo") not in (None, ""):
@@ -2225,16 +2368,29 @@ def construir_dashboard_data(
     nombre_archivo=""
 ):
     """
-    Convierte las transacciones normalizadas del parser
-    en la estructura JSON utilizada por index.html.
+    Convierte las transacciones normalizadas en la estructura del dashboard.
+
+    Los importes se agrupan por banco y moneda para evitar sumar monedas
+    diferentes como si fueran equivalentes.
     """
 
     bancos = {}
     saldos_por_cuenta = {}
     fechas = []
+    nombres_bancos = set()
 
-    total_creditos = 0.0
-    total_debitos = 0.0
+    totales_por_moneda = {}
+
+    def asegurar_total_moneda(moneda):
+        if moneda not in totales_por_moneda:
+            totales_por_moneda[moneda] = {
+                "moneda": moneda,
+                "saldo_total": 0.0,
+                "total_creditos": 0.0,
+                "total_debitos": 0.0,
+                "cantidad_movimientos": 0,
+            }
+        return totales_por_moneda[moneda]
 
     for transaction in transactions:
 
@@ -2252,45 +2408,39 @@ def construir_dashboard_data(
             )
         ).strip()
 
-        fecha = transaction.get(
-            "fecha"
+        moneda = normalizar_moneda(
+            transaction.get(
+                "moneda",
+                "N/D"
+            )
         )
 
-        if isinstance(
-            fecha,
-            (datetime, date)
-        ):
+        nombres_bancos.add(banco)
 
-            fechas.append(
-                fecha
-            )
+        fecha = transaction.get("fecha")
+
+        if isinstance(fecha, (datetime, date)):
+            fechas.append(fecha)
 
         credito = float(
-            transaction.get(
-                "credito",
-                0
-            ) or 0
+            transaction.get("credito", 0) or 0
         )
 
         debito = float(
-            transaction.get(
-                "debito",
-                0
-            ) or 0
+            transaction.get("debito", 0) or 0
         )
 
-        total_creditos += abs(
-            credito
-        )
+        total_moneda = asegurar_total_moneda(moneda)
+        total_moneda["total_creditos"] += abs(credito)
+        total_moneda["total_debitos"] += abs(debito)
+        total_moneda["cantidad_movimientos"] += 1
 
-        total_debitos += abs(
-            debito
-        )
+        clave_banco = (banco, moneda)
 
-        if banco not in bancos:
-
-            bancos[banco] = {
+        if clave_banco not in bancos:
+            bancos[clave_banco] = {
                 "nombre": banco,
+                "moneda": moneda,
                 "saldo": 0.0,
                 "creditos": 0.0,
                 "debitos": 0.0,
@@ -2298,129 +2448,113 @@ def construir_dashboard_data(
                 "movimientos": []
             }
 
-        bancos[banco][
-            "creditos"
-        ] += abs(
-            credito
-        )
+        banco_data = bancos[clave_banco]
 
-        bancos[banco][
-            "debitos"
-        ] += abs(
-            debito
-        )
-
-        bancos[banco][
-            "cantidad_movimientos"
-        ] += 1
+        banco_data["creditos"] += abs(credito)
+        banco_data["debitos"] += abs(debito)
+        banco_data["cantidad_movimientos"] += 1
 
         saldo_movimiento = None
 
-        if transaction.get(
-            "_tiene_saldo"
-        ):
-
+        if transaction.get("_tiene_saldo"):
             saldo_movimiento = float(
-                transaction.get(
-                    "saldo",
-                    0
-                ) or 0
+                transaction.get("saldo", 0) or 0
             )
 
-        bancos[banco][
-            "movimientos"
-        ].append({
-            "fecha": fecha_dashboard(
-                fecha
-            ),
+        banco_data["movimientos"].append({
+            "fecha": fecha_dashboard(fecha),
             "cuenta": cuenta,
             "referencia": str(
-                transaction.get(
-                    "referencia",
-                    ""
-                ) or ""
+                transaction.get("referencia", "") or ""
             ),
             "descripcion": str(
-                transaction.get(
-                    "descripcion",
-                    ""
-                ) or ""
+                transaction.get("descripcion", "") or ""
             ),
-            "debito": abs(
-                debito
-            ),
-            "credito": abs(
-                credito
-            ),
-            "saldo": saldo_movimiento
+            "debito": abs(debito),
+            "credito": abs(credito),
+            "saldo": saldo_movimiento,
+            "moneda": moneda,
         })
 
-        if transaction.get(
-            "_tiene_saldo"
-        ):
-
+        if transaction.get("_tiene_saldo"):
             saldos_por_cuenta[
-                (
-                    banco,
-                    cuenta
-                )
+                (banco, cuenta, moneda)
             ] = float(
-                transaction.get(
-                    "saldo",
-                    0
-                ) or 0
+                transaction.get("saldo", 0) or 0
             )
 
-    for (
-        banco,
-        cuenta
-    ), saldo in saldos_por_cuenta.items():
+    for (banco, cuenta, moneda), saldo in saldos_por_cuenta.items():
 
-        if banco in bancos:
+        clave_banco = (banco, moneda)
 
-            bancos[banco][
-                "saldo"
-            ] += saldo
+        if clave_banco in bancos:
+            bancos[clave_banco]["saldo"] += saldo
 
-    lista_bancos = list(
-        bancos.values()
-    )
+        asegurar_total_moneda(moneda)["saldo_total"] += saldo
+
+    lista_bancos = list(bancos.values())
 
     lista_bancos.sort(
-        key=lambda item: item[
-            "nombre"
-        ]
+        key=lambda item: (
+            item["nombre"],
+            item["moneda"]
+        )
     )
 
-    saldo_total = sum(
-        banco["saldo"]
-        for banco in lista_bancos
+    lista_totales_moneda = list(
+        totales_por_moneda.values()
     )
+
+    lista_totales_moneda.sort(
+        key=lambda item: item["moneda"]
+    )
+
+    for item in lista_totales_moneda:
+        item["saldo_total"] = round(item["saldo_total"], 2)
+        item["total_creditos"] = round(item["total_creditos"], 2)
+        item["total_debitos"] = round(item["total_debitos"], 2)
+
+    monedas_detectadas = [
+        item["moneda"]
+        for item in lista_totales_moneda
+        if item["moneda"] != "N/D"
+    ]
+
+    moneda_principal = (
+        monedas_detectadas[0]
+        if len(monedas_detectadas) == 1
+        and len(lista_totales_moneda) == 1
+        else (
+            "MULTI"
+            if len(lista_totales_moneda) > 1
+            else (
+                lista_totales_moneda[0]["moneda"]
+                if lista_totales_moneda
+                else "N/D"
+            )
+        )
+    )
+
+    # Mantiene los campos anteriores cuando solo existe una moneda.
+    # Si existen varias, se evita generar un total monetario inválido.
+    if len(lista_totales_moneda) == 1:
+        unico = lista_totales_moneda[0]
+        saldo_total = unico["saldo_total"]
+        total_creditos = unico["total_creditos"]
+        total_debitos = unico["total_debitos"]
+    else:
+        saldo_total = None
+        total_creditos = None
+        total_debitos = None
 
     periodo = ""
 
     if fechas:
-
-        fechas_ordenadas = sorted(
-            fechas
-        )
-
-        fecha_inicio = fechas_ordenadas[
-            0
-        ]
-
-        fecha_final = fechas_ordenadas[
-            -1
-        ]
-
+        fechas_ordenadas = sorted(fechas)
         periodo = (
-            fecha_dashboard(
-                fecha_inicio
-            )
+            fecha_dashboard(fechas_ordenadas[0])
             + " - "
-            + fecha_dashboard(
-                fecha_final
-            )
+            + fecha_dashboard(fechas_ordenadas[-1])
         )
 
     return {
@@ -2429,27 +2563,15 @@ def construir_dashboard_data(
             "%d/%m/%Y %H:%M"
         ),
         "periodo": periodo,
-        "saldo_total": round(
-            saldo_total,
-            2
-        ),
-        "total_creditos": round(
-            total_creditos,
-            2
-        ),
-        "total_debitos": round(
-            total_debitos,
-            2
-        ),
-        "cantidad_movimientos": len(
-            transactions
-        ),
-        "cantidad_bancos": len(
-            lista_bancos
-        ),
+        "moneda": moneda_principal,
+        "saldo_total": saldo_total,
+        "total_creditos": total_creditos,
+        "total_debitos": total_debitos,
+        "totales_por_moneda": lista_totales_moneda,
+        "cantidad_movimientos": len(transactions),
+        "cantidad_bancos": len(nombres_bancos),
         "bancos": lista_bancos
     }
-
 
 def guardar_dashboard_data(
     data

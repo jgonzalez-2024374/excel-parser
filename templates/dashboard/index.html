@@ -363,13 +363,43 @@ const palette = [
   '#026aa2','#b42318','#344054','#039855','#93370d'
 ];
 
-function money(v){
+function money(v, moneda='N/D'){
   const n = Number(v || 0);
+  const code = String(moneda || 'N/D').toUpperCase();
+
+  const config = {
+    GTQ: {locale:'es-GT', currency:'GTQ'},
+    USD: {locale:'en-US', currency:'USD'},
+    EUR: {locale:'es-ES', currency:'EUR'},
+    SVC: {locale:'es-SV', currency:'SVC'}
+  };
+
+  if(config[code]){
+    return new Intl.NumberFormat(config[code].locale,{
+      style:'currency',
+      currency:config[code].currency,
+      maximumFractionDigits:2
+    }).format(n);
+  }
+
   return new Intl.NumberFormat('en-US',{
-    style:'currency',
-    currency:'USD',
+    minimumFractionDigits:2,
     maximumFractionDigits:2
-  }).format(n);
+  }).format(n) + (code !== 'N/D' ? ' ' + code : '');
+}
+
+function totalsMoney(data, field){
+  const totals = Array.isArray(data.totales_por_moneda)
+    ? data.totales_por_moneda
+    : [];
+
+  if(totals.length){
+    return totals
+      .map(t => money(t[field] || 0, t.moneda))
+      .join(' · ');
+  }
+
+  return money(data[field] || 0, data.moneda || 'N/D');
 }
 
 function number(v){
@@ -403,11 +433,11 @@ function renderDashboard(data){
   const movimientosTotal = data.cantidad_movimientos ??
     bancos.reduce((a,b)=>a+(Array.isArray(b.movimientos) ? b.movimientos.length : Number(b.cantidad_movimientos || 0)),0);
 
-  document.getElementById('kpiSaldo').textContent = money(saldoTotal);
-  document.getElementById('kpiCreditos').textContent = money(creditosTotal);
-  document.getElementById('kpiDebitos').textContent = money(debitosTotal);
+  document.getElementById('kpiSaldo').textContent = totalsMoney(data, 'saldo_total');
+  document.getElementById('kpiCreditos').textContent = totalsMoney(data, 'total_creditos');
+  document.getElementById('kpiDebitos').textContent = totalsMoney(data, 'total_debitos');
   document.getElementById('kpiMovimientos').textContent = number(movimientosTotal);
-  document.getElementById('kpiBancos').textContent = bancos.length;
+  document.getElementById('kpiBancos').textContent = data.cantidad_bancos ?? bancos.length;
 
   document.getElementById('periodBadge').textContent =
     data.periodo || data.fecha_proceso || 'Actualizado';
@@ -415,21 +445,29 @@ function renderDashboard(data){
   document.getElementById('metaInfo').textContent =
     `${data.archivo || 'Archivo bancario'}${data.fecha_proceso ? ' · Procesado: ' + data.fecha_proceso : ''}`;
 
-  const maxBalance = Math.max(...bancos.map(b=>Math.abs(Number(b.saldo || 0))),1);
+  const maxBalanceByCurrency = {};
+  bancos.forEach(b=>{
+    const code = String(b.moneda || 'N/D').toUpperCase();
+    maxBalanceByCurrency[code] = Math.max(
+      maxBalanceByCurrency[code] || 1,
+      Math.abs(Number(b.saldo || 0))
+    );
+  });
   const bankBars = document.getElementById('bankBars');
   bankBars.innerHTML = '';
 
   bancos.forEach((b,i)=>{
     const saldo = Number(b.saldo || 0);
-    const pct = Math.abs(saldo)/maxBalance*100;
+    const code = String(b.moneda || 'N/D').toUpperCase();
+    const pct = Math.abs(saldo)/(maxBalanceByCurrency[code] || 1)*100;
 
     bankBars.insertAdjacentHTML('beforeend', `
       <div class="bank-row">
-        <div class="bank-name" title="${escapeHtml(b.nombre)}">${escapeHtml(b.nombre)}</div>
+        <div class="bank-name" title="${escapeHtml(b.nombre)}">${escapeHtml(b.nombre)}${b.moneda && b.moneda !== "N/D" ? " · " + escapeHtml(b.moneda) : ""}</div>
         <div class="track">
           <div class="fill" style="width:${pct.toFixed(2)}%;background:${palette[i%palette.length]}"></div>
         </div>
-        <div class="bank-value">${money(saldo)}</div>
+        <div class="bank-value">${money(saldo, b.moneda)}</div>
       </div>
     `);
   });
@@ -444,9 +482,9 @@ function renderDashboard(data){
       <tr>
         <td>${escapeHtml(b.nombre)}</td>
         <td class="num">${number(movs)}</td>
-        <td class="num">${money(b.creditos || 0)}</td>
-        <td class="num">${money(b.debitos || 0)}</td>
-        <td class="num">${money(b.saldo || 0)}</td>
+        <td class="num">${money(b.creditos || 0, b.moneda)}</td>
+        <td class="num">${money(b.debitos || 0, b.moneda)}</td>
+        <td class="num">${money(b.saldo || 0, b.moneda)}</td>
       </tr>
     `;
   }).join('');
@@ -460,7 +498,7 @@ function renderDashboard(data){
   bancos.forEach((b,i)=>{
     tabs.insertAdjacentHTML('beforeend', `
       <button class="tab ${i===0?'active':''}" data-target="panel-${i}">
-        ${escapeHtml(b.nombre)}
+        ${escapeHtml(b.nombre)}${b.moneda && b.moneda !== "N/D" ? " · " + escapeHtml(b.moneda) : ""}
       </button>
     `);
 
@@ -471,9 +509,9 @@ function renderDashboard(data){
         <td>${escapeHtml(m.fecha || '')}</td>
         <td>${escapeHtml(m.referencia || '')}</td>
         <td>${escapeHtml(m.descripcion || '')}</td>
-        <td class="num">${Number(m.debito || 0) ? money(m.debito) : ''}</td>
-        <td class="num">${Number(m.credito || 0) ? money(m.credito) : ''}</td>
-        <td class="num">${m.saldo !== null && m.saldo !== undefined && m.saldo !== '' ? money(m.saldo) : ''}</td>
+        <td class="num">${Number(m.debito || 0) ? money(m.debito, m.moneda || b.moneda) : ''}</td>
+        <td class="num">${Number(m.credito || 0) ? money(m.credito, m.moneda || b.moneda) : ''}</td>
+        <td class="num">${m.saldo !== null && m.saldo !== undefined && m.saldo !== '' ? money(m.saldo, m.moneda || b.moneda) : ''}</td>
       </tr>
     `).join('');
 
@@ -528,13 +566,8 @@ function renderDashboard(data){
 
 function loadData(){
   try{
-    if (
-      !DASHBOARD_DATA ||
-      typeof DASHBOARD_DATA !== 'object'
-    ){
-      throw new Error(
-        'No se recibieron datos para construir el dashboard.'
-      );
+    if(!DASHBOARD_DATA || typeof DASHBOARD_DATA !== 'object'){
+      throw new Error('No se recibieron datos para construir el dashboard.');
     }
 
     renderDashboard(DASHBOARD_DATA);
