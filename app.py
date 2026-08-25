@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file, after_this_request
 from flask import render_template
+from flask import make_response
 from openpyxl import load_workbook
 from openpyxl.formula.translate import Translator
 from openpyxl.utils import get_column_letter
@@ -78,6 +79,10 @@ DASHBOARD_CACHE = {
 }
 
 
+# Versión del generador del dashboard descargable.
+DASHBOARD_ATTACHMENT_VERSION = "embedded-fetch-1.0"
+
+
 # ============================================================
 # INICIO
 # ============================================================
@@ -142,6 +147,74 @@ def dashboard_data_endpoint():
     )
 
     return response
+
+
+
+@app.route(
+    "/dashboard-file",
+    methods=["GET"],
+    strict_slashes=False
+)
+def dashboard_file():
+    """
+    Devuelve una copia autónoma del dashboard como archivo HTML.
+    Está diseñada para adjuntarse desde Make/Gmail y abrirse
+    localmente sin necesitar data.json.
+    """
+
+    try:
+
+        html = construir_dashboard_html_autonomo()
+
+        fecha_nombre = datetime.now().strftime(
+            "%Y%m%d_%H%M%S"
+        )
+
+        nombre_archivo = (
+            "Dashboard_Bancario_"
+            + fecha_nombre
+            + ".html"
+        )
+
+        response = make_response(
+            html
+        )
+
+        response.headers[
+            "Content-Type"
+        ] = "text/html; charset=utf-8"
+
+        response.headers[
+            "Content-Disposition"
+        ] = (
+            'attachment; filename="'
+            + nombre_archivo
+            + '"'
+        )
+
+        response.headers[
+            "Cache-Control"
+        ] = (
+            "no-store, no-cache, "
+            "must-revalidate, max-age=0"
+        )
+
+        response.headers[
+            "X-Dashboard-Attachment-Version"
+        ] = DASHBOARD_ATTACHMENT_VERSION
+
+        response.headers[
+            "X-Dashboard-Filename"
+        ] = nombre_archivo
+
+        return response
+
+    except Exception as error:
+
+        return jsonify({
+            "success": False,
+            "error": str(error)
+        }), 500
 
 
 # ============================================================
@@ -2443,6 +2516,147 @@ def cargar_dashboard_data():
     return DASHBOARD_CACHE
 
 
+
+def construir_dashboard_html_autonomo():
+    """
+    Crea una copia del index.html con los datos actuales incrustados.
+
+    El index.html original puede seguir usando fetch("./data.json?...").
+    Para el archivo adjunto se intercepta únicamente la petición
+    a data.json y se responde con los datos incrustados.
+
+    Así el HTML puede abrirse desde file:/// sin CORS y sin necesitar
+    un archivo data.json junto a él.
+    """
+
+    if not os.path.exists(
+        DASHBOARD_TEMPLATE
+    ):
+
+        raise FileNotFoundError(
+            "No existe index.html del dashboard: "
+            + DASHBOARD_TEMPLATE
+        )
+
+    with open(
+        DASHBOARD_TEMPLATE,
+        "r",
+        encoding="utf-8"
+    ) as archivo:
+
+        html = archivo.read()
+
+    datos = cargar_dashboard_data()
+
+    datos_json = json.dumps(
+        datos,
+        ensure_ascii=False
+    )
+
+    # Evita cerrar accidentalmente el bloque <script>.
+    datos_json = datos_json.replace(
+        "</",
+        "<\\/"
+    )
+
+    script_embebido = """
+<script>
+(function () {
+    const DASHBOARD_EMBEDDED_DATA = __DATOS__;
+
+    window.__DASHBOARD_EMBEDDED_DATA__ =
+        DASHBOARD_EMBEDDED_DATA;
+
+    const originalFetch = window.fetch;
+
+    window.fetch = function(resource, options) {
+
+        let url = "";
+
+        if (typeof resource === "string") {
+            url = resource;
+        } else if (
+            resource &&
+            typeof resource.url === "string"
+        ) {
+            url = resource.url;
+        }
+
+        if (
+            url.includes("data.json")
+        ) {
+
+            return Promise.resolve(
+                new Response(
+                    JSON.stringify(
+                        DASHBOARD_EMBEDDED_DATA
+                    ),
+                    {
+                        status: 200,
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        }
+                    }
+                )
+            );
+        }
+
+        return originalFetch.call(
+            window,
+            resource,
+            options
+        );
+    };
+})();
+</script>
+""".replace(
+        "__DATOS__",
+        datos_json
+    )
+
+    # Debe cargarse antes que los scripts originales del dashboard.
+    if "</head>" in html:
+
+        html = html.replace(
+            "</head>",
+            script_embebido + "\\n</head>",
+            1
+        )
+
+    elif "<body" in html:
+
+        body_start = html.find("<body")
+        posicion = html.find(
+            ">",
+            body_start
+        )
+
+        if posicion != -1:
+
+            html = (
+                html[:posicion + 1]
+                + script_embebido
+                + html[posicion + 1:]
+            )
+
+        else:
+
+            html = (
+                script_embebido
+                + html
+            )
+
+    else:
+
+        html = (
+            script_embebido
+            + html
+        )
+
+    return html
+
+
 # ============================================================
 # PROCESAR EXCEL
 # ============================================================
@@ -2682,6 +2896,18 @@ def process_excel():
             + "/dashboard"
         )
 
+
+        response.headers[
+            "X-Dashboard-File-URL"
+        ] = (
+            request.host_url.rstrip("/")
+            + "/dashboard-file"
+        )
+
+        response.headers[
+            "X-Dashboard-Attachment-Version"
+        ] = DASHBOARD_ATTACHMENT_VERSION
+
         response.headers[
             "X-Dashboard-Banks"
         ] = str(
@@ -2741,4 +2967,4 @@ if __name__ == "__main__":
             )
         ),
         debug=False
-    )
+    )   
