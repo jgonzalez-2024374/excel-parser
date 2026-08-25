@@ -300,7 +300,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.2-dynamic-currency-kpis"
+PARSER_VERSION = "universal-3.3-safe-currency-parser"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -563,32 +563,75 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
             analizar_texto(value, 1)
 
     # También revisar formatos de celdas de Excel.
-    max_rows = min(worksheet.max_row, 80)
-    max_cols = min(worksheet.max_column, 40)
+    #
+    # IMPORTANTE:
+    # En algunos archivos bancarios abiertos con read_only=True,
+    # openpyxl puede devolver None en worksheet.max_row/max_column.
+    # Por eso NO usamos min(worksheet.max_row, ...).
+    #
+    # Recorremos de forma segura un máximo de 80 filas y 40 columnas.
+    try:
+        for row_index, row in enumerate(
+            worksheet.iter_rows(),
+            start=1
+        ):
+            if row_index > 80:
+                break
 
-    for row in worksheet.iter_rows(
-        min_row=1,
-        max_row=max_rows,
-        min_col=1,
-        max_col=max_cols
-    ):
-        for cell in row:
-            fmt = str(cell.number_format or "")
-            fmt_up = fmt.upper()
+            for column_index, cell in enumerate(
+                row,
+                start=1
+            ):
+                if column_index > 40:
+                    break
 
-            if "GTQ" in fmt_up or "QTZ" in fmt_up or re.search(r'(^|[^A-Z])Q([^A-Z]|$)', fmt_up):
-                scores["GTQ"] += 10
+                fmt = str(
+                    getattr(
+                        cell,
+                        "number_format",
+                        ""
+                    ) or ""
+                )
 
-            if "USD" in fmt_up or "US$" in fmt_up:
-                scores["USD"] += 12
-            elif "$" in fmt:
-                scores["USD"] += 4
+                fmt_up = fmt.upper()
 
-            if "EUR" in fmt_up or "€" in fmt:
-                scores["EUR"] += 12
+                if (
+                    "GTQ" in fmt_up
+                    or "QTZ" in fmt_up
+                    or re.search(
+                        r'(^|[^A-Z])Q([^A-Z]|$)',
+                        fmt_up
+                    )
+                ):
+                    scores["GTQ"] += 10
 
-            if "SVC" in fmt_up:
-                scores["SVC"] += 12
+                if (
+                    "USD" in fmt_up
+                    or "US$" in fmt_up
+                ):
+                    scores["USD"] += 12
+
+                elif "$" in fmt:
+                    scores["USD"] += 4
+
+                if (
+                    "EUR" in fmt_up
+                    or "€" in fmt
+                ):
+                    scores["EUR"] += 12
+
+                if "SVC" in fmt_up:
+                    scores["SVC"] += 12
+
+    except Exception as currency_format_error:
+        # La moneda es un dato de presentación.
+        # Nunca debe impedir que el estado de cuenta sea procesado.
+        print(
+            "Advertencia detectando formato de moneda en hoja",
+            worksheet.title,
+            ":",
+            str(currency_format_error)
+        )
 
     ranking = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
@@ -1746,7 +1789,24 @@ def procesar_hoja(worksheet):
 
     banco = detectar_banco(worksheet.title, rows)
     cuenta = detectar_cuenta(worksheet.title, rows, header_index)
-    moneda = detectar_moneda(worksheet, rows, header_index)
+
+    # La moneda es metadato para formato visual.
+    # Si algún banco trae un formato extraño, NO debe detener el parser.
+    try:
+        moneda = detectar_moneda(
+            worksheet,
+            rows,
+            header_index
+        )
+    except Exception as currency_error:
+        print(
+            "No se pudo detectar moneda en hoja",
+            worksheet.title,
+            ":",
+            str(currency_error)
+        )
+        moneda = "N/D"
+
     expected_month, expected_year = detectar_periodo(rows, worksheet.title)
     saldo_inicial = detectar_saldo_inicial(rows, header_index)
 
