@@ -80,7 +80,7 @@ DASHBOARD_CACHE = {
 
 
 # Versión del generador del dashboard descargable.
-DASHBOARD_ATTACHMENT_VERSION = "jinja-symbol-only-2.2"
+DASHBOARD_ATTACHMENT_VERSION = "jinja-symbol-only-2.3"
 
 
 # ============================================================
@@ -300,7 +300,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.1-dynamic-currency-excel"
+PARSER_VERSION = "universal-3.2-dynamic-currency-kpis"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -1015,6 +1015,79 @@ def aplicar_formato_moneda_excel(
         ws = workbook[
             SHEET_TABLERO
         ]
+
+        # --------------------------------------------------------
+        # KPIs SUPERIORES DEL TABLERO
+        # --------------------------------------------------------
+        # La plantilla trae estos indicadores con formato monetario fijo.
+        # Buscamos los títulos dinámicamente y aplicamos la moneda detectada
+        # únicamente a la celda de valor que está inmediatamente debajo.
+        #
+        # CRÉDITOS EN RANGO  -> moneda
+        # PROMEDIO DIARIO    -> moneda
+        # MAYOR DÍA          -> moneda
+        # CUENTAS CON ABONO  -> entero, sin símbolo
+        # --------------------------------------------------------
+
+        titulos_monetarios = (
+            "creditos en rango",
+            "promedio diario",
+            "mayor dia",
+        )
+
+        titulo_cantidad = "cuentas con abono"
+
+        for row in range(
+            1,
+            min(ws.max_row, 14) + 1
+        ):
+
+            for column in range(
+                1,
+                ws.max_column + 1
+            ):
+
+                cell = ws.cell(
+                    row=row,
+                    column=column
+                )
+
+                if es_celda_combinada(cell):
+                    continue
+
+                texto = clean_text(
+                    cell.value
+                )
+
+                if not texto:
+                    continue
+
+                # Indicadores monetarios.
+                if any(
+                    titulo in texto
+                    for titulo in titulos_monetarios
+                ):
+
+                    value_cell = obtener_celda_segura(
+                        ws,
+                        row + 1,
+                        column
+                    )
+
+                    if value_cell:
+                        value_cell.number_format = formato_general
+
+                # Indicador de cantidad.
+                elif titulo_cantidad in texto:
+
+                    value_cell = obtener_celda_segura(
+                        ws,
+                        row + 1,
+                        column
+                    )
+
+                    if value_cell:
+                        value_cell.number_format = "0"
 
         # Evolución: Crédito y Variación.
         # Si todo el archivo corresponde a una moneda, se usa su símbolo.
