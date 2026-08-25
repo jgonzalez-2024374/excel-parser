@@ -2518,16 +2518,7 @@ def cargar_dashboard_data():
 
 
 def construir_dashboard_html_autonomo():
-    """
-    Crea una copia del index.html con los datos actuales incrustados.
-
-    El index.html original puede seguir usando fetch("./data.json?...").
-    Para el archivo adjunto se intercepta únicamente la petición
-    a data.json y se responde con los datos incrustados.
-
-    Así el HTML puede abrirse desde file:/// sin CORS y sin necesitar
-    un archivo data.json junto a él.
-    """
+  
 
     if not os.path.exists(
         DASHBOARD_TEMPLATE
