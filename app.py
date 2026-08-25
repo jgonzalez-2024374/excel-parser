@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, send_file, after_this_request
 from flask import render_template
-from flask import make_response
 from openpyxl import load_workbook
 from openpyxl.formula.translate import Translator
 from openpyxl.utils import get_column_letter
@@ -143,93 +142,6 @@ def dashboard_data_endpoint():
     )
 
     return response
-
-
-
-@app.route(
-    "/dashboard-file",
-    methods=["GET"],
-    strict_slashes=False
-)
-def dashboard_file():
-    """
-    Devuelve Dashboard_Bancario.html como archivo descargable.
-
-    Está pensado para Make.com:
-    1. POST /process-excel
-    2. GET /dashboard-file
-    3. Adjuntar el resultado junto con el Excel en Gmail.
-    """
-
-    try:
-
-        html = construir_dashboard_html_autonomo()
-
-        datos = cargar_dashboard_data()
-
-        fecha_nombre = datetime.now().strftime(
-            "%Y%m%d_%H%M"
-        )
-
-        nombre_archivo = (
-            "Dashboard_Bancario_"
-            + fecha_nombre
-            + ".html"
-        )
-
-        response = make_response(
-            html
-        )
-
-        response.headers[
-            "Content-Type"
-        ] = "text/html; charset=utf-8"
-
-        response.headers[
-            "Content-Disposition"
-        ] = (
-            'attachment; filename="'
-            + nombre_archivo
-            + '"'
-        )
-
-        response.headers[
-            "Cache-Control"
-        ] = (
-            "no-store, no-cache, "
-            "must-revalidate, max-age=0"
-        )
-
-        response.headers[
-            "X-Dashboard-Filename"
-        ] = nombre_archivo
-
-        response.headers[
-            "X-Dashboard-Banks"
-        ] = str(
-            datos.get(
-                "cantidad_bancos",
-                0
-            )
-        )
-
-        response.headers[
-            "X-Dashboard-Balance"
-        ] = str(
-            datos.get(
-                "saldo_total",
-                0
-            )
-        )
-
-        return response
-
-    except Exception as error:
-
-        return jsonify({
-            "success": False,
-            "error": str(error)
-        }), 500
 
 
 # ============================================================
@@ -2531,116 +2443,6 @@ def cargar_dashboard_data():
     return DASHBOARD_CACHE
 
 
-
-def construir_dashboard_html_autonomo():
-    """
-    Genera una copia autónoma del dashboard para descargar o adjuntar por correo.
-
-    No modifica index.html.
-    Toma el mismo HTML de templates/dashboard/index.html e incrusta dentro
-    los últimos datos procesados, de forma que el archivo pueda abrirse
-    directamente desde una computadora sin depender de data.json.
-    """
-
-    if not os.path.exists(
-        DASHBOARD_TEMPLATE
-    ):
-
-        raise FileNotFoundError(
-            "No existe index.html del dashboard: "
-            + DASHBOARD_TEMPLATE
-        )
-
-    with open(
-        DASHBOARD_TEMPLATE,
-        "r",
-        encoding="utf-8"
-    ) as archivo:
-
-        html = archivo.read()
-
-    datos = cargar_dashboard_data()
-
-    datos_json = json.dumps(
-        datos,
-        ensure_ascii=False
-    )
-
-    # Evita que una descripción bancaria que contenga </script>
-    # cierre accidentalmente el bloque JavaScript.
-    datos_json = datos_json.replace(
-        "</",
-        "<\\/"
-    )
-
-    script_autonomo = (
-        "\\n<script>\\n"
-        "window.__DASHBOARD_EMBEDDED_DATA__ = "
-        + datos_json
-        + ";\\n"
-        "</script>\\n"
-    )
-
-    # Insertar los datos antes del cierre de BODY.
-    if "</body>" in html:
-
-        html = html.replace(
-            "</body>",
-            script_autonomo + "</body>",
-            1
-        )
-
-    else:
-
-        html += script_autonomo
-
-    # La plantilla original llama loadData(), que usa fetch(data.json).
-    # Para el archivo adjunto reemplazamos únicamente ESA llamada
-    # en la copia generada, no en el index.html del repositorio.
-    llamada_original = "loadData();"
-
-    llamada_autonoma = (
-        "renderDashboard("
-        "window.__DASHBOARD_EMBEDDED_DATA__"
-        ");"
-    )
-
-    if llamada_original in html:
-
-        html = html.replace(
-            llamada_original,
-            llamada_autonoma,
-            1
-        )
-
-    else:
-
-        # Fallback para futuras versiones del HTML.
-        fallback = (
-            "\\n<script>\\n"
-            "document.addEventListener('DOMContentLoaded', function(){\\n"
-            "  if (typeof renderDashboard === 'function') {\\n"
-            "    renderDashboard(window.__DASHBOARD_EMBEDDED_DATA__);\\n"
-            "  }\\n"
-            "});\\n"
-            "</script>\\n"
-        )
-
-        if "</body>" in html:
-
-            html = html.replace(
-                "</body>",
-                fallback + "</body>",
-                1
-            )
-
-        else:
-
-            html += fallback
-
-    return html
-
-
 # ============================================================
 # PROCESAR EXCEL
 # ============================================================
@@ -2878,14 +2680,6 @@ def process_excel():
         ] = (
             request.host_url.rstrip("/")
             + "/dashboard"
-        )
-
-
-        response.headers[
-            "X-Dashboard-File-URL"
-        ] = (
-            request.host_url.rstrip("/")
-            + "/dashboard-file"
         )
 
         response.headers[
