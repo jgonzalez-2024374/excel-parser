@@ -499,8 +499,8 @@ function renderDashboard(data){
       <div class="tab-panel ${i===0?'active':''}" id="panel-${i}">
         <div class="toolbar">
           <input class="search" placeholder="Buscar..." data-table="table-${i}">
-          <button class="btn" onclick="downloadCSV('table-${i}','${escapeHtml(b.nombre).replace(/'/g,"\\'")}')">
-            Exportar CSV
+          <button class="btn" onclick="downloadCSV('table-${i}', ${i})">
+            Descargar CSV
           </button>
         </div>
 
@@ -566,23 +566,287 @@ function loadData(){
   }
 }
 
-function downloadCSV(tableId, bankName){
+function csvCell(value){
+  const text = String(value ?? '');
+  return `"${text.replace(/"/g,'""')}"`;
+}
+
+function csvNumber(value){
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+}
+
+function safeFileName(value){
+  return String(value || 'Banco')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^\w-]+/g,'_')
+    .replace(/^_+|_+$/g,'');
+}
+
+function formatExportDate(date){
+  const pad = n => String(n).padStart(2,'0');
+  return (
+    pad(date.getDate()) + '/' +
+    pad(date.getMonth()+1) + '/' +
+    date.getFullYear() + ' ' +
+    pad(date.getHours()) + ':' +
+    pad(date.getMinutes())
+  );
+}
+
+function formatFileDate(date){
+  const pad = n => String(n).padStart(2,'0');
+  return (
+    date.getFullYear() +
+    pad(date.getMonth()+1) +
+    pad(date.getDate()) + '_' +
+    pad(date.getHours()) +
+    pad(date.getMinutes()) +
+    pad(date.getSeconds())
+  );
+}
+
+function downloadCSV(tableId, bankIndex){
+  const data = DASHBOARD_DATA || {};
+  const bancos = Array.isArray(data.bancos) ? data.bancos : [];
+  const banco = bancos[bankIndex];
+
+  if(!banco){
+    showStatus('No se pudo identificar el banco para exportar el CSV.','error');
+    return;
+  }
+
+  const movimientos = Array.isArray(banco.movimientos)
+    ? banco.movimientos
+    : [];
+
   const table = document.getElementById(tableId);
-  const rows = [...table.querySelectorAll('tr')].filter(r=>r.style.display!=='none');
+  const visibleRows = table
+    ? [...table.querySelectorAll('tbody tr')]
+    : [];
 
-  const csv = rows.map(row =>
-    [...row.querySelectorAll('th,td')]
-      .map(cell => `"${cell.innerText.replace(/"/g,'""')}"`)
-      .join(',')
-  ).join('\n');
+  // Respeta el filtro de búsqueda visible en pantalla.
+  const visibleIndexes = new Set(
+    visibleRows
+      .map((row,index)=>({row,index}))
+      .filter(item=>item.row.style.display !== 'none')
+      .map(item=>item.index)
+  );
 
-  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const exportRows = movimientos.filter(
+    (_,index)=>visibleIndexes.has(index)
+  );
+
+  const moneda = String(
+    banco.moneda ||
+    data.moneda ||
+    'N/D'
+  ).toUpperCase();
+
+  const now = new Date();
+
+  let totalDebitos = 0;
+  let totalCreditos = 0;
+  let saldoFinal = null;
+
+  exportRows.forEach(m=>{
+    totalDebitos += Number(m.debito || 0);
+    totalCreditos += Number(m.credito || 0);
+
+    if(
+      m.saldo !== null &&
+      m.saldo !== undefined &&
+      m.saldo !== ''
+    ){
+      saldoFinal = Number(m.saldo || 0);
+    }
+  });
+
+  const lines = [];
+
+  lines.push(
+    [
+      csvCell('REPORTE DE MOVIMIENTOS BANCARIOS'),
+      '',
+      '',
+      '',
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(
+    [
+      csvCell('Banco'),
+      csvCell(banco.nombre || 'N/D'),
+      '',
+      '',
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(
+    [
+      csvCell('Moneda'),
+      csvCell(moneda),
+      '',
+      '',
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(
+    [
+      csvCell('Período'),
+      csvCell(data.periodo || 'N/D'),
+      '',
+      '',
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(
+    [
+      csvCell('Archivo de origen'),
+      csvCell(data.archivo || 'N/D'),
+      '',
+      '',
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(
+    [
+      csvCell('Fecha de generación'),
+      csvCell(formatExportDate(now)),
+      '',
+      '',
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(
+    [
+      csvCell('Registros exportados'),
+      csvCell(exportRows.length),
+      '',
+      '',
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(';;;;;');
+
+  lines.push(
+    [
+      csvCell('Fecha'),
+      csvCell('Referencia'),
+      csvCell('Descripción'),
+      csvCell('Débito'),
+      csvCell('Crédito'),
+      csvCell('Saldo')
+    ].join(';')
+  );
+
+  exportRows.forEach(m=>{
+    lines.push(
+      [
+        csvCell(m.fecha || ''),
+        csvCell(m.referencia || ''),
+        csvCell(m.descripcion || ''),
+        csvNumber(m.debito || 0),
+        csvNumber(m.credito || 0),
+        (
+          m.saldo !== null &&
+          m.saldo !== undefined &&
+          m.saldo !== ''
+        )
+          ? csvNumber(m.saldo)
+          : ''
+      ].join(';')
+    );
+  });
+
+  lines.push(';;;;;');
+
+  lines.push(
+    [
+      csvCell('TOTAL DÉBITOS'),
+      '',
+      '',
+      csvNumber(totalDebitos),
+      '',
+      ''
+    ].join(';')
+  );
+
+  lines.push(
+    [
+      csvCell('TOTAL CRÉDITOS'),
+      '',
+      '',
+      '',
+      csvNumber(totalCreditos),
+      ''
+    ].join(';')
+  );
+
+  if(saldoFinal !== null){
+    lines.push(
+      [
+        csvCell('SALDO FINAL'),
+        '',
+        '',
+        '',
+        '',
+        csvNumber(saldoFinal)
+      ].join(';')
+    );
+  }
+
+  const csv = '\ufeff' + lines.join('\r\n');
+
+  const blob = new Blob(
+    [csv],
+    {type:'text/csv;charset=utf-8;'}
+  );
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
+
+  const bancoFile = safeFileName(
+    banco.nombre || 'Banco'
+  );
+
+  const monedaFile = safeFileName(
+    moneda
+  );
+
   a.href = url;
-  a.download = bankName.replace(/[^\wáéíóúñÁÉÍÓÚÑ-]+/g,'_') + '_movimientos.csv';
+  a.download =
+    'Reporte_Movimientos_' +
+    bancoFile + '_' +
+    monedaFile + '_' +
+    formatFileDate(now) +
+    '.csv';
+
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+
   URL.revokeObjectURL(url);
+
+  showStatus(
+    `CSV generado correctamente: ${exportRows.length} movimiento(s) de ${banco.nombre}.`,
+    'ok'
+  );
 }
 
 loadData();
