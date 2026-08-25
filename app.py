@@ -80,7 +80,7 @@ DASHBOARD_CACHE = {
 
 
 # Versión del generador del dashboard descargable.
-DASHBOARD_ATTACHMENT_VERSION = "embedded-fetch-1.0"
+DASHBOARD_ATTACHMENT_VERSION = "jinja-embedded-2.0"
 
 
 # ============================================================
@@ -121,7 +121,8 @@ def dashboard():
         }), 404
 
     return render_template(
-        "dashboard/index.html"
+        "dashboard/index.html",
+        dashboard_data=cargar_dashboard_data()
     )
 
 
@@ -164,7 +165,10 @@ def dashboard_file():
 
     try:
 
-        html = construir_dashboard_html_autonomo()
+        html = render_template(
+            "dashboard/index.html",
+            dashboard_data=cargar_dashboard_data()
+        )
 
         fecha_nombre = datetime.now().strftime(
             "%Y%m%d_%H%M%S"
@@ -2518,7 +2522,16 @@ def cargar_dashboard_data():
 
 
 def construir_dashboard_html_autonomo():
-  
+    """
+    Crea una copia del index.html con los datos actuales incrustados.
+
+    El index.html original puede seguir usando fetch("./data.json?...").
+    Para el archivo adjunto se intercepta únicamente la petición
+    a data.json y se responde con los datos incrustados.
+
+    Así el HTML puede abrirse desde file:/// sin CORS y sin necesitar
+    un archivo data.json junto a él.
+    """
 
     if not os.path.exists(
         DASHBOARD_TEMPLATE

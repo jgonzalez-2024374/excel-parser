@@ -356,8 +356,7 @@ main{
 </main>
 
 <script>
-window.__DASHBOARD_EMBEDDED_DATA__ =
-  window.__DASHBOARD_EMBEDDED_DATA__ || null;
+const DASHBOARD_DATA = {{ dashboard_data | tojson }};
 
 const palette = [
   '#175cd3','#067647','#b54708','#7f56d9','#c11574',
@@ -527,38 +526,18 @@ function renderDashboard(data){
   showStatus(`Dashboard actualizado correctamente con ${bancos.length} banco(s).`,'ok');
 }
 
-async function loadData(){
+function loadData(){
   try{
-    // 1) Para el HTML descargable: Flask incrusta los datos aquí.
     if (
-      window.__DASHBOARD_EMBEDDED_DATA__ &&
-      typeof window.__DASHBOARD_EMBEDDED_DATA__ === 'object'
+      !DASHBOARD_DATA ||
+      typeof DASHBOARD_DATA !== 'object'
     ){
-      renderDashboard(window.__DASHBOARD_EMBEDDED_DATA__);
-      return;
-    }
-
-    // 2) Para el dashboard en línea: consultar el endpoint del servidor.
-    if (window.location.protocol === 'http:' || window.location.protocol === 'https:'){
-      const response = await fetch(
-        '/dashboard/data.json?ts=' + Date.now(),
-        {cache:'no-store'}
+      throw new Error(
+        'No se recibieron datos para construir el dashboard.'
       );
-
-      if(!response.ok){
-        throw new Error('No se pudo leer /dashboard/data.json');
-      }
-
-      const data = await response.json();
-      renderDashboard(data);
-      return;
     }
 
-    // 3) Si se abrió como archivo local y no trae datos incrustados,
-    // mostrar un mensaje claro en vez de intentar buscar data.json.
-    throw new Error(
-      'Este HTML no contiene datos incrustados. Debe descargarse desde /dashboard-file después de procesar el Excel.'
-    );
+    renderDashboard(DASHBOARD_DATA);
 
   }catch(error){
     console.error(error);
