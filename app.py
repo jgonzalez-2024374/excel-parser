@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify, send_file, after_this_request
+from flask import base64
+import Flask, request, jsonify, send_file, after_this_request
 from flask import render_template
 from flask import make_response
 from openpyxl import load_workbook
@@ -17,7 +18,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v3.3-no-false-hnl-20260826-1759"
+APP_BUILD = "dashboard-v3.6-responsive-bank-logos-20260826-2020"
 
 
 # ============================================================
@@ -4214,6 +4215,304 @@ def _etiqueta_moneda_dashboard(codigo):
     return etiquetas.get(codigo, codigo)
 
 
+
+# ============================================================
+# LOGOS BANCARIOS DESDE /static/logos
+# ============================================================
+
+LOGOS_DIR = os.path.join(
+    BASE_DIR,
+    "static",
+    "logos"
+)
+
+
+BANK_LOGO_FILES = {
+    # --------------------------------------------------------
+    # GUATEMALA - nombres exactos de tu carpeta
+    # --------------------------------------------------------
+    "CHN": (
+        "guatemala",
+        ["CHN.png", "chn.png"]
+    ),
+    "BANTRAB": (
+        "guatemala",
+        ["BANTRAB.png", "bantrab.png"]
+    ),
+    "BANCO INDUSTRIAL": (
+        "guatemala",
+        ["BI.png", "bi.png", "BANCO INDUSTRIAL.png"]
+    ),
+    "BANRURAL": (
+        "guatemala",
+        ["BAN.png", "ban.png", "BANRURAL.png"]
+    ),
+    "PROMERICA": (
+        "guatemala",
+        ["PROMERICA.png", "promerica.png"]
+    ),
+    "BAC": (
+        "guatemala",
+        ["BAC.png", "bac.png"]
+    ),
+    "G&T CONTINENTAL": (
+        "guatemala",
+        ["G&T.png", "G&T CONTINENTAL.png", "GYT.png"]
+    ),
+    "BANCO AZTECA": (
+        "guatemala",
+        ["AZTECA.png", "azteca.png"]
+    ),
+
+    # Opcionales Guatemala, si los agregas después
+    "BAM": (
+        "guatemala",
+        ["BAM.png", "bam.png"]
+    ),
+    "BANCO INMOBILIARIO": (
+        "guatemala",
+        ["INMOBILIARIO.png", "BANCO INMOBILIARIO.png"]
+    ),
+    "INTERBANCO": (
+        "guatemala",
+        ["INTERBANCO.png", "interbanco.png"]
+    ),
+    "VIVIBANCO": (
+        "guatemala",
+        ["VIVIBANCO.png", "vivibanco.png"]
+    ),
+    "FICOHSA": (
+        "guatemala",
+        ["FICOHSA.png", "ficohsa.png"]
+    ),
+    "BANCO DE ANTIGUA": (
+        "guatemala",
+        ["ANTIGUA.png", "BANCO DE ANTIGUA.png"]
+    ),
+    "BANCO INV": (
+        "guatemala",
+        ["INV.png", "BANCO INV.png"]
+    ),
+
+    # --------------------------------------------------------
+    # EL SALVADOR
+    # Se aceptan varios nombres comunes para que no dependa
+    # de mayúsculas/minúsculas o guiones bajos.
+    # --------------------------------------------------------
+    "BANCO AGRÍCOLA": (
+        "el_salvador",
+        [
+            "AGRICOLA.png",
+            "BANCO AGRICOLA.png",
+            "BANCO_AGRICOLA.png",
+            "banco_agricola.png"
+        ]
+    ),
+    "BANCO CUSCATLÁN": (
+        "el_salvador",
+        [
+            "CUSCATLAN.png",
+            "BANCO CUSCATLAN.png",
+            "cuscatlan.png"
+        ]
+    ),
+    "DAVIVIENDA": (
+        "el_salvador",
+        [
+            "DAVIVIENDA.png",
+            "davivienda.png"
+        ]
+    ),
+    "BAC EL SALVADOR": (
+        "el_salvador",
+        [
+            "BAC.png",
+            "bac.png"
+        ]
+    ),
+    "PROMERICA EL SALVADOR": (
+        "el_salvador",
+        [
+            "PROMERICA.png",
+            "promerica.png"
+        ]
+    ),
+    "BANCO INDUSTRIAL EL SALVADOR": (
+        "el_salvador",
+        [
+            "BI.png",
+            "BANCO INDUSTRIAL.png",
+            "banco_industrial.png"
+        ]
+    ),
+    "APOYO INTEGRAL": (
+        "el_salvador",
+        [
+            "APOYO.png",
+            "APOYO INTEGRAL.png",
+            "apoyo_integral.png"
+        ]
+    ),
+    "BANCO ATLANTIDA": (
+        "el_salvador",
+        [
+            "ATLANTIDA.png",
+            "BANCO ATLANTIDA.png",
+            "banco_atlantida.png"
+        ]
+    ),
+    "ABANK": (
+        "el_salvador",
+        [
+            "ABANK.png",
+            "abank.png"
+        ]
+    ),
+    "BANCO AZUL": (
+        "el_salvador",
+        [
+            "AZUL.png",
+            "BANCO AZUL.png",
+            "banco_azul.png"
+        ]
+    ),
+    "BFA": (
+        "el_salvador",
+        [
+            "BFA.png",
+            "bfa.png"
+        ]
+    ),
+    "BANCO HIPOTECARIO": (
+        "el_salvador",
+        [
+            "HIPOTECARIO.png",
+            "BANCO HIPOTECARIO.png",
+            "banco_hipotecario.png"
+        ]
+    ),
+    "CITIBANK": (
+        "el_salvador",
+        [
+            "CITI.png",
+            "CITIBANK.png",
+            "citibank.png"
+        ]
+    ),
+}
+
+
+def _buscar_archivo_logo(subcarpeta, candidatos):
+    """
+    Busca un PNG en static/logos/<subcarpeta>.
+    Primero por nombre exacto y luego ignorando mayúsculas.
+    """
+
+    carpeta = os.path.join(
+        LOGOS_DIR,
+        subcarpeta
+    )
+
+    if not os.path.isdir(carpeta):
+        return None
+
+    # Búsqueda exacta
+    for nombre in candidatos:
+        ruta = os.path.join(
+            carpeta,
+            nombre
+        )
+
+        if os.path.isfile(ruta):
+            return ruta
+
+    # Búsqueda ignorando mayúsculas/minúsculas
+    archivos = {
+        nombre.lower(): nombre
+        for nombre in os.listdir(carpeta)
+        if nombre.lower().endswith(".png")
+    }
+
+    for candidato in candidatos:
+        real = archivos.get(
+            candidato.lower()
+        )
+
+        if real:
+            return os.path.join(
+                carpeta,
+                real
+            )
+
+    return None
+
+
+def _logo_png_a_data_uri(ruta):
+    """
+    Convierte un PNG local en data:image/png;base64,...
+    para que el HTML descargado sea completamente autónomo.
+    """
+
+    with open(
+        ruta,
+        "rb"
+    ) as archivo:
+
+        encoded = base64.b64encode(
+            archivo.read()
+        ).decode("ascii")
+
+    return (
+        "data:image/png;base64,"
+        + encoded
+    )
+
+
+def cargar_logos_bancarios_base64():
+    """
+    Carga únicamente los logos que realmente existan dentro de
+    static/logos/guatemala y static/logos/el_salvador.
+    """
+
+    resultado = {}
+
+    for (
+        clave,
+        (
+            subcarpeta,
+            candidatos
+        )
+    ) in BANK_LOGO_FILES.items():
+
+        try:
+
+            ruta = _buscar_archivo_logo(
+                subcarpeta,
+                candidatos
+            )
+
+            if not ruta:
+                continue
+
+            resultado[
+                clave
+            ] = _logo_png_a_data_uri(
+                ruta
+            )
+
+        except Exception as error:
+
+            print(
+                "No se pudo cargar logo",
+                clave,
+                ":",
+                str(error)
+            )
+
+    return resultado
+
+
+
 def renderizar_dashboard_nueva_plantilla():
     """
     Renderiza templates/dashboard/index.html y sustituye automáticamente
@@ -4286,6 +4585,37 @@ def renderizar_dashboard_nueva_plantilla():
     if cambios_tx == 0:
         raise ValueError(
             "La nueva plantilla no contiene el bloque 'const RAW_TRANSACTIONS = ...'."
+        )
+
+
+    # --------------------------------------------------------
+    # LOGOS AUTÓNOMOS
+    # --------------------------------------------------------
+    # Los PNG se leen desde /static/logos y se incrustan como Base64.
+    # Por eso el dashboard descargado funciona desde C:\...\Downloads
+    # sin depender de rutas locales ni URLs externas.
+    logos_bancarios = cargar_logos_bancarios_base64()
+
+    logos_json = json.dumps(
+        logos_bancarios,
+        ensure_ascii=False,
+        separators=(",", ":")
+    ).replace(
+        "</",
+        "<\\/"
+    )
+
+    html, cambios_logos = re.subn(
+        r"const\s+BANK_LOGOS\s*=\s*\{.*?\}\s*;",
+        "const BANK_LOGOS = " + logos_json + ";",
+        html,
+        count=1,
+        flags=re.S
+    )
+
+    if cambios_logos == 0:
+        raise ValueError(
+            "La plantilla no contiene el bloque 'const BANK_LOGOS = {...};'."
         )
 
     # La moneda se resuelve completamente dentro de index.html.
