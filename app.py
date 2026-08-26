@@ -16,6 +16,9 @@ import json
 
 app = Flask(__name__)
 
+# Identificador visible para confirmar qué versión está ejecutando Render.
+APP_BUILD = "dashboard-v2.5-final-20260826-1655"
+
 
 # ============================================================
 # CONFIGURACIÓN
@@ -110,6 +113,7 @@ DASHBOARD_ATTACHMENT_VERSION = "executive-dynamic-3.0"
 def home():
     return jsonify({
         "status": "ok",
+        "app_build": APP_BUILD,
         "message": "Excel Parser funcionando",
         "parser_version": PARSER_VERSION if "PARSER_VERSION" in globals() else "legacy",
         "template_exists": os.path.exists(TEMPLATE_FILE),
@@ -3009,7 +3013,7 @@ def _clave_banco_dashboard(banco):
     if "cuscatlan" in texto:
         return "BANCO CUSCATLÁN"
 
-    if re.search(r"\\bbac\\b", texto) or "america central" in texto:
+    if re.search(r"\bbac\b", texto) or "america central" in texto:
         return "BAC"
 
     if "promerica" in texto:
@@ -3106,9 +3110,9 @@ def _fecha_corte_desde_nombre(nombre_archivo, fecha_respaldo=""):
     nombre = str(nombre_archivo or "")
 
     patrones = [
-        (r"(?<!\\d)(\\d{2})(\\d{2})(20\\d{2})(?!\\d)", "%d/%m/%Y"),
-        (r"(?<!\\d)(20\\d{2})(\\d{2})(\\d{2})(?!\\d)", "%Y/%m/%d"),
-        (r"(?<!\\d)(\\d{2})[-_.](\\d{2})[-_.](20\\d{2})(?!\\d)", "%d/%m/%Y"),
+        (r"(?<!\d)(\d{2})(\d{2})(20\d{2})(?!\d)", "%d/%m/%Y"),
+        (r"(?<!\d)(20\d{2})(\d{2})(\d{2})(?!\d)", "%Y/%m/%d"),
+        (r"(?<!\d)(\d{2})[-_.](\d{2})[-_.](20\d{2})(?!\d)", "%d/%m/%Y"),
     ]
 
     for patron, tipo in patrones:
@@ -3788,7 +3792,7 @@ def renderizar_dashboard_nueva_plantilla():
 
     # Sustituye BASE_DATA incluso si la plantilla original trae un JSON enorme.
     html, cambios_base = re.subn(
-        r"const\\s+BASE_DATA\\s*=\\s*.*?;\\s*let\\s+DATA\\s*=\\s*null\\s*;",
+        r"const\s+BASE_DATA\s*=\s*.*?;\s*let\s+DATA\s*=\s*null\s*;",
         "const BASE_DATA = " + base_json + ";\\nlet DATA = null;",
         html,
         count=1,
@@ -3797,7 +3801,7 @@ def renderizar_dashboard_nueva_plantilla():
 
     # Sustituye RAW_TRANSACTIONS hasta justo antes de BANK_LOGOS.
     html, cambios_tx = re.subn(
-        r"const\\s+RAW_TRANSACTIONS\\s*=\\s*.*?;\\s*(?=const\\s+BANK_LOGOS\\s*=)",
+        r"const\s+RAW_TRANSACTIONS\s*=\s*.*?;\s*(?=const\s+BANK_LOGOS\s*=)",
         "const RAW_TRANSACTIONS = " + transactions_json + ";\\n",
         html,
         count=1,
@@ -4232,25 +4236,34 @@ def process_excel():
         response.headers[
             "X-Dashboard-Banks"
         ] = str(
-            dashboard_payload[
-                "cantidad_bancos"
-            ]
+            dashboard_payload.get(
+                "meta", {}
+            ).get(
+                "banks", 0
+            )
         )
 
         response.headers[
             "X-Dashboard-Balance"
         ] = str(
-            dashboard_payload[
-                "saldo_total"
-            ]
+            dashboard_payload.get(
+                "totals", {}
+            ).get(
+                "final", 0
+            )
         )
+
+        response.headers["X-App-Build"] = APP_BUILD
         return response
 
     except Exception as e:
 
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "app_build": APP_BUILD,
+            "parser_version": PARSER_VERSION if "PARSER_VERSION" in globals() else "legacy"
         }), 500
 
     finally:
