@@ -17,7 +17,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v2.7-auto-currency-fix-20260826-1719"
+APP_BUILD = "dashboard-v3.2-currency-all-tabs-20260826-1749"
 
 
 # ============================================================
@@ -510,6 +510,248 @@ def valor_o_nd(value):
 def clean_number(value):
     parsed = parse_number(value)
     return parsed if parsed is not None else 0.0
+
+
+
+def detectar_moneda_textual(
+    rows=None,
+    worksheet_title="",
+    nombre_archivo=""
+):
+    """
+    Detecta moneda usando SOLO señales textuales reales del archivo:
+    códigos (USD/GTQ/EUR...), nombres de moneda y símbolos escritos
+    junto a importes.
+
+    No usa number_format de Excel, porque un archivo transformado puede
+    conservar un formato viejo (por ejemplo Q) aunque el estado indique USD.
+    """
+
+    scores = {
+        "GTQ": 0,
+        "USD": 0,
+        "EUR": 0,
+        "SVC": 0,
+        "HNL": 0,
+        "CRC": 0,
+        "NIO": 0,
+        "MXN": 0,
+        "GBP": 0,
+    }
+
+    def analizar(value, peso=1):
+        if value in (None, ""):
+            return
+
+        raw = str(value).strip()
+        if not raw:
+            return
+
+        normal = clean_text(raw)
+
+        patrones = {
+            "GTQ": (
+                r"\bGTQ\b|\bQTZ\b|\bQUETZAL(?:ES)?\b",
+                r"(?<![A-Za-z])Q\s*[-+]?\s*\d",
+            ),
+            "USD": (
+                r"\bUSD\b|\bD[OÓ]LAR(?:ES)?\b|\bDOLLAR(?:S)?\b",
+                r"US\s*\$\s*[-+]?\s*\d",
+            ),
+            "EUR": (
+                r"\bEUR\b|\bEURO(?:S)?\b",
+                r"€\s*[-+]?\s*\d",
+            ),
+            "SVC": (
+                r"\bSVC\b|\bCOL[ÓO]N(?:ES)?\s+SALVADORE[ÑN]O(?:S)?\b",
+                None,
+            ),
+            "HNL": (
+                r"\bHNL\b|\bLEMPIRA(?:S)?\b",
+                None,
+            ),
+            "CRC": (
+                r"\bCRC\b|\bCOL[ÓO]N(?:ES)?\s+COSTARRICENSE(?:S)?\b",
+                None,
+            ),
+            "NIO": (
+                r"\bNIO\b|\bC[ÓO]RDOBA(?:S)?\b",
+                r"C\$\s*[-+]?\s*\d",
+            ),
+            "MXN": (
+                r"\bMXN\b|\bPESO(?:S)?\s+MEXICANO(?:S)?\b",
+                r"MX\$\s*[-+]?\s*\d",
+            ),
+            "GBP": (
+                r"\bGBP\b|\bLIBRA(?:S)?\s+ESTERLINA(?:S)?\b|\bPOUND(?:S)?\b",
+                r"£\s*[-+]?\s*\d",
+            ),
+        }
+
+        for codigo, (patron_texto, patron_simbolo) in patrones.items():
+            if re.search(patron_texto, raw, re.I):
+                scores[codigo] += 200 * peso
+
+            if patron_simbolo and re.search(
+                patron_simbolo,
+                raw,
+                re.I
+            ):
+                scores[codigo] += 120 * peso
+
+        # $ sin prefijo se toma como USD solo cuando está escrito en el
+        # contenido de una celda, no cuando viene de un number_format.
+        if re.search(r"(?<![A-Za-z])\$\s*[-+]?\s*\d", raw):
+            scores["USD"] += 80 * peso
+
+    analizar(nombre_archivo, 3)
+    analizar(worksheet_title, 3)
+
+    rows = rows or []
+
+    for row in rows[:60]:
+        for value in row:
+            analizar(value, 1)
+
+    ranking = sorted(
+        scores.items(),
+        key=lambda item: item[1],
+        reverse=True
+    )
+
+    if not ranking or ranking[0][1] <= 0:
+        return "N/D"
+
+    if (
+        len(ranking) > 1
+        and ranking[0][1] == ranking[1][1]
+    ):
+        return "N/D"
+
+    return ranking[0][0]
+
+
+def detectar_moneda_contexto_archivo(
+    workbook,
+    nombre_archivo=""
+):
+    """
+    Obtiene una moneda de respaldo para el libro completo.
+
+    Prioridad:
+    1. Moneda escrita explícitamente en los estados.
+    2. País/empresa escrito en el archivo.
+    3. Bancos fuertemente asociados al país como último respaldo.
+
+    Esta moneda SOLO se usa en hojas donde no haya una moneda textual
+    explícita. Por eso una cuenta USD en Guatemala puede seguir siendo USD
+    si el estado de cuenta lo indica expresamente.
+    """
+
+    monedas_textuales = set()
+    contexto = [str(nombre_archivo or "")]
+
+    for worksheet in workbook.worksheets:
+
+        rows_contexto = []
+
+        try:
+            for row_index, row in enumerate(
+                worksheet.iter_rows(values_only=True),
+                start=1
+            ):
+                if row_index > 40:
+                    break
+
+                valores = list(row)
+                rows_contexto.append(valores)
+
+                for value in valores:
+                    if value not in (None, ""):
+                        contexto.append(str(value))
+
+        except Exception:
+            pass
+
+        contexto.append(str(worksheet.title))
+
+        moneda_textual = detectar_moneda_textual(
+            rows_contexto,
+            worksheet.title,
+            nombre_archivo
+        )
+
+        if moneda_textual not in {"N/D", "MULTI"}:
+            monedas_textuales.add(moneda_textual)
+
+    # Si todo lo escrito explícitamente coincide, esa es la mejor
+    # moneda de respaldo del archivo.
+    if len(monedas_textuales) == 1:
+        return next(iter(monedas_textuales))
+
+    # Si hay dos monedas explícitas reales, no forzar una sola.
+    if len(monedas_textuales) > 1:
+        return "MULTI"
+
+    texto_contexto = clean_text(
+        " | ".join(contexto)
+    )
+
+    # País / empresa como respaldo.
+    if "el salvador" in texto_contexto:
+        return "USD"
+
+    if "guatemala" in texto_contexto:
+        return "GTQ"
+
+    if "honduras" in texto_contexto:
+        return "HNL"
+
+    if "costa rica" in texto_contexto:
+        return "CRC"
+
+    if "nicaragua" in texto_contexto:
+        return "NIO"
+
+    if "mexico" in texto_contexto:
+        return "MXN"
+
+    # Último respaldo por bancos muy representativos del país.
+    senales_gt = (
+        "banco industrial",
+        "banrural",
+        "g&t",
+        "gyt",
+        "banco agricola mercantil",
+        " bam ",
+    )
+
+    senales_sv = (
+        "banco agricola",
+        "banco agricola",
+        "cuscatlan",
+        "cuscatlan",
+    )
+
+    gt = sum(
+        1
+        for señal in senales_gt
+        if señal in texto_contexto
+    )
+
+    sv = sum(
+        1
+        for señal in senales_sv
+        if señal in texto_contexto
+    )
+
+    if gt > 0 and gt > sv:
+        return "GTQ"
+
+    if sv > 0 and sv > gt:
+        return "USD"
+
+    return "N/D"
 
 
 def detectar_moneda(worksheet, rows=None, header_index=None):
@@ -1862,7 +2104,11 @@ def extraer_transaccion(
     }
 
 
-def procesar_hoja(worksheet):
+def procesar_hoja(
+    worksheet,
+    moneda_respaldo="N/D",
+    nombre_archivo=""
+):
     rows = []
 
     for row in worksheet.iter_rows(values_only=True):
@@ -1880,14 +2126,35 @@ def procesar_hoja(worksheet):
     banco = detectar_banco(worksheet.title, rows)
     cuenta = detectar_cuenta(worksheet.title, rows, header_index)
 
-    # La moneda es metadato para formato visual.
-    # Si algún banco trae un formato extraño, NO debe detener el parser.
+    # --------------------------------------------------------
+    # MONEDA
+    # --------------------------------------------------------
+    # 1) Prioridad máxima: moneda escrita en el estado de cuenta.
+    # 2) Si no existe, usar la moneda contextual del archivo.
+    # 3) Solo al final revisar el number_format de las celdas.
+    #
+    # Esto evita que un formato viejo de Excel (ej. Q) gane sobre
+    # un texto real como "MONETARIO (USD)".
     try:
-        moneda = detectar_moneda(
-            worksheet,
+        moneda_textual = detectar_moneda_textual(
             rows,
-            header_index
+            worksheet.title,
+            nombre_archivo
         )
+
+        if moneda_textual not in {"N/D", "MULTI"}:
+            moneda = moneda_textual
+
+        elif moneda_respaldo not in {"N/D", "MULTI", ""}:
+            moneda = moneda_respaldo
+
+        else:
+            moneda = detectar_moneda(
+                worksheet,
+                rows,
+                header_index
+            )
+
     except Exception as currency_error:
         print(
             "No se pudo detectar moneda en hoja",
@@ -1895,7 +2162,12 @@ def procesar_hoja(worksheet):
             ":",
             str(currency_error)
         )
-        moneda = "N/D"
+
+        moneda = (
+            moneda_respaldo
+            if moneda_respaldo not in {"N/D", "MULTI", ""}
+            else "N/D"
+        )
 
     expected_month, expected_year = detectar_periodo(rows, worksheet.title)
     saldo_inicial = detectar_saldo_inicial(rows, header_index)
@@ -3222,9 +3494,116 @@ def _fecha_corte_desde_nombre(nombre_archivo, fecha_respaldo=""):
     return fecha_respaldo or ""
 
 
+
+def resolver_moneda_dashboard_final(
+    transactions,
+    nombre_archivo="",
+    moneda_contextual="N/D"
+):
+    """
+    Resuelve UNA moneda de presentación para el dashboard.
+
+    Prioridad:
+    1. Moneda contextual/textual confiable del archivo.
+    2. País indicado en el nombre del archivo.
+    3. Conjunto de bancos del archivo.
+    4. Moneda resultante de las transacciones.
+
+    Esto corrige falsos MULTI causados por formatos heredados de Excel.
+    No convierte importes.
+    """
+
+    contextual = normalizar_codigo_moneda(
+        moneda_contextual
+    )
+
+    if contextual not in {"N/D", ""}:
+        return contextual
+
+    archivo = clean_text(
+        nombre_archivo
+    )
+
+    if "el salvador" in archivo:
+        return "USD"
+
+    if "guatemala" in archivo:
+        return "GTQ"
+
+    if "honduras" in archivo:
+        return "HNL"
+
+    if "costa rica" in archivo:
+        return "CRC"
+
+    if "nicaragua" in archivo:
+        return "NIO"
+
+    if "mexico" in archivo:
+        return "MXN"
+
+    bancos_texto = " | ".join(
+        str(
+            transaction.get(
+                "banco",
+                ""
+            )
+        )
+        for transaction in transactions
+    )
+
+    bancos_normal = clean_text(
+        bancos_texto
+    )
+
+    # Señales muy fuertes de Guatemala.
+    guatemala_signals = (
+        "banco industrial",
+        "industrial",
+        "banrural",
+        "g&t",
+        "gyt",
+        "banco agricola mercantil",
+        "bam",
+    )
+
+    if any(
+        signal in bancos_normal
+        for signal in guatemala_signals
+    ):
+        return "GTQ"
+
+    # Conjunto típico de El Salvador.
+    tiene_agricola = (
+        "banco agricola" in bancos_normal
+        or "agricola" in bancos_normal
+    )
+
+    tiene_cuscatlan = (
+        "cuscatlan" in bancos_normal
+    )
+
+    if tiene_agricola and tiene_cuscatlan:
+        return "USD"
+
+    detectada = moneda_unica_transacciones(
+        transactions
+    )
+
+    if detectada in {
+        "GTQ", "USD", "EUR", "SVC",
+        "HNL", "CRC", "NIO", "MXN", "GBP"
+    }:
+        return detectada
+
+    return "N/D"
+
+
+
 def construir_dashboard_data(
     transactions,
-    nombre_archivo=""
+    nombre_archivo="",
+    moneda_preferida="N/D"
 ):
     """
     Convierte las transacciones normalizadas del parser a la estructura
@@ -3254,8 +3633,13 @@ def construir_dashboard_data(
     # MONEDA GENERAL
     # --------------------------------------------------------
 
-    moneda_dashboard = moneda_unica_transacciones(
-        transactions
+    # Moneda FINAL para presentación del dashboard.
+    # Se resuelve a nivel de archivo para evitar falsos MULTI por
+    # number_format heredados en algunas hojas.
+    moneda_dashboard = resolver_moneda_dashboard_final(
+        transactions,
+        nombre_archivo=nombre_archivo,
+        moneda_contextual=moneda_preferida
     )
 
     # --------------------------------------------------------
@@ -3907,96 +4291,10 @@ def renderizar_dashboard_nueva_plantilla():
             "La nueva plantilla no contiene el bloque 'const RAW_TRANSACTIONS = ...'."
         )
 
-    moneda = str(
-        datos.get("meta", {}).get("currency", "N/D")
-    ).upper()
+    # La moneda se resuelve completamente dentro de index.html.
+    # Python solo inyecta BASE_DATA y RAW_TRANSACTIONS.
+    # Así todas las pestañas usan el mismo formateador monetario.
 
-    # Texto visible de moneda en portada/encabezado.
-    html = html.replace(
-        "USD ($)",
-        _etiqueta_moneda_dashboard(moneda)
-    )
-
-    # --------------------------------------------------------
-    # FORMATO MONETARIO DINÁMICO EN EL DASHBOARD
-    # --------------------------------------------------------
-    # La plantilla original trae:
-    #   const money = ... currency:'USD' ...
-    #
-    # Se reemplaza por un formatter basado en BASE_DATA.meta.currency,
-    # de modo que:
-    #   GTQ -> Q
-    #   USD -> $
-    #   EUR -> €
-    # etc.
-    #
-    # IMPORTANTE: esto SOLO cambia presentación. No convierte montos.
-    currency_js = (
-        "const DASHBOARD_CURRENCY = "
-        "String((BASE_DATA&&BASE_DATA.meta&&BASE_DATA.meta.currency)||'N/D').toUpperCase();\\n"
-        "const DASHBOARD_CURRENCY_SYMBOLS = {"
-        "GTQ:'Q',USD:'$',EUR:'€',SVC:'₡',HNL:'L',CRC:'₡',"
-        "NIO:'C$',MXN:'MX$',GBP:'£'"
-        "};\\n"
-        "const DASHBOARD_CURRENCY_SYMBOL = "
-        "DASHBOARD_CURRENCY_SYMBOLS[DASHBOARD_CURRENCY]||'';\\n"
-        "const money = v => {"
-        "const n=Number(v)||0;"
-        "const formatted=new Intl.NumberFormat('en-US',"
-        "{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);"
-        "return DASHBOARD_CURRENCY_SYMBOL"
-        "?DASHBOARD_CURRENCY_SYMBOL+' '+formatted"
-        ":formatted;"
-        "};"
-    )
-
-    html, cambios_money = re.subn(
-        r"const\s+money\s*=\s*v\s*=>\s*new\s+Intl\.NumberFormat\(.*?\)\.format\(Number\(v\)\|\|0\);",
-        currency_js,
-        html,
-        count=1,
-        flags=re.S
-    )
-
-    # Segunda estrategia: reemplazo literal de la línea de la plantilla
-    # actual, por si el HTML cambia mínimamente y la regex no coincide.
-    if cambios_money == 0:
-        money_original = (
-            "const money = v => new Intl.NumberFormat('en-US',"
-            "{style:'currency',currency:'USD',minimumFractionDigits:2})"
-            ".format(Number(v)||0);"
-        )
-        if money_original in html:
-            html = html.replace(
-                money_original,
-                currency_js,
-                1
-            )
-            cambios_money = 1
-
-    # Tercera estrategia: al menos cambiar el código de moneda si la
-    # plantilla conserva un Intl.NumberFormat con USD fijo.
-    if cambios_money == 0 and moneda in {
-        "USD", "GTQ", "EUR", "SVC", "HNL", "CRC", "NIO", "MXN", "GBP"
-    }:
-        html, cambios_currency_code = re.subn(
-            r"currency\s*:\s*['\"]USD['\"]",
-            "currency:'" + moneda + "'",
-            html,
-            count=1
-        )
-
-    # Si aún queda el formatter fijo en USD, detener la generación.
-    # Es preferible un error claro a entregar un dashboard con moneda falsa.
-    if (
-        moneda not in {"N/D", "MULTI"}
-        and "currency:'USD'" in html
-        and moneda != "USD"
-    ):
-        raise ValueError(
-            "El dashboard todavía conserva currency:'USD' aunque "
-            "el Excel fue detectado como " + moneda + "."
-        )
 
     return html
 
@@ -4217,6 +4515,18 @@ def process_excel():
             read_only=True
         )
 
+        # Moneda de respaldo del archivo completo.
+        # Se obtiene del texto real / país / bancos antes de procesar hojas.
+        moneda_archivo = detectar_moneda_contexto_archivo(
+            workbook,
+            file.filename
+        )
+
+        print(
+            "Moneda contextual detectada:",
+            moneda_archivo
+        )
+
         all_transactions = []
         processed_sheets = []
 
@@ -4229,7 +4539,9 @@ def process_excel():
             try:
 
                 transactions = procesar_hoja(
-                    worksheet
+                    worksheet,
+                    moneda_respaldo=moneda_archivo,
+                    nombre_archivo=file.filename
                 )
 
                 if transactions:
@@ -4242,6 +4554,11 @@ def process_excel():
                         "name": worksheet.title,
                         "transactions": len(
                             transactions
+                        ),
+                        "currency": (
+                            transactions[0].get("moneda", "N/D")
+                            if transactions
+                            else "N/D"
                         )
                     })
 
@@ -4300,7 +4617,8 @@ def process_excel():
 
         dashboard_payload = construir_dashboard_data(
             all_transactions,
-            file.filename
+            file.filename,
+            moneda_preferida=moneda_archivo
         )
 
         guardar_dashboard_data(
@@ -4419,6 +4737,10 @@ def process_excel():
             ).get(
                 "currency", "N/D"
             )
+        )
+
+        response.headers["X-Source-Currency"] = str(
+            moneda_archivo
         )
 
         response.headers["X-App-Build"] = APP_BUILD
