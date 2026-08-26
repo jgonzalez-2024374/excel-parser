@@ -1,5 +1,5 @@
-from flask import base64
-import Flask, request, jsonify, send_file, after_this_request
+import base64
+from flask import Flask, request, jsonify, send_file, after_this_request
 from flask import render_template
 from flask import make_response
 from openpyxl import load_workbook
@@ -18,7 +18,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v3.6-responsive-bank-logos-20260826-2020"
+APP_BUILD = "dashboard-v3.6.1-responsive-bank-logos-import-fix-20260826-2022"
 
 
 # ============================================================
