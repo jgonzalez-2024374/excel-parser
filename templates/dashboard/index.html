@@ -260,8 +260,59 @@ const BANK_LOGOS = {
 const CURRENCY_SYMBOLS = {
   GTQ:'Q', USD:'$', EUR:'€', SVC:'₡', HNL:'L', CRC:'₡', NIO:'C$', MXN:'MX$', GBP:'£'
 };
-const currencyCode = () => String((BASE_DATA && BASE_DATA.meta && BASE_DATA.meta.currency) || 'N/D').toUpperCase();
+const currencyCode = () => {
+  const meta = (BASE_DATA && BASE_DATA.meta) ? BASE_DATA.meta : {};
+  const explicit = String(meta.currency || 'N/D').trim().toUpperCase();
+
+  // Si Python ya detectó una moneda válida, respetarla.
+  if (CURRENCY_SYMBOLS[explicit]) return explicit;
+
+  // Si el archivo contiene varias monedas reales, no inventar una sola.
+  if (explicit === 'MULTI') return 'MULTI';
+
+  // Respaldo 1: país o empresa indicado en el nombre del archivo.
+  const fileText = String(meta.file || '').toUpperCase();
+  if (fileText.includes('EL SALVADOR')) return 'USD';
+  if (fileText.includes('GUATEMALA')) return 'GTQ';
+  if (fileText.includes('HONDURAS')) return 'HNL';
+  if (fileText.includes('COSTA RICA')) return 'CRC';
+  if (fileText.includes('NICARAGUA')) return 'NIO';
+  if (fileText.includes('MEXICO') || fileText.includes('MÉXICO')) return 'MXN';
+
+  // Respaldo 2: bancos del archivo.
+  // Solo se usa cuando meta.currency viene N/D.
+  const banks = Array.isArray(BASE_DATA && BASE_DATA.banks) ? BASE_DATA.banks : [];
+  const bankText = banks.map(b => `${b.key || ''} ${b.name || ''}`).join(' ').toUpperCase();
+
+  // Bancos que identifican con mucha fuerza un archivo de Guatemala.
+  const guatemalaSignals = [
+    'BANCO INDUSTRIAL',
+    'INDUSTRIAL',
+    'BANRURAL',
+    'G&T',
+    'GYT',
+    'BANCO AGRICOLA MERCANTIL',
+    'BANCO AGRÍCOLA MERCANTIL',
+    'BAM'
+  ];
+
+  if (guatemalaSignals.some(s => bankText.includes(s))) {
+    return 'GTQ';
+  }
+
+  // Agrícola + Cuscatlán es una señal fuerte del conjunto salvadoreño.
+  const hasAgricola = bankText.includes('BANCO AGRÍCOLA') || bankText.includes('BANCO AGRICOLA');
+  const hasCuscatlan = bankText.includes('CUSCATLÁN') || bankText.includes('CUSCATLAN');
+
+  if (hasAgricola && hasCuscatlan) {
+    return 'USD';
+  }
+
+  return explicit || 'N/D';
+};
+
 const currencySymbol = () => CURRENCY_SYMBOLS[currencyCode()] || '';
+
 const currencyLabel = () => {
   const code = currencyCode();
   const symbol = currencySymbol();
@@ -274,9 +325,16 @@ const money = v => {
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(n);
+  }).format(Math.abs(n));
+
   const symbol = currencySymbol();
-  return symbol ? `${symbol} ${formatted}` : formatted;
+  const sign = n < 0 ? '-' : '';
+
+  if (symbol) {
+    return `${sign}${symbol} ${formatted}`;
+  }
+
+  return `${sign}${formatted}`;
 };
 const pct = v => `${v>=0?'+':''}${Number(v||0).toFixed(2)}%`;
 const cls = v => v>0?'positive':v<0?'negative':'neutral';

@@ -17,7 +17,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v2.9-currency-context-fix-20260826-1731"
+APP_BUILD = "dashboard-v3.0-currency-dashboard-20260826-1736"
 
 
 # ============================================================
@@ -3496,7 +3496,8 @@ def _fecha_corte_desde_nombre(nombre_archivo, fecha_respaldo=""):
 
 def construir_dashboard_data(
     transactions,
-    nombre_archivo=""
+    nombre_archivo="",
+    moneda_preferida="N/D"
 ):
     """
     Convierte las transacciones normalizadas del parser a la estructura
@@ -3529,6 +3530,22 @@ def construir_dashboard_data(
     moneda_dashboard = moneda_unica_transacciones(
         transactions
     )
+
+    # Si las transacciones no traen una moneda concluyente, usar la
+    # moneda contextual detectada del archivo original.
+    #
+    # Esto es especialmente importante cuando un Excel transformado
+    # conserva formatos antiguos ($ / Q) que no representan la moneda
+    # real del estado de cuenta.
+    moneda_preferida = normalizar_codigo_moneda(
+        moneda_preferida
+    )
+
+    if (
+        moneda_dashboard in {"N/D", "MULTI"}
+        and moneda_preferida not in {"N/D", "MULTI", ""}
+    ):
+        moneda_dashboard = moneda_preferida
 
     # --------------------------------------------------------
     # IDENTIFICAR CUENTAS Y EVITAR COLISIONES DE ÚLTIMOS 4
@@ -4591,7 +4608,8 @@ def process_excel():
 
         dashboard_payload = construir_dashboard_data(
             all_transactions,
-            file.filename
+            file.filename,
+            moneda_preferida=moneda_archivo
         )
 
         guardar_dashboard_data(
