@@ -13,11 +13,14 @@ import tempfile
 import unicodedata
 import re
 import json
+import time
+import urllib.request
+import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.0-country-split-gt-sv-20260826-1455"
+APP_BUILD = "dashboard-v4.2-live-fx-banguat-20260826-1518"
 
 
 # ============================================================
@@ -68,6 +71,19 @@ os.makedirs(
     DASHBOARD_DATA_DIR,
     exist_ok=True
 )
+
+
+# Cache del tipo de cambio de referencia USD/GTQ.
+# El Banco de Guatemala publica un valor diario; se refresca cada 15 minutos
+# para evitar llamadas innecesarias al servicio externo.
+FX_CACHE = {
+    "rate_gtq_per_usd": None,
+    "date": "",
+    "fetched_at": 0.0,
+    "source": "Banco de Guatemala"
+}
+
+FX_CACHE_TTL_SECONDS = 15 * 60
 
 DASHBOARD_CACHE = {
     "meta": {
@@ -120,6 +136,284 @@ def home():
         "endpoint": "/process-excel"
     })
 
+
+
+
+# ============================================================
+# TIPO DE CAMBIO USD / GTQ
+# ============================================================
+
+BANGUAT_FX_URL = (
+    "https://www.banguat.gob.gt/"
+    "variables/ws/TipoCambio.asmx"
+)
+
+
+def _consultar_tipo_cambio_banguat():
+    """
+    Consulta TipoCambioDia del Web Service del Banco de Guatemala.
+
+    Retorna:
+        {
+            "rate_gtq_per_usd": float,
+            "date": str,
+            "source": "Banco de Guatemala"
+        }
+
+    No utiliza librerías externas.
+    """
+
+    soap_body = """<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <TipoCambioDia xmlns="http://www.banguat.gob.gt/variables/ws/" />
+  </soap:Body>
+</soap:Envelope>""".encode("utf-8")
+
+    req = urllib.request.Request(
+        BANGUAT_FX_URL,
+        data=soap_body,
+        method="POST",
+        headers={
+            "Content-Type": "text/xml; charset=utf-8",
+            "SOAPAction": (
+                '"http://www.banguat.gob.gt/'
+                'variables/ws/TipoCambioDia"'
+            ),
+            "User-Agent": "excel-parser/1.0"
+        }
+    )
+
+    with urllib.request.urlopen(
+        req,
+        timeout=10
+    ) as response:
+
+        xml_bytes = response.read()
+
+    root = ET.fromstring(
+        xml_bytes
+    )
+
+    referencia = None
+    fecha = ""
+
+    for element in root.iter():
+        local_name = element.tag.split("}")[-1].lower()
+
+        if (
+            local_name == "referencia"
+            and referencia is None
+        ):
+            try:
+                referencia = float(
+                    str(
+                        element.text
+                        or ""
+                    ).strip()
+                )
+            except Exception:
+                pass
+
+        if (
+            local_name == "fecha"
+            and not fecha
+        ):
+            fecha = str(
+                element.text
+                or ""
+            ).strip()
+
+    if (
+        referencia is None
+        or referencia <= 0
+    ):
+        raise ValueError(
+            "Banco de Guatemala no devolvió una referencia válida."
+        )
+
+    return {
+        "rate_gtq_per_usd": referencia,
+        "date": fecha,
+        "source": "Banco de Guatemala"
+    }
+
+
+@app.route(
+    "/api/tipo-cambio",
+    methods=["GET"]
+)
+def tipo_cambio_actual():
+    """
+    Devuelve el tipo de cambio de referencia USD -> GTQ.
+
+    Se permite CORS porque el dashboard descargado puede abrirse desde file://
+    y consultar este endpoint alojado en Render.
+    """
+
+    force_refresh = (
+        request.args.get(
+            "refresh",
+            ""
+        )
+        == "1"
+    )
+
+    now_ts = time.time()
+
+    cache_rate = FX_CACHE.get(
+        "rate_gtq_per_usd"
+    )
+
+    cache_age = (
+        now_ts
+        - float(
+            FX_CACHE.get(
+                "fetched_at",
+                0.0
+            )
+            or 0.0
+        )
+    )
+
+    if (
+        not force_refresh
+        and cache_rate
+        and cache_age < FX_CACHE_TTL_SECONDS
+    ):
+        payload = {
+            "success": True,
+            "rate_gtq_per_usd": cache_rate,
+            "date": FX_CACHE.get(
+                "date",
+                ""
+            ),
+            "source": FX_CACHE.get(
+                "source",
+                "Banco de Guatemala"
+            ),
+            "cached": True,
+            "stale": False,
+            "fetched_at": datetime.now().isoformat(
+                timespec="seconds"
+            )
+        }
+
+        response = jsonify(
+            payload
+        )
+
+        response.headers[
+            "Access-Control-Allow-Origin"
+        ] = "*"
+
+        response.headers[
+            "Cache-Control"
+        ] = "no-store"
+
+        return response
+
+    try:
+        live = _consultar_tipo_cambio_banguat()
+
+        FX_CACHE.update({
+            "rate_gtq_per_usd": live[
+                "rate_gtq_per_usd"
+            ],
+            "date": live.get(
+                "date",
+                ""
+            ),
+            "source": live.get(
+                "source",
+                "Banco de Guatemala"
+            ),
+            "fetched_at": now_ts
+        })
+
+        payload = {
+            "success": True,
+            "rate_gtq_per_usd": FX_CACHE[
+                "rate_gtq_per_usd"
+            ],
+            "date": FX_CACHE[
+                "date"
+            ],
+            "source": FX_CACHE[
+                "source"
+            ],
+            "cached": False,
+            "stale": False,
+            "fetched_at": datetime.now().isoformat(
+                timespec="seconds"
+            )
+        }
+
+        status_code = 200
+
+    except Exception as error:
+
+        # Si hubo una consulta exitosa antes, conservar el último dato
+        # como respaldo en lugar de dejar el dashboard inutilizable.
+        if FX_CACHE.get(
+            "rate_gtq_per_usd"
+        ):
+            payload = {
+                "success": True,
+                "rate_gtq_per_usd": FX_CACHE[
+                    "rate_gtq_per_usd"
+                ],
+                "date": FX_CACHE.get(
+                    "date",
+                    ""
+                ),
+                "source": FX_CACHE.get(
+                    "source",
+                    "Banco de Guatemala"
+                ),
+                "cached": True,
+                "stale": True,
+                "warning": (
+                    "No se pudo actualizar el tipo de cambio; "
+                    "se muestra el último valor disponible."
+                ),
+                "fetched_at": datetime.now().isoformat(
+                    timespec="seconds"
+                )
+            }
+
+            status_code = 200
+
+        else:
+            payload = {
+                "success": False,
+                "error": str(
+                    error
+                ),
+                "source": "Banco de Guatemala"
+            }
+
+            status_code = 502
+
+    response = jsonify(
+        payload
+    )
+
+    response.headers[
+        "Access-Control-Allow-Origin"
+    ] = "*"
+
+    response.headers[
+        "Cache-Control"
+    ] = "no-store"
+
+    return (
+        response,
+        status_code
+    )
 
 
 # ============================================================
