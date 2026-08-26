@@ -1397,7 +1397,7 @@ function setFxLiveStatus(type,message){
 async function loadLiveExchangeRate(force=false){
   if(
     !LIVE_FX_ENDPOINT ||
-    LIVE_FX_ENDPOINT.includes('{{')
+    LIVE_FX_ENDPOINT.includes(String.fromCharCode(123,123))
   ){
     setFxLiveStatus(
       'error',
