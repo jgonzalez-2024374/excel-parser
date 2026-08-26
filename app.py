@@ -17,7 +17,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v3.2-currency-all-tabs-20260826-1749"
+APP_BUILD = "dashboard-v3.3-no-false-hnl-20260826-1759"
 
 
 # ============================================================
@@ -567,7 +567,7 @@ def detectar_moneda_textual(
                 None,
             ),
             "HNL": (
-                r"\bHNL\b|\bLEMPIRA(?:S)?\b",
+                r"\bHNL\b|\bLEMPIRA(?:S)?\b|\bHONDURAS\b",
                 None,
             ),
             "CRC": (
@@ -828,9 +828,6 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
             # ₡ puede corresponder a CRC o SVC. Si el texto no aclara,
             # se favorece CRC por uso actual del símbolo.
             scores["CRC"] += 45 * peso
-
-        if re.search(r"\bL\.?\s*[-+]?\s*\d", raw, re.I):
-            scores["HNL"] += 35 * peso
 
         if re.search(r"C\$\s*[-+]?\s*\d", raw, re.I):
             scores["NIO"] += 45 * peso
