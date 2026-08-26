@@ -17,7 +17,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v2.5-final-20260826-1655"
+APP_BUILD = "dashboard-v2.6-auto-currency-20260826-1708"
 
 
 # ============================================================
@@ -518,10 +518,15 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
     NO convierte importes, NO separa totales y NO modifica cálculos.
     """
     scores = {
-        "GTQ": 0,
-        "USD": 0,
-        "EUR": 0,
-        "SVC": 0,
+        "GTQ": 0,   # Quetzal
+        "USD": 0,   # Dólar estadounidense
+        "EUR": 0,   # Euro
+        "SVC": 0,   # Colón salvadoreño
+        "HNL": 0,   # Lempira
+        "CRC": 0,   # Colón costarricense
+        "NIO": 0,   # Córdoba
+        "MXN": 0,   # Peso mexicano
+        "GBP": 0,   # Libra esterlina
     }
 
     def analizar_texto(value, peso=1):
@@ -547,6 +552,21 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
         if re.search(r"\bSVC\b", normal, re.I):
             scores["SVC"] += 100 * peso
 
+        if re.search(r"\bHNL\b|\bLEMPIRA(?:S)?\b", normal, re.I):
+            scores["HNL"] += 100 * peso
+
+        if re.search(r"\bCRC\b|\bCOLON(?:ES)? COSTARRICENSE(?:S)?\b", normal, re.I):
+            scores["CRC"] += 100 * peso
+
+        if re.search(r"\bNIO\b|\bCORDOBA(?:S)?\b", normal, re.I):
+            scores["NIO"] += 100 * peso
+
+        if re.search(r"\bMXN\b|\bPESO(?:S)? MEXICANO(?:S)?\b", normal, re.I):
+            scores["MXN"] += 100 * peso
+
+        if re.search(r"\bGBP\b|\bLIBRA(?:S)? ESTERLINA(?:S)?\b|\bPOUND(?:S)?\b", normal, re.I):
+            scores["GBP"] += 100 * peso
+
         # Símbolos junto a importes
         if re.search(r"(?<![A-Za-z])Q\s*[-+]?\s*\d", raw, re.I):
             scores["GTQ"] += 50 * peso
@@ -558,6 +578,23 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
 
         if re.search(r"€\s*[-+]?\s*\d", raw):
             scores["EUR"] += 60 * peso
+
+        if re.search(r"£\s*[-+]?\s*\d", raw):
+            scores["GBP"] += 60 * peso
+
+        if re.search(r"₡\s*[-+]?\s*\d", raw):
+            # ₡ puede corresponder a CRC o SVC. Si el texto no aclara,
+            # se favorece CRC por uso actual del símbolo.
+            scores["CRC"] += 45 * peso
+
+        if re.search(r"\bL\.?\s*[-+]?\s*\d", raw, re.I):
+            scores["HNL"] += 35 * peso
+
+        if re.search(r"C\$\s*[-+]?\s*\d", raw, re.I):
+            scores["NIO"] += 45 * peso
+
+        if re.search(r"MX\$\s*[-+]?\s*\d", raw, re.I):
+            scores["MXN"] += 55 * peso
 
     analizar_texto(worksheet.title, 2)
 
@@ -629,6 +666,24 @@ def detectar_moneda(worksheet, rows=None, header_index=None):
                 if "SVC" in fmt_up:
                     scores["SVC"] += 12
 
+                if "HNL" in fmt_up:
+                    scores["HNL"] += 12
+
+                if "CRC" in fmt_up:
+                    scores["CRC"] += 12
+
+                if "NIO" in fmt_up or "C$" in fmt_up:
+                    scores["NIO"] += 12
+
+                if "MXN" in fmt_up or "MX$" in fmt_up:
+                    scores["MXN"] += 12
+
+                if "GBP" in fmt_up or "£" in fmt:
+                    scores["GBP"] += 12
+
+                if "₡" in fmt and "SVC" not in fmt_up:
+                    scores["CRC"] += 8
+
     except Exception as currency_format_error:
         # La moneda es un dato de presentación.
         # Nunca debe impedir que el estado de cuenta sea procesado.
@@ -675,12 +730,36 @@ def normalizar_codigo_moneda(moneda):
         "EURO": "EUR",
         "EUROS": "EUR",
         "SVC": "SVC",
-        "COLON": "SVC",
-        "COLÓN": "SVC",
-        "COLONES": "SVC",
+        "COLON SALVADORENO": "SVC",
+        "COLÓN SALVADOREÑO": "SVC",
+        "HNL": "HNL",
+        "LEMPIRA": "HNL",
+        "LEMPIRAS": "HNL",
+        "CRC": "CRC",
+        "COLON COSTARRICENSE": "CRC",
+        "COLÓN COSTARRICENSE": "CRC",
+        "NIO": "NIO",
+        "CORDOBA": "NIO",
+        "CÓRDOBA": "NIO",
+        "CORDOBAS": "NIO",
+        "CÓRDOBAS": "NIO",
+        "MXN": "MXN",
+        "PESO MEXICANO": "MXN",
+        "PESOS MEXICANOS": "MXN",
+        "GBP": "GBP",
+        "LIBRA ESTERLINA": "GBP",
+        "LIBRAS ESTERLINAS": "GBP",
     }
 
-    return aliases.get(texto, texto if texto in {"GTQ", "USD", "EUR", "SVC"} else "N/D")
+    codigos_validos = {
+        "GTQ", "USD", "EUR", "SVC",
+        "HNL", "CRC", "NIO", "MXN", "GBP"
+    }
+
+    return aliases.get(
+        texto,
+        texto if texto in codigos_validos else "N/D"
+    )
 
 
 def formato_moneda_excel(moneda):
@@ -695,6 +774,11 @@ def formato_moneda_excel(moneda):
         "USD": '"$" #,##0.00;[Red]-"$" #,##0.00',
         "EUR": '"€" #,##0.00;[Red]-"€" #,##0.00',
         "SVC": '"₡" #,##0.00;[Red]-"₡" #,##0.00',
+        "HNL": '"L" #,##0.00;[Red]-"L" #,##0.00',
+        "CRC": '"₡" #,##0.00;[Red]-"₡" #,##0.00',
+        "NIO": '"C$" #,##0.00;[Red]-"C$" #,##0.00',
+        "MXN": '"MX$" #,##0.00;[Red]-"MX$" #,##0.00',
+        "GBP": '"£" #,##0.00;[Red]-"£" #,##0.00',
     }
 
     return formatos.get(
@@ -3737,7 +3821,12 @@ def _etiqueta_moneda_dashboard(codigo):
         "USD": "USD ($)",
         "GTQ": "GTQ (Q)",
         "EUR": "EUR (€)",
-        "SVC": "SVC",
+        "SVC": "SVC (₡)",
+        "HNL": "HNL (L)",
+        "CRC": "CRC (₡)",
+        "NIO": "NIO (C$)",
+        "MXN": "MXN (MX$)",
+        "GBP": "GBP (£)",
         "MULTI": "Múltiples monedas",
         "N/D": "N/D"
     }
@@ -3828,9 +3917,50 @@ def renderizar_dashboard_nueva_plantilla():
         _etiqueta_moneda_dashboard(moneda)
     )
 
-    # La plantilla original tenía currency:'USD' fijo en Intl.NumberFormat.
-    # Para una moneda única conocida se adapta automáticamente.
-    if moneda in {"USD", "GTQ", "EUR", "SVC"}:
+    # --------------------------------------------------------
+    # FORMATO MONETARIO DINÁMICO EN EL DASHBOARD
+    # --------------------------------------------------------
+    # La plantilla original trae:
+    #   const money = ... currency:'USD' ...
+    #
+    # Se reemplaza por un formatter basado en BASE_DATA.meta.currency,
+    # de modo que:
+    #   GTQ -> Q
+    #   USD -> $
+    #   EUR -> €
+    # etc.
+    #
+    # IMPORTANTE: esto SOLO cambia presentación. No convierte montos.
+    currency_js = (
+        "const DASHBOARD_CURRENCY = "
+        "String((BASE_DATA&&BASE_DATA.meta&&BASE_DATA.meta.currency)||'N/D').toUpperCase();\\n"
+        "const DASHBOARD_CURRENCY_SYMBOLS = {"
+        "GTQ:'Q',USD:'$',EUR:'€',SVC:'₡',HNL:'L',CRC:'₡',"
+        "NIO:'C$',MXN:'MX$',GBP:'£'"
+        "};\\n"
+        "const DASHBOARD_CURRENCY_SYMBOL = "
+        "DASHBOARD_CURRENCY_SYMBOLS[DASHBOARD_CURRENCY]||'';\\n"
+        "const money = v => {"
+        "const n=Number(v)||0;"
+        "const formatted=new Intl.NumberFormat('en-US',"
+        "{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);"
+        "return DASHBOARD_CURRENCY_SYMBOL"
+        "?DASHBOARD_CURRENCY_SYMBOL+' '+formatted"
+        ":formatted;"
+        "};"
+    )
+
+    html, cambios_money = re.subn(
+        r"const\\s+money\\s*=\\s*v\\s*=>\\s*new\\s+Intl\\.NumberFormat\\(.*?\\)\\.format\\(Number\\(v\\)\\|\\|0\\);",
+        currency_js,
+        html,
+        count=1,
+        flags=re.S
+    )
+
+    # Compatibilidad por si la plantilla cambia levemente y no coincide
+    # con la expresión completa anterior.
+    if cambios_money == 0:
         html = re.sub(
             r"currency\\s*:\\s*['\\\"]USD['\\\"]",
             "currency:'" + moneda + "'",
