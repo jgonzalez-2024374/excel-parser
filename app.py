@@ -67,20 +67,39 @@ os.makedirs(
 )
 
 DASHBOARD_CACHE = {
-    "archivo": "",
-    "fecha_proceso": "",
-    "periodo": "",
-    "saldo_total": 0,
-    "total_creditos": 0,
-    "total_debitos": 0,
-    "cantidad_movimientos": 0,
-    "cantidad_bancos": 0,
-    "bancos": []
+    "meta": {
+        "file": "",
+        "fileCut": "",
+        "latestMovement": "",
+        "currency": "N/D",
+        "accounts": 0,
+        "banks": 0,
+        "movementCount": 0
+    },
+    "totals": {
+        "initial": 0.0,
+        "final": 0.0,
+        "change": 0.0,
+        "changePct": 0.0,
+        "credits": 0.0,
+        "debits": 0.0,
+        "netFlow": 0.0
+    },
+    "highlights": {
+        "maxCredit": None,
+        "maxDebit": None,
+        "maxNet": None,
+        "minNet": None
+    },
+    "banks": [],
+    "accounts": [],
+    "daily": [],
+    "transactions": []
 }
 
 
 # Versión del generador del dashboard descargable.
-DASHBOARD_ATTACHMENT_VERSION = "jinja-symbol-only-2.3"
+DASHBOARD_ATTACHMENT_VERSION = "executive-dynamic-3.0"
 
 
 # ============================================================
@@ -109,21 +128,29 @@ def home():
     strict_slashes=False
 )
 def dashboard():
+    """Muestra la plantilla ejecutiva con los datos del último Excel procesado."""
 
-    if not os.path.exists(
-        DASHBOARD_TEMPLATE
-    ):
-
+    if not os.path.exists(DASHBOARD_TEMPLATE):
         return jsonify({
             "success": False,
             "error": "No existe index.html del dashboard",
             "path": DASHBOARD_TEMPLATE
         }), 404
 
-    return render_template(
-        "dashboard/index.html",
-        dashboard_data=cargar_dashboard_data()
-    )
+    try:
+        html = renderizar_dashboard_nueva_plantilla()
+        response = make_response(html)
+        response.headers["Content-Type"] = "text/html; charset=utf-8"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, max-age=0"
+        )
+        return response
+
+    except Exception as error:
+        return jsonify({
+            "success": False,
+            "error": str(error)
+        }), 500
 
 
 @app.route(
@@ -140,15 +167,11 @@ def dashboard_data_endpoint():
         cargar_dashboard_data()
     )
 
-    response.headers[
-        "Cache-Control"
-    ] = (
-        "no-store, no-cache, "
-        "must-revalidate, max-age=0"
+    response.headers["Cache-Control"] = (
+        "no-store, no-cache, must-revalidate, max-age=0"
     )
 
     return response
-
 
 
 @app.route(
@@ -158,63 +181,42 @@ def dashboard_data_endpoint():
 )
 def dashboard_file():
     """
-    Devuelve una copia autónoma del dashboard como archivo HTML.
-    Está diseñada para adjuntarse desde Make/Gmail y abrirse
-    localmente sin necesitar data.json.
+    Descarga una copia autónoma del dashboard ejecutivo.
+    Python sustituye BASE_DATA y RAW_TRANSACTIONS dentro del HTML,
+    por lo que el archivo puede abrirse localmente sin data.json y sin CORS.
     """
 
     try:
-
-        html = render_template(
-            "dashboard/index.html",
-            dashboard_data=cargar_dashboard_data()
-        )
+        html = renderizar_dashboard_nueva_plantilla()
 
         fecha_nombre = datetime.now().strftime(
             "%Y%m%d_%H%M%S"
         )
 
         nombre_archivo = (
-            "Dashboard_Bancario_"
+            "Dashboard_Saldos_Bancarios_"
             + fecha_nombre
             + ".html"
         )
 
-        response = make_response(
-            html
-        )
-
-        response.headers[
-            "Content-Type"
-        ] = "text/html; charset=utf-8"
-
-        response.headers[
-            "Content-Disposition"
-        ] = (
+        response = make_response(html)
+        response.headers["Content-Type"] = "text/html; charset=utf-8"
+        response.headers["Content-Disposition"] = (
             'attachment; filename="'
             + nombre_archivo
             + '"'
         )
-
-        response.headers[
-            "Cache-Control"
-        ] = (
-            "no-store, no-cache, "
-            "must-revalidate, max-age=0"
+        response.headers["Cache-Control"] = (
+            "no-store, no-cache, must-revalidate, max-age=0"
         )
-
-        response.headers[
-            "X-Dashboard-Attachment-Version"
-        ] = DASHBOARD_ATTACHMENT_VERSION
-
-        response.headers[
-            "X-Dashboard-Filename"
-        ] = nombre_archivo
+        response.headers["X-Dashboard-Attachment-Version"] = (
+            DASHBOARD_ATTACHMENT_VERSION
+        )
+        response.headers["X-Dashboard-Filename"] = nombre_archivo
 
         return response
 
     except Exception as error:
-
         return jsonify({
             "success": False,
             "error": str(error)
@@ -2946,28 +2948,190 @@ def insertar_en_plantilla(
 # ============================================================
 
 def fecha_dashboard(value):
+    """Fecha legible dd/mm/YYYY."""
 
-    if isinstance(
-        value,
-        datetime
+    if isinstance(value, datetime):
+        return value.strftime("%d/%m/%Y")
+
+    if isinstance(value, date):
+        return value.strftime("%d/%m/%Y")
+
+    return str(value or "")
+
+
+def fecha_dashboard_iso(value):
+    """Fecha ISO YYYY-mm-dd utilizada por los filtros del HTML."""
+
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+
+    texto = str(value or "").strip()
+
+    if not texto:
+        return ""
+
+    for formato in (
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%m/%d/%Y"
     ):
+        try:
+            return datetime.strptime(texto, formato).strftime("%Y-%m-%d")
+        except Exception:
+            pass
 
-        return value.strftime(
-            "%d/%m/%Y"
-        )
+    return ""
 
-    if isinstance(
-        value,
-        date
-    ):
 
-        return value.strftime(
-            "%d/%m/%Y"
-        )
+def _redondear_dashboard(value):
+    try:
+        return round(float(value or 0), 2)
+    except Exception:
+        return 0.0
 
-    return str(
-        value or ""
-    )
+
+def _clave_banco_dashboard(banco):
+    """
+    Normaliza las llaves que utiliza la plantilla para colores/logos.
+    Para bancos no conocidos conserva una llave estable en mayúsculas.
+    """
+
+    original = str(banco or "BANCO NO IDENTIFICADO").strip()
+    texto = clean_text(original)
+
+    if "agricola" in texto:
+        return "BANCO AGRÍCOLA"
+
+    if "cuscatlan" in texto:
+        return "BANCO CUSCATLÁN"
+
+    if re.search(r"\\bbac\\b", texto) or "america central" in texto:
+        return "BAC"
+
+    if "promerica" in texto:
+        return "PROMERICA"
+
+    if "davivienda" in texto:
+        return "DAVIVIENDA"
+
+    if "industrial" in texto:
+        return "BANCO INDUSTRIAL"
+
+    if "banrural" in texto or "desarrollo rural" in texto:
+        return "BANRURAL"
+
+    if "g&t" in original.lower() or "gyt" in texto:
+        return "G&T"
+
+    if texto == "bam" or "agricola mercantil" in texto:
+        return "BAM"
+
+    if "ficohsa" in texto:
+        return "FICOHSA"
+
+    return original.upper() or "BANCO NO IDENTIFICADO"
+
+
+def _nombre_banco_dashboard(clave, original=""):
+    nombres = {
+        "BANCO AGRÍCOLA": "Banco Agrícola",
+        "BANCO CUSCATLÁN": "Banco Cuscatlán",
+        "BAC": "BAC",
+        "PROMERICA": "Promerica",
+        "DAVIVIENDA": "Davivienda",
+        "BANCO INDUSTRIAL": "Banco Industrial",
+        "BANRURAL": "Banrural",
+        "G&T": "G&T Continental",
+        "BAM": "BAM",
+        "FICOHSA": "Ficohsa",
+    }
+
+    if clave in nombres:
+        return nombres[clave]
+
+    texto = str(original or clave or "Banco").strip()
+    return texto if texto else "Banco"
+
+
+def _color_banco_dashboard(clave, indice=0):
+    colores_conocidos = {
+        "BANCO AGRÍCOLA": "#18B981",
+        "BANCO CUSCATLÁN": "#8B5CF6",
+        "BAC": "#F05252",
+        "PROMERICA": "#3B82F6",
+        "DAVIVIENDA": "#F59E0B",
+        "BANCO INDUSTRIAL": "#2563EB",
+        "BANRURAL": "#16A34A",
+        "G&T": "#7C3AED",
+        "BAM": "#0891B2",
+        "FICOHSA": "#DC2626",
+    }
+
+    if clave in colores_conocidos:
+        return colores_conocidos[clave]
+
+    paleta = [
+        "#60A5FA",
+        "#34D399",
+        "#A78BFA",
+        "#FBBF24",
+        "#FB7185",
+        "#22D3EE",
+        "#F97316",
+        "#84CC16",
+        "#E879F9",
+        "#94A3B8",
+    ]
+
+    return paleta[indice % len(paleta)]
+
+
+def _cuenta_corta_dashboard(cuenta):
+    texto = str(cuenta or "N/D").strip()
+    digitos = re.sub(r"[^0-9]", "", texto)
+
+    if len(digitos) > 4:
+        return digitos[-4:]
+
+    return digitos or texto or "N/D"
+
+
+def _fecha_corte_desde_nombre(nombre_archivo, fecha_respaldo=""):
+    """Intenta obtener una fecha de corte del nombre; si no, usa la última fecha."""
+
+    nombre = str(nombre_archivo or "")
+
+    patrones = [
+        (r"(?<!\\d)(\\d{2})(\\d{2})(20\\d{2})(?!\\d)", "%d/%m/%Y"),
+        (r"(?<!\\d)(20\\d{2})(\\d{2})(\\d{2})(?!\\d)", "%Y/%m/%d"),
+        (r"(?<!\\d)(\\d{2})[-_.](\\d{2})[-_.](20\\d{2})(?!\\d)", "%d/%m/%Y"),
+    ]
+
+    for patron, tipo in patrones:
+        match = re.search(patron, nombre)
+        if not match:
+            continue
+
+        try:
+            if tipo == "%Y/%m/%d":
+                year, month, day = match.groups()
+            else:
+                day, month, year = match.groups()
+
+            return datetime(
+                int(year),
+                int(month),
+                int(day)
+            ).strftime("%d/%m/%Y")
+
+        except Exception:
+            pass
+
+    return fecha_respaldo or ""
 
 
 def construir_dashboard_data(
@@ -2975,262 +3139,521 @@ def construir_dashboard_data(
     nombre_archivo=""
 ):
     """
-    Convierte las transacciones normalizadas del parser
-    en la estructura JSON utilizada por index.html.
+    Convierte las transacciones normalizadas del parser a la estructura
+    que exige la plantilla ejecutiva de Saldos Bancarios Consolidados.
+
+    La salida contiene:
+      - meta
+      - totals
+      - highlights
+      - banks
+      - accounts
+      - daily
+      - transactions
+
+    Los importes NO se convierten de moneda. Solo se presenta la moneda
+    detectada por el parser.
     """
 
-    bancos = {}
-    saldos_por_cuenta = {}
-    fechas = []
+    transactions = list(transactions or [])
 
-    total_creditos = 0.0
-    total_debitos = 0.0
+    if not transactions:
+        data = json.loads(json.dumps(DASHBOARD_CACHE))
+        data["meta"]["file"] = nombre_archivo or ""
+        return data
+
+    # --------------------------------------------------------
+    # MONEDA GENERAL
+    # --------------------------------------------------------
+
+    moneda_dashboard = moneda_unica_transacciones(
+        transactions
+    )
+
+    # --------------------------------------------------------
+    # IDENTIFICAR CUENTAS Y EVITAR COLISIONES DE ÚLTIMOS 4
+    # --------------------------------------------------------
+
+    originales_por_banco = {}
+    orden_cuentas = []
 
     for transaction in transactions:
-
-        banco = str(
-            transaction.get(
-                "banco",
-                "BANCO NO IDENTIFICADO"
-            )
+        banco_original = str(
+            transaction.get("banco", "BANCO NO IDENTIFICADO")
+        ).strip()
+        bank_key = _clave_banco_dashboard(banco_original)
+        cuenta_original = str(
+            transaction.get("cuenta", "N/D")
         ).strip()
 
-        cuenta = str(
-            transaction.get(
-                "cuenta",
-                "N/D"
-            )
+        clave = (bank_key, cuenta_original)
+
+        if clave not in orden_cuentas:
+            orden_cuentas.append(clave)
+
+        originales_por_banco.setdefault(
+            bank_key,
+            []
+        )
+
+        if cuenta_original not in originales_por_banco[bank_key]:
+            originales_por_banco[bank_key].append(cuenta_original)
+
+    cuenta_display = {}
+
+    for bank_key, cuentas_originales in originales_por_banco.items():
+        candidatos = {}
+
+        for cuenta_original in cuentas_originales:
+            corta = _cuenta_corta_dashboard(cuenta_original)
+            candidatos.setdefault(corta, []).append(cuenta_original)
+
+        for corta, originales in candidatos.items():
+            if len(originales) == 1:
+                cuenta_display[(bank_key, originales[0])] = corta
+                continue
+
+            # Si dos cuentas del mismo banco terminan igual, ampliar hasta 6.
+            usados = set()
+            for cuenta_original in originales:
+                digitos = re.sub(r"[^0-9]", "", cuenta_original)
+                visible = digitos[-6:] if len(digitos) > 6 else (digitos or cuenta_original)
+
+                if visible in usados:
+                    visible = digitos or cuenta_original
+
+                usados.add(visible)
+                cuenta_display[(bank_key, cuenta_original)] = visible
+
+    # --------------------------------------------------------
+    # TRANSACCIONES PARA EL FILTRO DE FECHA
+    # --------------------------------------------------------
+
+    raw_transactions = []
+    grupos_cuenta = {}
+    fechas_validas = []
+    banco_original_por_key = {}
+
+    for indice, transaction in enumerate(transactions, start=2):
+        banco_original = str(
+            transaction.get("banco", "BANCO NO IDENTIFICADO")
         ).strip()
+        bank_key = _clave_banco_dashboard(banco_original)
+        banco_nombre = _nombre_banco_dashboard(
+            bank_key,
+            banco_original
+        )
+        banco_original_por_key.setdefault(bank_key, banco_original)
 
-        fecha = transaction.get(
-            "fecha"
+        cuenta_original = str(
+            transaction.get("cuenta", "N/D")
+        ).strip()
+        cuenta_visible = cuenta_display.get(
+            (bank_key, cuenta_original),
+            _cuenta_corta_dashboard(cuenta_original)
         )
 
-        if isinstance(
-            fecha,
-            (datetime, date)
-        ):
+        fecha = transaction.get("fecha")
+        fecha_iso = fecha_dashboard_iso(fecha)
 
-            fechas.append(
-                fecha
+        if fecha_iso:
+            fechas_validas.append(fecha_iso)
+
+        debito = abs(float(
+            transaction.get("debito", 0) or 0
+        ))
+        credito = abs(float(
+            transaction.get("credito", 0) or 0
+        ))
+
+        saldo = None
+        if transaction.get("_tiene_saldo"):
+            saldo = _redondear_dashboard(
+                transaction.get("saldo", 0)
             )
 
-        credito = float(
-            transaction.get(
-                "credito",
-                0
-            ) or 0
-        )
-
-        debito = float(
-            transaction.get(
-                "debito",
-                0
-            ) or 0
-        )
-
-        total_creditos += abs(
-            credito
-        )
-
-        total_debitos += abs(
-            debito
-        )
-
-        moneda = str(
-            transaction.get(
-                "moneda",
-                "N/D"
-            ) or "N/D"
-        ).upper()
-
-        if banco not in bancos:
-
-            bancos[banco] = {
-                "nombre": banco,
-                "moneda": moneda,
-                "saldo": 0.0,
-                "creditos": 0.0,
-                "debitos": 0.0,
-                "cantidad_movimientos": 0,
-                "movimientos": []
-            }
-
-        elif (
-            bancos[banco].get("moneda", "N/D") == "N/D"
-            and moneda != "N/D"
-        ):
-            bancos[banco]["moneda"] = moneda
-
-        bancos[banco][
-            "creditos"
-        ] += abs(
-            credito
-        )
-
-        bancos[banco][
-            "debitos"
-        ] += abs(
-            debito
-        )
-
-        bancos[banco][
-            "cantidad_movimientos"
-        ] += 1
-
-        saldo_movimiento = None
-
-        if transaction.get(
-            "_tiene_saldo"
-        ):
-
-            saldo_movimiento = float(
-                transaction.get(
-                    "saldo",
-                    0
-                ) or 0
+        fila = {
+            "row": indice,
+            "bankKey": bank_key,
+            "bank": banco_nombre,
+            "account": cuenta_visible,
+            "original": cuenta_original,
+            "date": fecha_iso,
+            "debit": _redondear_dashboard(debito),
+            "credit": _redondear_dashboard(credito),
+            "balance": saldo,
+            "reference": str(
+                transaction.get("referencia", "") or ""
+            ),
+            "description": str(
+                transaction.get("descripcion", "") or ""
             )
+        }
 
-        bancos[banco][
-            "movimientos"
-        ].append({
-            "fecha": fecha_dashboard(
-                fecha
+        raw_transactions.append(fila)
+
+        clave_cuenta = (
+            bank_key,
+            cuenta_original
+        )
+
+        grupos_cuenta.setdefault(
+            clave_cuenta,
+            []
+        ).append({
+            "order": indice,
+            "date": fecha_iso,
+            "debit": debito,
+            "credit": credito,
+            "balance": saldo,
+            "saldo_inicial_cuenta": transaction.get(
+                "saldo_inicial_cuenta"
             ),
-            "cuenta": cuenta,
-            "referencia": str(
-                transaction.get(
-                    "referencia",
-                    ""
-                ) or ""
-            ),
-            "descripcion": str(
-                transaction.get(
-                    "descripcion",
-                    ""
-                ) or ""
-            ),
-            "debito": abs(
-                debito
-            ),
-            "credito": abs(
-                credito
-            ),
-            "saldo": saldo_movimiento,
-            "moneda": moneda
+            "has_balance": bool(
+                transaction.get("_tiene_saldo")
+            )
         })
 
-        if transaction.get(
-            "_tiene_saldo"
-        ):
+    raw_transactions = [
+        item for item in raw_transactions
+        if item.get("date")
+    ]
 
-            saldos_por_cuenta[
-                (
-                    banco,
-                    cuenta
-                )
-            ] = float(
-                transaction.get(
-                    "saldo",
-                    0
-                ) or 0
-            )
+    # --------------------------------------------------------
+    # CUENTAS
+    # --------------------------------------------------------
 
-    for (
-        banco,
-        cuenta
-    ), saldo in saldos_por_cuenta.items():
+    accounts = []
 
-        if banco in bancos:
-
-            bancos[banco][
-                "saldo"
-            ] += saldo
-
-    lista_bancos = list(
-        bancos.values()
-    )
-
-    lista_bancos.sort(
-        key=lambda item: item[
-            "nombre"
-        ]
-    )
-
-    saldo_total = sum(
-        banco["saldo"]
-        for banco in lista_bancos
-    )
-
-    periodo = ""
-
-    if fechas:
-
-        fechas_ordenadas = sorted(
-            fechas
+    for bank_key, cuenta_original in orden_cuentas:
+        movimientos = grupos_cuenta.get(
+            (bank_key, cuenta_original),
+            []
         )
 
-        fecha_inicio = fechas_ordenadas[
-            0
-        ]
-
-        fecha_final = fechas_ordenadas[
-            -1
-        ]
-
-        periodo = (
-            fecha_dashboard(
-                fecha_inicio
-            )
-            + " - "
-            + fecha_dashboard(
-                fecha_final
+        movimientos = sorted(
+            movimientos,
+            key=lambda item: (
+                item.get("date", ""),
+                item.get("order", 0)
             )
         )
 
-    monedas_detectadas = {
-        str(
-            transaction.get("moneda", "N/D") or "N/D"
-        ).upper()
-        for transaction in transactions
-        if str(
-            transaction.get("moneda", "N/D") or "N/D"
-        ).upper() != "N/D"
-    }
+        if not movimientos:
+            continue
 
-    if len(monedas_detectadas) == 1:
-        moneda_dashboard = next(iter(monedas_detectadas))
-    elif len(monedas_detectadas) > 1:
-        moneda_dashboard = "MULTI"
-    else:
-        moneda_dashboard = "N/D"
+        primero = movimientos[0]
+
+        saldo_inicial_explicito = primero.get(
+            "saldo_inicial_cuenta"
+        )
+
+        if saldo_inicial_explicito is not None:
+            initial = _redondear_dashboard(
+                saldo_inicial_explicito
+            )
+        elif primero.get("has_balance") and primero.get("balance") is not None:
+            # El débito interno del parser era negativo. Aquí ya está en positivo:
+            # saldo anterior = saldo posterior + débito - crédito.
+            initial = _redondear_dashboard(
+                float(primero.get("balance") or 0)
+                + float(primero.get("debit") or 0)
+                - float(primero.get("credit") or 0)
+            )
+        else:
+            initial = 0.0
+
+        saldo_final = None
+        for movimiento in movimientos:
+            if movimiento.get("has_balance") and movimiento.get("balance") is not None:
+                saldo_final = movimiento.get("balance")
+
+        creditos = sum(
+            float(item.get("credit") or 0)
+            for item in movimientos
+        )
+        debitos = sum(
+            float(item.get("debit") or 0)
+            for item in movimientos
+        )
+
+        if saldo_final is None:
+            saldo_final = initial + creditos - debitos
+
+        final = _redondear_dashboard(saldo_final)
+        change = _redondear_dashboard(final - initial)
+        change_pct = (
+            _redondear_dashboard(change / initial * 100)
+            if initial != 0
+            else None
+        )
+
+        banco_original = banco_original_por_key.get(
+            bank_key,
+            bank_key
+        )
+
+        accounts.append({
+            "bankKey": bank_key,
+            "bank": _nombre_banco_dashboard(
+                bank_key,
+                banco_original
+            ),
+            "account": cuenta_display.get(
+                (bank_key, cuenta_original),
+                _cuenta_corta_dashboard(cuenta_original)
+            ),
+            "original": cuenta_original,
+            "initial": initial,
+            "final": final,
+            "change": change,
+            "changePct": change_pct,
+            "credits": _redondear_dashboard(creditos),
+            "debits": _redondear_dashboard(debitos),
+            "movements": len(movimientos)
+        })
+
+    # --------------------------------------------------------
+    # BANCOS
+    # --------------------------------------------------------
+
+    bank_keys = []
+
+    for account in accounts:
+        if account["bankKey"] not in bank_keys:
+            bank_keys.append(account["bankKey"])
+
+    total_final = _redondear_dashboard(
+        sum(account["final"] for account in accounts)
+    )
+
+    banks = []
+
+    for indice, bank_key in enumerate(bank_keys):
+        cuentas_banco = [
+            account
+            for account in accounts
+            if account["bankKey"] == bank_key
+        ]
+
+        trans_banco = [
+            item
+            for item in raw_transactions
+            if item["bankKey"] == bank_key
+        ]
+
+        initial = _redondear_dashboard(
+            sum(account["initial"] for account in cuentas_banco)
+        )
+        final = _redondear_dashboard(
+            sum(account["final"] for account in cuentas_banco)
+        )
+        credits = _redondear_dashboard(
+            sum(item["credit"] for item in trans_banco)
+        )
+        debits = _redondear_dashboard(
+            sum(item["debit"] for item in trans_banco)
+        )
+        change = _redondear_dashboard(final - initial)
+        change_pct = (
+            _redondear_dashboard(change / initial * 100)
+            if initial != 0
+            else None
+        )
+        net_flow = _redondear_dashboard(
+            credits - debits
+        )
+        share = (
+            _redondear_dashboard(final / total_final * 100)
+            if total_final != 0
+            else 0.0
+        )
+
+        banco_original = banco_original_por_key.get(
+            bank_key,
+            bank_key
+        )
+
+        banks.append({
+            "key": bank_key,
+            "name": _nombre_banco_dashboard(
+                bank_key,
+                banco_original
+            ),
+            "color": _color_banco_dashboard(
+                bank_key,
+                indice
+            ),
+            "initial": initial,
+            "final": final,
+            "change": change,
+            "changePct": change_pct,
+            "credits": credits,
+            "debits": debits,
+            "netFlow": net_flow,
+            "share": share,
+            "accounts": len(cuentas_banco),
+            "movements": len(trans_banco)
+        })
+
+    # --------------------------------------------------------
+    # RESUMEN DIARIO
+    # --------------------------------------------------------
+
+    por_fecha = {}
+
+    for item in raw_transactions:
+        fecha_iso = item.get("date")
+
+        if not fecha_iso:
+            continue
+
+        registro = por_fecha.setdefault(
+            fecha_iso,
+            {
+                "date": fecha_iso,
+                "moves": 0,
+                "debits": 0.0,
+                "credits": 0.0
+            }
+        )
+
+        registro["moves"] += 1
+        registro["debits"] += float(
+            item.get("debit") or 0
+        )
+        registro["credits"] += float(
+            item.get("credit") or 0
+        )
+
+    daily = []
+
+    for fecha_iso in sorted(por_fecha.keys()):
+        item = por_fecha[fecha_iso]
+        debits = _redondear_dashboard(
+            item["debits"]
+        )
+        credits = _redondear_dashboard(
+            item["credits"]
+        )
+
+        try:
+            label = datetime.strptime(
+                fecha_iso,
+                "%Y-%m-%d"
+            ).strftime("%d/%m")
+        except Exception:
+            label = fecha_iso
+
+        daily.append({
+            "date": fecha_iso,
+            "label": label,
+            "moves": int(item["moves"]),
+            "debits": debits,
+            "credits": credits,
+            "net": _redondear_dashboard(
+                credits - debits
+            )
+        })
+
+    # --------------------------------------------------------
+    # HIGHLIGHTS
+    # --------------------------------------------------------
+
+    max_credit = (
+        max(daily, key=lambda item: item["credits"])
+        if daily else None
+    )
+    max_debit = (
+        max(daily, key=lambda item: item["debits"])
+        if daily else None
+    )
+    max_net = (
+        max(daily, key=lambda item: item["net"])
+        if daily else None
+    )
+    min_net = (
+        min(daily, key=lambda item: item["net"])
+        if daily else None
+    )
+
+    # --------------------------------------------------------
+    # TOTALES / META
+    # --------------------------------------------------------
+
+    total_initial = _redondear_dashboard(
+        sum(account["initial"] for account in accounts)
+    )
+    total_final = _redondear_dashboard(
+        sum(account["final"] for account in accounts)
+    )
+    total_credits = _redondear_dashboard(
+        sum(item["credit"] for item in raw_transactions)
+    )
+    total_debits = _redondear_dashboard(
+        sum(item["debit"] for item in raw_transactions)
+    )
+    net_flow = _redondear_dashboard(
+        total_credits - total_debits
+    )
+
+    # La plantilla define "Variación entradas vs salidas" como flujo neto
+    # y el porcentaje respecto a las salidas/débitos.
+    change_pct = (
+        _redondear_dashboard(net_flow / total_debits * 100)
+        if total_debits != 0
+        else 0.0
+    )
+
+    latest_iso = max(fechas_validas) if fechas_validas else ""
+    latest_display = ""
+
+    if latest_iso:
+        try:
+            latest_display = datetime.strptime(
+                latest_iso,
+                "%Y-%m-%d"
+            ).strftime("%d/%m/%Y")
+        except Exception:
+            latest_display = latest_iso
+
+    file_cut = _fecha_corte_desde_nombre(
+        nombre_archivo,
+        latest_display
+    )
 
     return {
-        "archivo": nombre_archivo,
-        "moneda": moneda_dashboard,
-        "fecha_proceso": datetime.now().strftime(
-            "%d/%m/%Y %H:%M"
-        ),
-        "periodo": periodo,
-        "saldo_total": round(
-            saldo_total,
-            2
-        ),
-        "total_creditos": round(
-            total_creditos,
-            2
-        ),
-        "total_debitos": round(
-            total_debitos,
-            2
-        ),
-        "cantidad_movimientos": len(
-            transactions
-        ),
-        "cantidad_bancos": len(
-            lista_bancos
-        ),
-        "bancos": lista_bancos
+        "meta": {
+            "file": nombre_archivo or "Archivo bancario",
+            "fileCut": file_cut,
+            "latestMovement": latest_display,
+            "currency": moneda_dashboard,
+            "accounts": len(accounts),
+            "banks": len(banks),
+            "movementCount": len(raw_transactions),
+            "generatedAt": datetime.now().strftime(
+                "%d/%m/%Y %H:%M"
+            )
+        },
+        "totals": {
+            "initial": total_initial,
+            "final": total_final,
+            "change": net_flow,
+            "changePct": change_pct,
+            "credits": total_credits,
+            "debits": total_debits,
+            "netFlow": net_flow
+        },
+        "highlights": {
+            "maxCredit": max_credit,
+            "maxDebit": max_debit,
+            "maxNet": max_net,
+            "minNet": min_net
+        },
+        "banks": banks,
+        "accounts": accounts,
+        "daily": daily,
+        "transactions": raw_transactions
     }
 
 
@@ -3301,6 +3724,117 @@ def cargar_dashboard_data():
         )
 
     return DASHBOARD_CACHE
+
+
+
+def _etiqueta_moneda_dashboard(codigo):
+    codigo = str(codigo or "N/D").upper()
+    etiquetas = {
+        "USD": "USD ($)",
+        "GTQ": "GTQ (Q)",
+        "EUR": "EUR (€)",
+        "SVC": "SVC",
+        "MULTI": "Múltiples monedas",
+        "N/D": "N/D"
+    }
+    return etiquetas.get(codigo, codigo)
+
+
+def renderizar_dashboard_nueva_plantilla():
+    """
+    Renderiza templates/dashboard/index.html y sustituye automáticamente
+    los dos bloques de datos fijos que trae la plantilla nueva:
+
+        const BASE_DATA = {...};
+        const RAW_TRANSACTIONS = [...];
+
+    De esta forma la plantilla puede conservar todo su diseño, filtros,
+    pestañas, gráficos y logos, pero siempre usa el último Excel procesado.
+    """
+
+    if not os.path.exists(DASHBOARD_TEMPLATE):
+        raise FileNotFoundError(
+            "No existe index.html del dashboard: "
+            + DASHBOARD_TEMPLATE
+        )
+
+    datos = cargar_dashboard_data()
+
+    # Primero pasa por Jinja por compatibilidad con versiones anteriores
+    # del dashboard que puedan contener {{ dashboard_data | tojson }}.
+    html = render_template(
+        "dashboard/index.html",
+        dashboard_data=datos,
+        base_data=datos,
+        raw_transactions=datos.get("transactions", [])
+    )
+
+    base_data = dict(datos)
+    raw_transactions = list(
+        base_data.pop("transactions", []) or []
+    )
+
+    base_json = json.dumps(
+        base_data,
+        ensure_ascii=False,
+        separators=(",", ":")
+    ).replace("</", "<\\/")
+
+    transactions_json = json.dumps(
+        raw_transactions,
+        ensure_ascii=False,
+        separators=(",", ":")
+    ).replace("</", "<\\/")
+
+    # Sustituye BASE_DATA incluso si la plantilla original trae un JSON enorme.
+    html, cambios_base = re.subn(
+        r"const\\s+BASE_DATA\\s*=\\s*.*?;\\s*let\\s+DATA\\s*=\\s*null\\s*;",
+        "const BASE_DATA = " + base_json + ";\\nlet DATA = null;",
+        html,
+        count=1,
+        flags=re.S
+    )
+
+    # Sustituye RAW_TRANSACTIONS hasta justo antes de BANK_LOGOS.
+    html, cambios_tx = re.subn(
+        r"const\\s+RAW_TRANSACTIONS\\s*=\\s*.*?;\\s*(?=const\\s+BANK_LOGOS\\s*=)",
+        "const RAW_TRANSACTIONS = " + transactions_json + ";\\n",
+        html,
+        count=1,
+        flags=re.S
+    )
+
+    if cambios_base == 0:
+        raise ValueError(
+            "La nueva plantilla no contiene el bloque 'const BASE_DATA = ...'."
+        )
+
+    if cambios_tx == 0:
+        raise ValueError(
+            "La nueva plantilla no contiene el bloque 'const RAW_TRANSACTIONS = ...'."
+        )
+
+    moneda = str(
+        datos.get("meta", {}).get("currency", "N/D")
+    ).upper()
+
+    # Texto visible de moneda en portada/encabezado.
+    html = html.replace(
+        "USD ($)",
+        _etiqueta_moneda_dashboard(moneda)
+    )
+
+    # La plantilla original tenía currency:'USD' fijo en Intl.NumberFormat.
+    # Para una moneda única conocida se adapta automáticamente.
+    if moneda in {"USD", "GTQ", "EUR", "SVC"}:
+        html = re.sub(
+            r"currency\\s*:\\s*['\\\"]USD['\\\"]",
+            "currency:'" + moneda + "'",
+            html,
+            count=1
+        )
+
+    return html
 
 
 
