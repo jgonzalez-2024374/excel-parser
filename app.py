@@ -17,7 +17,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v2.6-auto-currency-20260826-1708"
+APP_BUILD = "dashboard-v2.7-auto-currency-fix-20260826-1719"
 
 
 # ============================================================
@@ -3951,21 +3951,51 @@ def renderizar_dashboard_nueva_plantilla():
     )
 
     html, cambios_money = re.subn(
-        r"const\\s+money\\s*=\\s*v\\s*=>\\s*new\\s+Intl\\.NumberFormat\\(.*?\\)\\.format\\(Number\\(v\\)\\|\\|0\\);",
+        r"const\s+money\s*=\s*v\s*=>\s*new\s+Intl\.NumberFormat\(.*?\)\.format\(Number\(v\)\|\|0\);",
         currency_js,
         html,
         count=1,
         flags=re.S
     )
 
-    # Compatibilidad por si la plantilla cambia levemente y no coincide
-    # con la expresión completa anterior.
+    # Segunda estrategia: reemplazo literal de la línea de la plantilla
+    # actual, por si el HTML cambia mínimamente y la regex no coincide.
     if cambios_money == 0:
-        html = re.sub(
-            r"currency\\s*:\\s*['\\\"]USD['\\\"]",
+        money_original = (
+            "const money = v => new Intl.NumberFormat('en-US',"
+            "{style:'currency',currency:'USD',minimumFractionDigits:2})"
+            ".format(Number(v)||0);"
+        )
+        if money_original in html:
+            html = html.replace(
+                money_original,
+                currency_js,
+                1
+            )
+            cambios_money = 1
+
+    # Tercera estrategia: al menos cambiar el código de moneda si la
+    # plantilla conserva un Intl.NumberFormat con USD fijo.
+    if cambios_money == 0 and moneda in {
+        "USD", "GTQ", "EUR", "SVC", "HNL", "CRC", "NIO", "MXN", "GBP"
+    }:
+        html, cambios_currency_code = re.subn(
+            r"currency\s*:\s*['\"]USD['\"]",
             "currency:'" + moneda + "'",
             html,
             count=1
+        )
+
+    # Si aún queda el formatter fijo en USD, detener la generación.
+    # Es preferible un error claro a entregar un dashboard con moneda falsa.
+    if (
+        moneda not in {"N/D", "MULTI"}
+        and "currency:'USD'" in html
+        and moneda != "USD"
+    ):
+        raise ValueError(
+            "El dashboard todavía conserva currency:'USD' aunque "
+            "el Excel fue detectado como " + moneda + "."
         )
 
     return html
@@ -4380,6 +4410,14 @@ def process_excel():
                 "totals", {}
             ).get(
                 "final", 0
+            )
+        )
+
+        response.headers["X-Dashboard-Currency"] = str(
+            dashboard_payload.get(
+                "meta", {}
+            ).get(
+                "currency", "N/D"
             )
         )
 
