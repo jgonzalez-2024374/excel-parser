@@ -102,6 +102,21 @@
   @media(max-width:1200px){.kpis{grid-template-columns:repeat(3,1fr)}.bank-detail-grid{grid-template-columns:repeat(3,1fr)}.insights{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:820px){.date-filter{width:100%;border-radius:14px}.date-filter input[type="date"]{width:118px}.app{padding:14px}.hero{flex-direction:column}.hero-actions{justify-content:flex-start}.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid-equal{grid-template-columns:1fr}.bank-detail-grid{grid-template-columns:1fr}.insights{grid-template-columns:1fr}canvas{height:280px}}
   @media print{body{background:#fff;color:#111}.executive-cover{background:#fff!important;color:#111!important;border:1px solid #d7d7d7;box-shadow:none}.executive-cover:before{display:none}.cover-copy,.cover-badges span{color:#444!important}.cover-badges span{background:#fff;border-color:#ddd}.cover-logo{box-shadow:none;border-color:#ddd}.app{max-width:none;padding:0}.hero,.card,.kpi,.bank-card,.insight{box-shadow:none}.hero-actions,.tabs{display:none!important}.section{display:block!important;page-break-inside:avoid;margin-bottom:20px}.hero,.card,.kpi,.bank-card,.insight{background:#fff;color:#111;border-color:#ddd}.sub,.desc,.hint,.small,.note,.footer{color:#555!important}.table-wrap{border-color:#ddd}table,td{background:#fff!important;color:#111!important}th{background:#eee!important;color:#111!important}.meta span{background:#f5f5f5;color:#333;border-color:#ddd}}
+
+.tab-currency{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin:0 0 12px 0;
+  padding:6px 10px;
+  border:1px solid #3A4658;
+  border-radius:999px;
+  background:#1C2430;
+  color:#C8D3E3;
+  font-size:12px;
+  font-weight:700;
+}
+
 </style>
 </head>
 <body>
@@ -190,6 +205,8 @@
   </section>
 
   <section id="bancos" class="section">
+    <div class="tab-currency">Moneda: <b class="currencyLabel">—</b></div>
+
     <div class="card">
       <div class="section-heading"><div><h2>Resumen individual por banco</h2><p>Saldos y movimientos acumulados sin modificar las cifras originales.</p></div><span class="section-chip">Detalle ejecutivo</span></div>
       <div class="bank-detail-grid" id="bankCards"></div>
@@ -197,6 +214,8 @@
   </section>
 
   <section id="flujo" class="section">
+    <div class="tab-currency">Moneda: <b class="currencyLabel">—</b></div>
+
     <div class="card">
       <h2>Evolución diaria de créditos y débitos</h2>
       <div class="desc">Fechas disponibles en la hoja de resumen diario consolidado.</div>
@@ -218,6 +237,8 @@
   </section>
 
   <section id="cuentas" class="section">
+    <div class="tab-currency">Moneda: <b class="currencyLabel">—</b></div>
+
     <div class="card">
       <div class="toolbar">
         <div>
@@ -261,17 +282,13 @@ const CURRENCY_SYMBOLS = {
   GTQ:'Q', USD:'$', EUR:'€', SVC:'₡', HNL:'L', CRC:'₡', NIO:'C$', MXN:'MX$', GBP:'£'
 };
 const currencyCode = () => {
-  const meta = (BASE_DATA && BASE_DATA.meta) ? BASE_DATA.meta : {};
+  const active = (typeof DATA !== 'undefined' && DATA) ? DATA : BASE_DATA;
+  const meta = (active && active.meta) ? active.meta : ((BASE_DATA && BASE_DATA.meta) ? BASE_DATA.meta : {});
   const explicit = String(meta.currency || 'N/D').trim().toUpperCase();
+  const fileText = String(meta.file || '').toUpperCase();
 
-  // Si Python ya detectó una moneda válida, respetarla.
   if (CURRENCY_SYMBOLS[explicit]) return explicit;
 
-  // Si el archivo contiene varias monedas reales, no inventar una sola.
-  if (explicit === 'MULTI') return 'MULTI';
-
-  // Respaldo 1: país o empresa indicado en el nombre del archivo.
-  const fileText = String(meta.file || '').toUpperCase();
   if (fileText.includes('EL SALVADOR')) return 'USD';
   if (fileText.includes('GUATEMALA')) return 'GTQ';
   if (fileText.includes('HONDURAS')) return 'HNL';
@@ -279,37 +296,42 @@ const currencyCode = () => {
   if (fileText.includes('NICARAGUA')) return 'NIO';
   if (fileText.includes('MEXICO') || fileText.includes('MÉXICO')) return 'MXN';
 
-  // Respaldo 2: bancos del archivo.
-  // Solo se usa cuando meta.currency viene N/D.
-  const banks = Array.isArray(BASE_DATA && BASE_DATA.banks) ? BASE_DATA.banks : [];
-  const bankText = banks.map(b => `${b.key || ''} ${b.name || ''}`).join(' ').toUpperCase();
+  const banks = Array.isArray(active && active.banks)
+    ? active.banks
+    : (Array.isArray(BASE_DATA && BASE_DATA.banks) ? BASE_DATA.banks : []);
 
-  // Bancos que identifican con mucha fuerza un archivo de Guatemala.
-  const guatemalaSignals = [
-    'BANCO INDUSTRIAL',
-    'INDUSTRIAL',
-    'BANRURAL',
-    'G&T',
-    'GYT',
-    'BANCO AGRICOLA MERCANTIL',
-    'BANCO AGRÍCOLA MERCANTIL',
-    'BAM'
-  ];
+  const bankText = banks
+    .map(b => `${b.key || ''} ${b.name || ''}`)
+    .join(' ')
+    .toUpperCase();
 
-  if (guatemalaSignals.some(s => bankText.includes(s))) {
+  if (
+    bankText.includes('BANCO INDUSTRIAL') ||
+    bankText.includes('INDUSTRIAL') ||
+    bankText.includes('BANRURAL') ||
+    bankText.includes('G&T') ||
+    bankText.includes('GYT') ||
+    bankText.includes('BANCO AGRICOLA MERCANTIL') ||
+    bankText.includes('BANCO AGRÍCOLA MERCANTIL')
+  ) {
     return 'GTQ';
   }
 
-  // Agrícola + Cuscatlán es una señal fuerte del conjunto salvadoreño.
-  const hasAgricola = bankText.includes('BANCO AGRÍCOLA') || bankText.includes('BANCO AGRICOLA');
-  const hasCuscatlan = bankText.includes('CUSCATLÁN') || bankText.includes('CUSCATLAN');
+  const hasAgricola =
+    bankText.includes('BANCO AGRÍCOLA') ||
+    bankText.includes('BANCO AGRICOLA');
 
-  if (hasAgricola && hasCuscatlan) {
-    return 'USD';
-  }
+  const hasCuscatlan =
+    bankText.includes('CUSCATLÁN') ||
+    bankText.includes('CUSCATLAN');
 
-  return explicit || 'N/D';
+  if (hasAgricola && hasCuscatlan) return 'USD';
+
+  if (explicit === 'MULTI') return 'MULTI';
+  return 'N/D';
 };
+
+console.info('[Dashboard v3.2] moneda resuelta:', currencyCode(), 'meta:', (BASE_DATA.meta||{}).currency);
 
 const currencySymbol = () => CURRENCY_SYMBOLS[currencyCode()] || '';
 
@@ -320,22 +342,23 @@ const currencyLabel = () => {
   if(code === 'N/D') return 'N/D';
   return symbol ? `${code} (${symbol})` : code;
 };
-const money = v => {
+const moneyAllViews = v => {
   const n = Number(v) || 0;
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(Math.abs(n));
 
-  const symbol = currencySymbol();
+  const code = currencyCode();
+  const symbol = CURRENCY_SYMBOLS[code] || '';
   const sign = n < 0 ? '-' : '';
 
-  if (symbol) {
-    return `${sign}${symbol} ${formatted}`;
-  }
-
+  if (symbol) return `${sign}${symbol} ${formatted}`;
+  if (code && code !== 'N/D' && code !== 'MULTI') return `${sign}${code} ${formatted}`;
   return `${sign}${formatted}`;
 };
+
+const money = v => moneyAllViews(v);
 const pct = v => `${v>=0?'+':''}${Number(v||0).toFixed(2)}%`;
 const cls = v => v>0?'positive':v<0?'negative':'neutral';
 const esc = s => String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -464,11 +487,11 @@ function renderHeader(){
 
 function renderKpis(){
   const kpis=[
-    ['Saldo inicial total',money(DATA.totals.initial),'Saldo al inicio del período seleccionado','neutral'],
-    ['Saldo final total',money(DATA.totals.final),'Saldo al cierre del período seleccionado','neutral'],
-    ['Créditos acumulados',money(DATA.totals.credits),'Abonos / entradas del período','positive'],
-    ['Débitos acumulados',money(DATA.totals.debits),'Cargos / salidas del período','negative'],
-    ['Variación entradas vs salidas',money(DATA.totals.change),pct(DATA.totals.changePct)+' respecto a salidas',cls(DATA.totals.change)],
+    ['Saldo inicial total',moneyAllViews(DATA.totals.initial),'Saldo al inicio del período seleccionado','neutral'],
+    ['Saldo final total',moneyAllViews(DATA.totals.final),'Saldo al cierre del período seleccionado','neutral'],
+    ['Créditos acumulados',moneyAllViews(DATA.totals.credits),'Abonos / entradas del período','positive'],
+    ['Débitos acumulados',moneyAllViews(DATA.totals.debits),'Cargos / salidas del período','negative'],
+    ['Variación entradas vs salidas',moneyAllViews(DATA.totals.change),pct(DATA.totals.changePct)+' respecto a salidas',cls(DATA.totals.change)],
     ['Movimientos totales',DATA.meta.movementCount.toLocaleString('en-US'),'Registros de ESTADO UNIFORME en el período','neutral']
   ];
   document.getElementById('kpis').innerHTML=kpis.map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value ${k[3]}">${k[1]}</div><div class="hint">${k[2]}</div></div>`).join('');
@@ -476,7 +499,7 @@ function renderKpis(){
 
 function renderBankList(){
   document.getElementById('bankList').innerHTML=DATA.banks.slice().sort((a,b)=>b.final-a.final).map(b=>`
-    <div class="bank-row"><span class="dot" style="background:${b.color}"></span><div><strong>${esc(b.name)}</strong><small>${b.accounts} cuenta${b.accounts>1?'s':''} · ${b.share.toFixed(2)}% del saldo final</small><div class="progress"><i style="width:${Math.max(0,b.share)}%;background:${b.color}"></i></div></div><div class="amount">${money(b.final)}</div></div>`).join('');
+    <div class="bank-row"><span class="dot" style="background:${b.color}"></span><div><strong>${esc(b.name)}</strong><small>${b.accounts} cuenta${b.accounts>1?'s':''} · ${b.share.toFixed(2)}% del saldo final</small><div class="progress"><i style="width:${Math.max(0,b.share)}%;background:${b.color}"></i></div></div><div class="amount">${moneyAllViews(b.final)}</div></div>`).join('');
 }
 
 function renderInsights(){
@@ -484,15 +507,15 @@ function renderInsights(){
   const biggestDrop=DATA.banks.slice().sort((a,b)=>a.change-b.change)[0];
   const mc=DATA.highlights.maxCredit, md=DATA.highlights.maxDebit;
   document.getElementById('insights').innerHTML=`
-    <div class="insight"><div class="tag">Mayor saldo final</div><b>${largestBank?largestBank.name:'—'}</b><p>${largestBank?`${money(largestBank.final)} · ${largestBank.share.toFixed(2)}% del total.`:'Sin datos.'}</p></div>
-    <div class="insight"><div class="tag">Mayor reducción de saldo</div><b>${biggestDrop?biggestDrop.name:'—'}</b><p class="${biggestDrop?cls(biggestDrop.change):''}">${biggestDrop?`${money(biggestDrop.change)} (${biggestDrop.changePct===null?'—':pct(biggestDrop.changePct)}).`:'Sin datos.'}</p></div>
-    <div class="insight"><div class="tag">Mayor día de créditos</div><b>${mc?mc.label:'—'}</b><p>${mc?money(mc.credits)+' en créditos.':'Sin movimientos en el período.'}</p></div>
-    <div class="insight"><div class="tag">Mayor día de débitos</div><b>${md?md.label:'—'}</b><p>${md?money(md.debits)+' en débitos.':'Sin movimientos en el período.'}</p></div>`;
+    <div class="insight"><div class="tag">Mayor saldo final</div><b>${largestBank?largestBank.name:'—'}</b><p>${largestBank?`${moneyAllViews(largestBank.final)} · ${largestBank.share.toFixed(2)}% del total.`:'Sin datos.'}</p></div>
+    <div class="insight"><div class="tag">Mayor reducción de saldo</div><b>${biggestDrop?biggestDrop.name:'—'}</b><p class="${biggestDrop?cls(biggestDrop.change):''}">${biggestDrop?`${moneyAllViews(biggestDrop.change)} (${biggestDrop.changePct===null?'—':pct(biggestDrop.changePct)}).`:'Sin datos.'}</p></div>
+    <div class="insight"><div class="tag">Mayor día de créditos</div><b>${mc?mc.label:'—'}</b><p>${mc?moneyAllViews(mc.credits)+' en créditos.':'Sin movimientos en el período.'}</p></div>
+    <div class="insight"><div class="tag">Mayor día de débitos</div><b>${md?md.label:'—'}</b><p>${md?moneyAllViews(md.debits)+' en débitos.':'Sin movimientos en el período.'}</p></div>`;
 }
 
 function renderBankCards(){
   document.getElementById('bankCards').innerHTML=DATA.banks.map(b=>`
-    <div class="bank-card" style="--bank:${b.color}"><div class="bank-title"><span>${esc(b.name)}</span><span class="bank-icon ${logoClass(b.key)}"><img src="${BANK_LOGOS[b.key]||''}" alt="Logo ${esc(b.name)}"></span></div><div class="big">${money(b.final)}</div><div class="small">Saldo final · ${b.share.toFixed(2)}% del total</div><div class="bank-metrics"><div class="mini"><b>${money(b.initial)}</b><span>Saldo inicial</span></div><div class="mini"><b class="${cls(b.change)}">${money(b.change)}</b><span>Variación</span></div><div class="mini"><b class="positive">${money(b.credits)}</b><span>Créditos</span></div><div class="mini"><b class="negative">${money(b.debits)}</b><span>Débitos</span></div></div></div>`).join('');
+    <div class="bank-card" style="--bank:${b.color}"><div class="bank-title"><span>${esc(b.name)}</span><span class="bank-icon ${logoClass(b.key)}"><img src="${BANK_LOGOS[b.key]||''}" alt="Logo ${esc(b.name)}"></span></div><div class="big">${moneyAllViews(b.final)}</div><div class="small">Saldo final · ${b.share.toFixed(2)}% del total</div><div class="bank-metrics"><div class="mini"><b>${moneyAllViews(b.initial)}</b><span>Saldo inicial</span></div><div class="mini"><b class="${cls(b.change)}">${moneyAllViews(b.change)}</b><span>Variación</span></div><div class="mini"><b class="positive">${moneyAllViews(b.credits)}</b><span>Créditos</span></div><div class="mini"><b class="negative">${moneyAllViews(b.debits)}</b><span>Débitos</span></div></div></div>`).join('');
 }
 
 const bankFilter=document.getElementById('bankFilter');
@@ -500,12 +523,12 @@ BASE_DATA.banks.forEach(b=>{const o=document.createElement('option');o.value=b.k
 function renderAccounts(){
   const f=bankFilter.value;
   const rows=DATA.accounts.filter(a=>f==='ALL'||a.bankKey===f);
-  document.getElementById('accountsTable').innerHTML=rows.map(a=>`<tr><td><span class="badge">${esc(a.bank)}</span></td><td><b>${esc(a.account)}</b></td><td class="num">${money(a.initial)}</td><td class="num"><b>${money(a.final)}</b></td><td class="num ${cls(a.change)}">${money(a.change)}</td><td class="num ${cls(a.change)}">${a.changePct===null?'—':pct(a.changePct)}</td><td class="num positive">${money(a.credits)}</td><td class="num negative">${money(a.debits)}</td></tr>`).join('');
+  document.getElementById('accountsTable').innerHTML=rows.map(a=>`<tr><td><span class="badge">${esc(a.bank)}</span></td><td><b>${esc(a.account)}</b></td><td class="num">${moneyAllViews(a.initial)}</td><td class="num"><b>${moneyAllViews(a.final)}</b></td><td class="num ${cls(a.change)}">${moneyAllViews(a.change)}</td><td class="num ${cls(a.change)}">${a.changePct===null?'—':pct(a.changePct)}</td><td class="num positive">${moneyAllViews(a.credits)}</td><td class="num negative">${moneyAllViews(a.debits)}</td></tr>`).join('');
 }
 bankFilter.addEventListener('change',renderAccounts);
 
 function renderDailyTable(){
-  document.getElementById('dailyTable').innerHTML=DATA.daily.length?DATA.daily.map(d=>`<tr><td><b>${d.label}/2026</b></td><td class="num">${d.moves}</td><td class="num negative">${money(d.debits)}</td><td class="num positive">${money(d.credits)}</td><td class="num ${cls(d.net)}"><b>${money(d.net)}</b></td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#94A0B2;padding:24px">No hay movimientos en el período seleccionado.</td></tr>';
+  document.getElementById('dailyTable').innerHTML=DATA.daily.length?DATA.daily.map(d=>`<tr><td><b>${d.label}/2026</b></td><td class="num">${d.moves}</td><td class="num negative">${moneyAllViews(d.debits)}</td><td class="num positive">${moneyAllViews(d.credits)}</td><td class="num ${cls(d.net)}"><b>${moneyAllViews(d.net)}</b></td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#94A0B2;padding:24px">No hay movimientos en el período seleccionado.</td></tr>';
 }
 
 function renderAll(){
@@ -558,13 +581,13 @@ function fitCanvas(canvas){
 function roundedRect(ctx,x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill()}
 function text(ctx,t,x,y,opt={}){ctx.fillStyle=opt.color||'#D9E1EC';ctx.font=`${opt.weight||600} ${opt.size||12}px Inter,Segoe UI,Arial`;ctx.textAlign=opt.align||'left';ctx.textBaseline='middle';ctx.fillText(t,x,y)}
 function drawGroupedBars(id,labels,s1,s2,c1,c2){
-  const {ctx,w,h}=fitCanvas(document.getElementById(id));ctx.clearRect(0,0,w,h);const L=85,R=18,T=25,B=45,pw=w-L-R,ph=h-T-B;const max=Math.max(...s1,...s2,1)*1.12;ctx.strokeStyle='#3B4350';ctx.lineWidth=1;for(let i=0;i<=4;i++){const y=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();text(ctx,money(max*(1-i/4)),L-8,y,{size:10,color:'#8F9AAB',align:'right',weight:500})}const group=pw/labels.length,bw=Math.min(32,group*.28);labels.forEach((lab,i)=>{const cx=L+group*(i+.5),h1=ph*s1[i]/max,h2=ph*s2[i]/max;roundedRect(ctx,cx-bw-3,T+ph-h1,bw,h1,6,c1);roundedRect(ctx,cx+3,T+ph-h2,bw,h2,6,c2);text(ctx,lab,cx,h-B/2+15,{size:10,color:'#B8C2D1',align:'center',weight:700})});
+  const {ctx,w,h}=fitCanvas(document.getElementById(id));ctx.clearRect(0,0,w,h);const L=85,R=18,T=25,B=45,pw=w-L-R,ph=h-T-B;const max=Math.max(...s1,...s2,1)*1.12;ctx.strokeStyle='#3B4350';ctx.lineWidth=1;for(let i=0;i<=4;i++){const y=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();text(ctx,moneyAllViews(max*(1-i/4)),L-8,y,{size:10,color:'#8F9AAB',align:'right',weight:500})}const group=pw/labels.length,bw=Math.min(32,group*.28);labels.forEach((lab,i)=>{const cx=L+group*(i+.5),h1=ph*s1[i]/max,h2=ph*s2[i]/max;roundedRect(ctx,cx-bw-3,T+ph-h1,bw,h1,6,c1);roundedRect(ctx,cx+3,T+ph-h2,bw,h2,6,c2);text(ctx,lab,cx,h-B/2+15,{size:10,color:'#B8C2D1',align:'center',weight:700})});
 }
 function drawNetBars(){
-  const {ctx,w,h}=fitCanvas(document.getElementById('netBankChart'));ctx.clearRect(0,0,w,h);const vals=DATA.banks.map(b=>b.netFlow),labels=DATA.banks.map(b=>b.name.replace('Banco ',''));const L=85,R=20,T=25,B=45,pw=w-L-R,ph=h-T-B,max=Math.max(...vals.map(Math.abs),1)*1.15,mid=T+ph/2;ctx.strokeStyle='#667085';ctx.beginPath();ctx.moveTo(L,mid);ctx.lineTo(w-R,mid);ctx.stroke();const group=pw/vals.length,bw=Math.min(48,group*.48);vals.forEach((v,i)=>{const barh=(ph/2)*Math.abs(v)/max,cx=L+group*(i+.5),y=v>=0?mid-barh:mid;roundedRect(ctx,cx-bw/2,y,bw,barh,7,v>=0?'#34D399':'#FB7185');text(ctx,labels[i],cx,h-18,{size:10,color:'#B8C2D1',align:'center',weight:700});text(ctx,money(v),cx,v>=0?Math.max(T+10,y-10):Math.min(h-B-5,y+barh+12),{size:10,color:v>=0?'#6EE7B7':'#FDA4AF',align:'center',weight:700})});
+  const {ctx,w,h}=fitCanvas(document.getElementById('netBankChart'));ctx.clearRect(0,0,w,h);const vals=DATA.banks.map(b=>b.netFlow),labels=DATA.banks.map(b=>b.name.replace('Banco ',''));const L=85,R=20,T=25,B=45,pw=w-L-R,ph=h-T-B,max=Math.max(...vals.map(Math.abs),1)*1.15,mid=T+ph/2;ctx.strokeStyle='#667085';ctx.beginPath();ctx.moveTo(L,mid);ctx.lineTo(w-R,mid);ctx.stroke();const group=pw/vals.length,bw=Math.min(48,group*.48);vals.forEach((v,i)=>{const barh=(ph/2)*Math.abs(v)/max,cx=L+group*(i+.5),y=v>=0?mid-barh:mid;roundedRect(ctx,cx-bw/2,y,bw,barh,7,v>=0?'#34D399':'#FB7185');text(ctx,labels[i],cx,h-18,{size:10,color:'#B8C2D1',align:'center',weight:700});text(ctx,moneyAllViews(v),cx,v>=0?Math.max(T+10,y-10):Math.min(h-B-5,y+barh+12),{size:10,color:v>=0?'#6EE7B7':'#FDA4AF',align:'center',weight:700})});
 }
 function drawDaily(){
-  const canvas=document.getElementById('dailyChart'),{ctx,w,h}=fitCanvas(canvas);ctx.clearRect(0,0,w,h);if(!DATA.daily.length){text(ctx,'Sin movimientos en el período seleccionado',w/2,h/2,{size:13,color:'#94A0B2',align:'center',weight:650});return}const L=80,R=20,T=24,B=48,pw=w-L-R,ph=h-T-B,vals=[...DATA.daily.map(d=>d.credits),...DATA.daily.map(d=>d.debits)],max=Math.max(...vals,1)*1.1;ctx.strokeStyle='#3B4350';for(let i=0;i<=4;i++){const y=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();text(ctx,money(max*(1-i/4)),L-8,y,{size:10,color:'#8F9AAB',align:'right',weight:500})}const x=i=>L+pw*(i/(DATA.daily.length-1||1)),y=v=>T+ph-(v/max*ph);function line(key,color){ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();DATA.daily.forEach((d,i)=>{const xx=x(i),yy=y(d[key]);i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)});ctx.stroke();DATA.daily.forEach((d,i)=>{ctx.fillStyle=color;ctx.beginPath();ctx.arc(x(i),y(d[key]),3,0,Math.PI*2);ctx.fill()})}line('credits','#34D399');line('debits','#FB7185');DATA.daily.forEach((d,i)=>{if(i%2===0||DATA.daily.length<12)text(ctx,d.label,x(i),h-18,{size:9,color:'#9BA6B6',align:'center',weight:600})});
+  const canvas=document.getElementById('dailyChart'),{ctx,w,h}=fitCanvas(canvas);ctx.clearRect(0,0,w,h);if(!DATA.daily.length){text(ctx,'Sin movimientos en el período seleccionado',w/2,h/2,{size:13,color:'#94A0B2',align:'center',weight:650});return}const L=80,R=20,T=24,B=48,pw=w-L-R,ph=h-T-B,vals=[...DATA.daily.map(d=>d.credits),...DATA.daily.map(d=>d.debits)],max=Math.max(...vals,1)*1.1;ctx.strokeStyle='#3B4350';for(let i=0;i<=4;i++){const y=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();text(ctx,moneyAllViews(max*(1-i/4)),L-8,y,{size:10,color:'#8F9AAB',align:'right',weight:500})}const x=i=>L+pw*(i/(DATA.daily.length-1||1)),y=v=>T+ph-(v/max*ph);function line(key,color){ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();DATA.daily.forEach((d,i)=>{const xx=x(i),yy=y(d[key]);i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)});ctx.stroke();DATA.daily.forEach((d,i)=>{ctx.fillStyle=color;ctx.beginPath();ctx.arc(x(i),y(d[key]),3,0,Math.PI*2);ctx.fill()})}line('credits','#34D399');line('debits','#FB7185');DATA.daily.forEach((d,i)=>{if(i%2===0||DATA.daily.length<12)text(ctx,d.label,x(i),h-18,{size:9,color:'#9BA6B6',align:'center',weight:600})});
 }
 function drawAll(){if(document.getElementById('balancesChart').offsetParent)drawGroupedBars('balancesChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.initial),DATA.banks.map(b=>b.final),'#60A5FA','#34D399');if(document.getElementById('flowBankChart').offsetParent)drawGroupedBars('flowBankChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.credits),DATA.banks.map(b=>b.debits),'#34D399','#FB7185');if(document.getElementById('netBankChart').offsetParent)drawNetBars();if(document.getElementById('dailyChart').offsetParent)drawDaily()}
 window.addEventListener('resize',()=>setTimeout(drawAll,80));

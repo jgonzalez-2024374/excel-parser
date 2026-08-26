@@ -17,7 +17,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v3.0-currency-dashboard-20260826-1736"
+APP_BUILD = "dashboard-v3.2-currency-all-tabs-20260826-1749"
 
 
 # ============================================================
@@ -3494,6 +3494,112 @@ def _fecha_corte_desde_nombre(nombre_archivo, fecha_respaldo=""):
     return fecha_respaldo or ""
 
 
+
+def resolver_moneda_dashboard_final(
+    transactions,
+    nombre_archivo="",
+    moneda_contextual="N/D"
+):
+    """
+    Resuelve UNA moneda de presentación para el dashboard.
+
+    Prioridad:
+    1. Moneda contextual/textual confiable del archivo.
+    2. País indicado en el nombre del archivo.
+    3. Conjunto de bancos del archivo.
+    4. Moneda resultante de las transacciones.
+
+    Esto corrige falsos MULTI causados por formatos heredados de Excel.
+    No convierte importes.
+    """
+
+    contextual = normalizar_codigo_moneda(
+        moneda_contextual
+    )
+
+    if contextual not in {"N/D", ""}:
+        return contextual
+
+    archivo = clean_text(
+        nombre_archivo
+    )
+
+    if "el salvador" in archivo:
+        return "USD"
+
+    if "guatemala" in archivo:
+        return "GTQ"
+
+    if "honduras" in archivo:
+        return "HNL"
+
+    if "costa rica" in archivo:
+        return "CRC"
+
+    if "nicaragua" in archivo:
+        return "NIO"
+
+    if "mexico" in archivo:
+        return "MXN"
+
+    bancos_texto = " | ".join(
+        str(
+            transaction.get(
+                "banco",
+                ""
+            )
+        )
+        for transaction in transactions
+    )
+
+    bancos_normal = clean_text(
+        bancos_texto
+    )
+
+    # Señales muy fuertes de Guatemala.
+    guatemala_signals = (
+        "banco industrial",
+        "industrial",
+        "banrural",
+        "g&t",
+        "gyt",
+        "banco agricola mercantil",
+        "bam",
+    )
+
+    if any(
+        signal in bancos_normal
+        for signal in guatemala_signals
+    ):
+        return "GTQ"
+
+    # Conjunto típico de El Salvador.
+    tiene_agricola = (
+        "banco agricola" in bancos_normal
+        or "agricola" in bancos_normal
+    )
+
+    tiene_cuscatlan = (
+        "cuscatlan" in bancos_normal
+    )
+
+    if tiene_agricola and tiene_cuscatlan:
+        return "USD"
+
+    detectada = moneda_unica_transacciones(
+        transactions
+    )
+
+    if detectada in {
+        "GTQ", "USD", "EUR", "SVC",
+        "HNL", "CRC", "NIO", "MXN", "GBP"
+    }:
+        return detectada
+
+    return "N/D"
+
+
+
 def construir_dashboard_data(
     transactions,
     nombre_archivo="",
@@ -3527,25 +3633,14 @@ def construir_dashboard_data(
     # MONEDA GENERAL
     # --------------------------------------------------------
 
-    moneda_dashboard = moneda_unica_transacciones(
-        transactions
+    # Moneda FINAL para presentación del dashboard.
+    # Se resuelve a nivel de archivo para evitar falsos MULTI por
+    # number_format heredados en algunas hojas.
+    moneda_dashboard = resolver_moneda_dashboard_final(
+        transactions,
+        nombre_archivo=nombre_archivo,
+        moneda_contextual=moneda_preferida
     )
-
-    # Si las transacciones no traen una moneda concluyente, usar la
-    # moneda contextual detectada del archivo original.
-    #
-    # Esto es especialmente importante cuando un Excel transformado
-    # conserva formatos antiguos ($ / Q) que no representan la moneda
-    # real del estado de cuenta.
-    moneda_preferida = normalizar_codigo_moneda(
-        moneda_preferida
-    )
-
-    if (
-        moneda_dashboard in {"N/D", "MULTI"}
-        and moneda_preferida not in {"N/D", "MULTI", ""}
-    ):
-        moneda_dashboard = moneda_preferida
 
     # --------------------------------------------------------
     # IDENTIFICAR CUENTAS Y EVITAR COLISIONES DE ÚLTIMOS 4
@@ -4196,96 +4291,10 @@ def renderizar_dashboard_nueva_plantilla():
             "La nueva plantilla no contiene el bloque 'const RAW_TRANSACTIONS = ...'."
         )
 
-    moneda = str(
-        datos.get("meta", {}).get("currency", "N/D")
-    ).upper()
+    # La moneda se resuelve completamente dentro de index.html.
+    # Python solo inyecta BASE_DATA y RAW_TRANSACTIONS.
+    # Así todas las pestañas usan el mismo formateador monetario.
 
-    # Texto visible de moneda en portada/encabezado.
-    html = html.replace(
-        "USD ($)",
-        _etiqueta_moneda_dashboard(moneda)
-    )
-
-    # --------------------------------------------------------
-    # FORMATO MONETARIO DINÁMICO EN EL DASHBOARD
-    # --------------------------------------------------------
-    # La plantilla original trae:
-    #   const money = ... currency:'USD' ...
-    #
-    # Se reemplaza por un formatter basado en BASE_DATA.meta.currency,
-    # de modo que:
-    #   GTQ -> Q
-    #   USD -> $
-    #   EUR -> €
-    # etc.
-    #
-    # IMPORTANTE: esto SOLO cambia presentación. No convierte montos.
-    currency_js = (
-        "const DASHBOARD_CURRENCY = "
-        "String((BASE_DATA&&BASE_DATA.meta&&BASE_DATA.meta.currency)||'N/D').toUpperCase();\\n"
-        "const DASHBOARD_CURRENCY_SYMBOLS = {"
-        "GTQ:'Q',USD:'$',EUR:'€',SVC:'₡',HNL:'L',CRC:'₡',"
-        "NIO:'C$',MXN:'MX$',GBP:'£'"
-        "};\\n"
-        "const DASHBOARD_CURRENCY_SYMBOL = "
-        "DASHBOARD_CURRENCY_SYMBOLS[DASHBOARD_CURRENCY]||'';\\n"
-        "const money = v => {"
-        "const n=Number(v)||0;"
-        "const formatted=new Intl.NumberFormat('en-US',"
-        "{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);"
-        "return DASHBOARD_CURRENCY_SYMBOL"
-        "?DASHBOARD_CURRENCY_SYMBOL+' '+formatted"
-        ":formatted;"
-        "};"
-    )
-
-    html, cambios_money = re.subn(
-        r"const\s+money\s*=\s*v\s*=>\s*new\s+Intl\.NumberFormat\(.*?\)\.format\(Number\(v\)\|\|0\);",
-        currency_js,
-        html,
-        count=1,
-        flags=re.S
-    )
-
-    # Segunda estrategia: reemplazo literal de la línea de la plantilla
-    # actual, por si el HTML cambia mínimamente y la regex no coincide.
-    if cambios_money == 0:
-        money_original = (
-            "const money = v => new Intl.NumberFormat('en-US',"
-            "{style:'currency',currency:'USD',minimumFractionDigits:2})"
-            ".format(Number(v)||0);"
-        )
-        if money_original in html:
-            html = html.replace(
-                money_original,
-                currency_js,
-                1
-            )
-            cambios_money = 1
-
-    # Tercera estrategia: al menos cambiar el código de moneda si la
-    # plantilla conserva un Intl.NumberFormat con USD fijo.
-    if cambios_money == 0 and moneda in {
-        "USD", "GTQ", "EUR", "SVC", "HNL", "CRC", "NIO", "MXN", "GBP"
-    }:
-        html, cambios_currency_code = re.subn(
-            r"currency\s*:\s*['\"]USD['\"]",
-            "currency:'" + moneda + "'",
-            html,
-            count=1
-        )
-
-    # Si aún queda el formatter fijo en USD, detener la generación.
-    # Es preferible un error claro a entregar un dashboard con moneda falsa.
-    if (
-        moneda not in {"N/D", "MULTI"}
-        and "currency:'USD'" in html
-        and moneda != "USD"
-    ):
-        raise ValueError(
-            "El dashboard todavía conserva currency:'USD' aunque "
-            "el Excel fue detectado como " + moneda + "."
-        )
 
     return html
 
