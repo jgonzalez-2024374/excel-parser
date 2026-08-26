@@ -310,6 +310,307 @@
     }
   }
 
+
+  .consolidated-summary{
+    margin:14px 0 18px;
+    border:1px solid #394252;
+    border-radius:18px;
+    background:
+      radial-gradient(circle at top right,rgba(96,165,250,.10),transparent 32%),
+      linear-gradient(180deg,#222832,#1B212A);
+    box-shadow:0 12px 28px rgba(0,0,0,.14);
+    overflow:hidden;
+  }
+  .consolidated-summary-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+    padding:16px 18px 12px;
+    border-bottom:1px solid #343D4C;
+  }
+  .consolidated-summary-title h2{
+    margin:0;
+    font-size:17px;
+    color:#F8FAFC;
+    letter-spacing:-.02em;
+  }
+  .consolidated-summary-title p{
+    margin:5px 0 0;
+    color:#94A3B8;
+    font-size:11px;
+    line-height:1.45;
+    max-width:670px;
+  }
+  .consolidated-controls{
+    display:flex;
+    align-items:flex-end;
+    justify-content:flex-end;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .consolidated-control{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .consolidated-control label{
+    font-size:9px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#94A3B8;
+    font-weight:800;
+  }
+  .consolidated-control select,
+  .consolidated-control input{
+    min-height:38px;
+    border:1px solid #465064;
+    border-radius:10px;
+    background:#171C24;
+    color:#E2E8F0;
+    padding:0 10px;
+    font-weight:800;
+    outline:none;
+  }
+  .consolidated-control select{
+    min-width:158px;
+  }
+  .consolidated-control input{
+    width:130px;
+  }
+  .consolidated-control select:focus,
+  .consolidated-control input:focus{
+    border-color:#60A5FA;
+    box-shadow:0 0 0 3px rgba(96,165,250,.12);
+  }
+  .consolidated-kpis{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:10px;
+    padding:14px 18px 10px;
+  }
+  .consolidated-kpi{
+    min-width:0;
+    border:1px solid #394252;
+    border-radius:14px;
+    background:#171C24;
+    padding:12px;
+  }
+  .consolidated-kpi .label{
+    min-height:26px;
+    display:flex;
+    align-items:flex-start;
+    color:#94A3B8;
+    font-size:9px;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    font-weight:800;
+    line-height:1.35;
+  }
+  .consolidated-kpi .value{
+    margin-top:7px;
+    font-size:clamp(15px,1.35vw,21px);
+    font-weight:900;
+    color:#F8FAFC;
+    letter-spacing:-.035em;
+    line-height:1.08;
+    white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .consolidated-kpi .sub{
+    margin-top:5px;
+    color:#64748B;
+    font-size:9px;
+    line-height:1.35;
+  }
+  .consolidated-country-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+    padding:0 18px 14px;
+  }
+  .consolidated-country{
+    border:1px solid #394252;
+    border-radius:12px;
+    background:#1E252F;
+    padding:11px 12px;
+  }
+  .consolidated-country-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:7px;
+  }
+  .consolidated-country-head b{
+    color:#E2E8F0;
+    font-size:11px;
+  }
+  .consolidated-country-head span{
+    color:#94A3B8;
+    font-size:9px;
+    font-weight:750;
+  }
+  .consolidated-country-values{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px;
+  }
+  .consolidated-country-values div{
+    min-width:0;
+  }
+  .consolidated-country-values small{
+    display:block;
+    color:#64748B;
+    font-size:8px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    margin-bottom:3px;
+  }
+  .consolidated-country-values strong{
+    display:block;
+    color:#E2E8F0;
+    font-size:11px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-variant-numeric:tabular-nums;
+  }
+  .consolidated-warning{
+    display:none;
+    margin:0 18px 14px;
+    padding:10px 12px;
+    border:1px solid rgba(245,158,11,.32);
+    border-radius:11px;
+    background:rgba(245,158,11,.08);
+    color:#FCD34D;
+    font-size:10px;
+    line-height:1.45;
+  }
+  .consolidated-warning.show{
+    display:block;
+  }
+  .consolidated-foot{
+    padding:0 18px 14px;
+    color:#64748B;
+    font-size:9px;
+    line-height:1.45;
+  }
+  @media(max-width:1100px){
+    .consolidated-summary-head{
+      flex-direction:column;
+    }
+    .consolidated-controls{
+      justify-content:flex-start;
+      width:100%;
+    }
+    .consolidated-kpis{
+      grid-template-columns:repeat(3,minmax(0,1fr));
+    }
+  }
+  @media(max-width:720px){
+    .consolidated-kpis{
+      grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+    .consolidated-country-grid{
+      grid-template-columns:1fr;
+    }
+    .consolidated-controls{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+    }
+    .consolidated-control select,
+    .consolidated-control input{
+      width:100%;
+      min-width:0;
+    }
+  }
+  @media(max-width:480px){
+    .consolidated-kpis{
+      grid-template-columns:1fr;
+    }
+    .consolidated-controls{
+      grid-template-columns:1fr;
+    }
+    .consolidated-country-values{
+      grid-template-columns:1fr;
+    }
+  }
+
+
+  .fx-live-row{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
+    flex-wrap:wrap;
+    width:100%;
+    margin-top:2px;
+  }
+  .fx-live-status{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    min-height:30px;
+    padding:6px 9px;
+    border:1px solid #394252;
+    border-radius:9px;
+    background:#171C24;
+    color:#94A3B8;
+    font-size:9px;
+    line-height:1.3;
+  }
+  .fx-live-dot{
+    width:7px;
+    height:7px;
+    border-radius:999px;
+    background:#64748B;
+    flex:0 0 auto;
+  }
+  .fx-live-status.loading .fx-live-dot{
+    background:#FBBF24;
+  }
+  .fx-live-status.ok .fx-live-dot{
+    background:#34D399;
+  }
+  .fx-live-status.error .fx-live-dot{
+    background:#FB7185;
+  }
+  .fx-refresh-btn{
+    min-height:30px;
+    border:1px solid #465064;
+    border-radius:9px;
+    background:#2A313D;
+    color:#E2E8F0;
+    padding:6px 10px;
+    font-size:9px;
+    font-weight:800;
+    cursor:pointer;
+  }
+  .fx-refresh-btn:hover{
+    border-color:#60A5FA;
+  }
+  .fx-refresh-btn:disabled{
+    opacity:.55;
+    cursor:wait;
+  }
+  .fx-live-source{
+    color:#64748B;
+    font-size:8px;
+    margin-top:4px;
+    text-align:right;
+  }
+  @media(max-width:720px){
+    .fx-live-row{
+      justify-content:flex-start;
+    }
+    .fx-live-source{
+      text-align:left;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -376,6 +677,67 @@
       </button>
     </div>
   </div>
+
+
+  <section class="consolidated-summary" id="consolidatedSummary">
+    <div class="consolidated-summary-head">
+      <div class="consolidated-summary-title">
+        <h2>Resumen consolidado en una sola moneda</h2>
+        <p>
+          Integra Guatemala y El Salvador únicamente para visualización.
+          Puedes presentar el resultado completo en quetzales o dólares sin modificar
+          los valores originales del archivo.
+        </p>
+      </div>
+
+      <div class="consolidated-controls">
+        <div class="consolidated-control">
+          <label for="summaryCurrency">Mostrar resumen en</label>
+          <select id="summaryCurrency">
+            <option value="GTQ">Quetzales (GTQ · Q)</option>
+            <option value="USD">Dólares (USD · $)</option>
+          </select>
+        </div>
+
+        <div class="consolidated-control">
+          <label for="summaryFxRate">Tipo de cambio actual · Q por US$1</label>
+          <input
+            id="summaryFxRate"
+            type="number"
+            min="0.000001"
+            step="0.00001"
+            inputmode="decimal"
+            placeholder="Consultando..."
+          >
+          <div class="fx-live-source">Automático · editable como respaldo</div>
+        </div>
+
+        <div class="fx-live-row">
+          <div class="fx-live-status loading" id="fxLiveStatus">
+            <span class="fx-live-dot"></span>
+            <span id="fxLiveStatusText">Consultando Banco de Guatemala…</span>
+          </div>
+          <button
+            type="button"
+            class="fx-refresh-btn"
+            id="fxRefreshBtn"
+          >Actualizar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="consolidated-kpis" id="consolidatedKpis"></div>
+
+    <div class="consolidated-country-grid" id="consolidatedCountryGrid"></div>
+
+    <div class="consolidated-warning" id="consolidatedWarning"></div>
+
+    <div class="consolidated-foot">
+      El tipo de cambio se consulta automáticamente al Banco de Guatemala y se utiliza
+      solamente para este resumen consolidado. Las vistas de Guatemala continúan en GTQ
+      y las de El Salvador continúan en USD.
+    </div>
+  </section>
 
   <nav class="tabs">
     <button class="tab active" data-target="resumen">Resumen ejecutivo</button>
@@ -988,6 +1350,495 @@ function buildFiltered(startDate,endDate){
   };
 }
 
+
+const LIVE_FX_ENDPOINT="{{ url_for('tipo_cambio_actual', _external=True) }}";
+
+const summaryCurrencyEl=document.getElementById('summaryCurrency');
+const summaryFxRateEl=document.getElementById('summaryFxRate');
+const fxLiveStatusEl=document.getElementById('fxLiveStatus');
+const fxLiveStatusTextEl=document.getElementById('fxLiveStatusText');
+const fxRefreshBtnEl=document.getElementById('fxRefreshBtn');
+const consolidatedKpisEl=document.getElementById('consolidatedKpis');
+const consolidatedCountryGridEl=document.getElementById('consolidatedCountryGrid');
+const consolidatedWarningEl=document.getElementById('consolidatedWarning');
+
+const SUMMARY_STORAGE_KEY='bankDashboardSummaryCurrency';
+const FX_STORAGE_KEY='bankDashboardFxGtqPerUsd';
+
+try{
+  const savedCurrency=localStorage.getItem(SUMMARY_STORAGE_KEY);
+  if(savedCurrency==='GTQ'||savedCurrency==='USD'){
+    summaryCurrencyEl.value=savedCurrency;
+  }
+
+  const savedRate=localStorage.getItem(FX_STORAGE_KEY);
+  if(savedRate && Number(savedRate)>0){
+    summaryFxRateEl.value=savedRate;
+  }
+}catch(_err){}
+
+
+function setFxLiveStatus(type,message){
+  if(!fxLiveStatusEl||!fxLiveStatusTextEl) return;
+
+  fxLiveStatusEl.classList.remove(
+    'loading',
+    'ok',
+    'error'
+  );
+
+  fxLiveStatusEl.classList.add(
+    type
+  );
+
+  fxLiveStatusTextEl.textContent=message;
+}
+
+async function loadLiveExchangeRate(force=false){
+  if(
+    !LIVE_FX_ENDPOINT ||
+    LIVE_FX_ENDPOINT.includes('{{')
+  ){
+    setFxLiveStatus(
+      'error',
+      'Dashboard no renderizado por Flask; usa el valor manual.'
+    );
+    return;
+  }
+
+  if(fxRefreshBtnEl){
+    fxRefreshBtnEl.disabled=true;
+  }
+
+  setFxLiveStatus(
+    'loading',
+    'Consultando Banco de Guatemala…'
+  );
+
+  const controller=new AbortController();
+  const timeoutId=setTimeout(
+    ()=>controller.abort(),
+    12000
+  );
+
+  try{
+    const separator=LIVE_FX_ENDPOINT.includes('?')
+      ? '&'
+      : '?';
+
+    const url=force
+      ? `${LIVE_FX_ENDPOINT}${separator}refresh=1&_=${Date.now()}`
+      : `${LIVE_FX_ENDPOINT}${separator}_=${Date.now()}`;
+
+    const response=await fetch(
+      url,
+      {
+        cache:'no-store',
+        signal:controller.signal
+      }
+    );
+
+    const payload=await response.json();
+
+    if(
+      !response.ok ||
+      !payload.success ||
+      !(Number(payload.rate_gtq_per_usd)>0)
+    ){
+      throw new Error(
+        payload.error ||
+        'Respuesta inválida del servicio de tipo de cambio.'
+      );
+    }
+
+    const rate=Number(
+      payload.rate_gtq_per_usd
+    );
+
+    summaryFxRateEl.value=rate.toFixed(5);
+
+    try{
+      localStorage.setItem(
+        FX_STORAGE_KEY,
+        String(rate)
+      );
+    }catch(_err){}
+
+    const dateText=String(
+      payload.date ||
+      ''
+    ).trim();
+
+    const stale=Boolean(
+      payload.stale
+    );
+
+    setFxLiveStatus(
+      stale ? 'error' : 'ok',
+      `${stale?'Último valor disponible':'Actual'}: Q${rate.toFixed(5)} por US$1${dateText?' · '+dateText:''}`
+    );
+
+    renderConsolidatedSummary();
+
+  }catch(error){
+    const saved=Number(
+      summaryFxRateEl.value
+    );
+
+    if(saved>0){
+      setFxLiveStatus(
+        'error',
+        `No se pudo actualizar; usando Q${saved.toFixed(5)} por US$1`
+      );
+    }else{
+      setFxLiveStatus(
+        'error',
+        'No se pudo consultar el tipo de cambio. Puedes ingresarlo manualmente.'
+      );
+    }
+
+  }finally{
+    clearTimeout(
+      timeoutId
+    );
+
+    if(fxRefreshBtnEl){
+      fxRefreshBtnEl.disabled=false;
+    }
+  }
+}
+
+if(fxRefreshBtnEl){
+  fxRefreshBtnEl.addEventListener(
+    'click',
+    ()=>loadLiveExchangeRate(true)
+  );
+}
+
+function summaryMoney(value,currency){
+  const n=Number(value)||0;
+  const symbol=CURRENCY_SYMBOLS[currency]||currency||'';
+  const formatted=new Intl.NumberFormat('en-US',{
+    minimumFractionDigits:2,
+    maximumFractionDigits:2
+  }).format(Math.abs(n));
+  const sign=n<0?'-':'';
+  return `${sign}${symbol} ${formatted}`.trim();
+}
+
+function accountCurrency(account){
+  const explicit=String(
+    account && (account.currency||account.moneda) || ''
+  ).trim().toUpperCase();
+
+  if(explicit==='GTQ'||explicit==='USD'){
+    return explicit;
+  }
+
+  const country=recordCountry(account);
+  if(country==='GUATEMALA') return 'GTQ';
+  if(country==='EL_SALVADOR') return 'USD';
+
+  return explicit||'N/D';
+}
+
+function convertSummaryAmount(value,sourceCurrency,targetCurrency,fxRate){
+  const amount=Number(value)||0;
+
+  if(sourceCurrency===targetCurrency){
+    return {
+      ok:true,
+      value:amount
+    };
+  }
+
+  if(
+    sourceCurrency==='GTQ' &&
+    targetCurrency==='USD'
+  ){
+    if(!(fxRate>0)){
+      return {ok:false,value:0};
+    }
+
+    return {
+      ok:true,
+      value:amount/fxRate
+    };
+  }
+
+  if(
+    sourceCurrency==='USD' &&
+    targetCurrency==='GTQ'
+  ){
+    if(!(fxRate>0)){
+      return {ok:false,value:0};
+    }
+
+    return {
+      ok:true,
+      value:amount*fxRate
+    };
+  }
+
+  return {
+    ok:false,
+    value:0,
+    unsupported:true
+  };
+}
+
+function consolidatedAccountSnapshot(account,startDate,endDate){
+  const key=txKey(
+    account.bankKey,
+    account.account
+  );
+
+  const txs=(TX_BY_ACCOUNT[key]||[]).filter(
+    t=>t.date>=startDate&&t.date<=endDate
+  );
+
+  const initial=accountBalanceBefore(
+    account,
+    startDate,
+    true
+  );
+
+  const final=accountBalanceBefore(
+    account,
+    endDate,
+    false
+  );
+
+  const credits=round2(
+    txs.reduce(
+      (sum,t)=>sum+Number(t.credit||0),
+      0
+    )
+  );
+
+  const debits=round2(
+    txs.reduce(
+      (sum,t)=>sum+Number(t.debit||0),
+      0
+    )
+  );
+
+  return {
+    country:recordCountry(account),
+    currency:accountCurrency(account),
+    initial:round2(initial),
+    final:round2(final),
+    credits,
+    debits,
+    net:round2(credits-debits)
+  };
+}
+
+function renderConsolidatedSummary(){
+  if(
+    !summaryCurrencyEl ||
+    !summaryFxRateEl ||
+    !consolidatedKpisEl
+  ){
+    return;
+  }
+
+  const targetCurrency=summaryCurrencyEl.value==='USD'
+    ? 'USD'
+    : 'GTQ';
+
+  const fxRate=Number(summaryFxRateEl.value)||0;
+
+  const startDate=(
+    typeof dateFrom!=='undefined' &&
+    dateFrom &&
+    dateFrom.value
+  ) ? dateFrom.value : MIN_DATE;
+
+  const endDate=(
+    typeof dateTo!=='undefined' &&
+    dateTo &&
+    dateTo.value
+  ) ? dateTo.value : MAX_DATE;
+
+  const snapshots=(Array.isArray(BASE_DATA.accounts)?BASE_DATA.accounts:[])
+    .map(a=>consolidatedAccountSnapshot(a,startDate,endDate));
+
+  const currenciesPresent=new Set(
+    snapshots
+      .map(s=>s.currency)
+      .filter(c=>c==='GTQ'||c==='USD')
+  );
+
+  const conversionNeeded=
+    currenciesPresent.size>1 ||
+    (
+      currenciesPresent.size===1 &&
+      !currenciesPresent.has(targetCurrency)
+    );
+
+  let missingRate=false;
+  let unsupportedCount=0;
+
+  const totals={
+    initial:0,
+    final:0,
+    credits:0,
+    debits:0,
+    net:0
+  };
+
+  const byCountry={
+    GUATEMALA:{
+      label:'🇬🇹 Guatemala',
+      sourceCurrency:'GTQ',
+      initial:0,
+      final:0,
+      net:0,
+      accounts:0
+    },
+    EL_SALVADOR:{
+      label:'🇸🇻 El Salvador',
+      sourceCurrency:'USD',
+      initial:0,
+      final:0,
+      net:0,
+      accounts:0
+    }
+  };
+
+  snapshots.forEach(snapshot=>{
+    const country=normalizeCountry(snapshot.country);
+
+    if(byCountry[country]){
+      byCountry[country].accounts+=1;
+    }
+
+    ['initial','final','credits','debits','net'].forEach(field=>{
+      const converted=convertSummaryAmount(
+        snapshot[field],
+        snapshot.currency,
+        targetCurrency,
+        fxRate
+      );
+
+      if(!converted.ok){
+        if(converted.unsupported){
+          unsupportedCount+=1;
+        }else{
+          missingRate=true;
+        }
+        return;
+      }
+
+      totals[field]+=converted.value;
+
+      if(
+        byCountry[country] &&
+        ['initial','final','net'].includes(field)
+      ){
+        byCountry[country][field]+=converted.value;
+      }
+    });
+  });
+
+  const canShow=
+    !conversionNeeded ||
+    fxRate>0;
+
+  const cards=[
+    ['Saldo inicial consolidado','initial','Inicio del período seleccionado'],
+    ['Saldo final consolidado','final','Cierre del período seleccionado'],
+    ['Créditos consolidados','credits','Entradas de ambos países'],
+    ['Débitos consolidados','debits','Salidas de ambos países'],
+    ['Flujo neto consolidado','net','Créditos menos débitos']
+  ];
+
+  consolidatedKpisEl.innerHTML=cards.map(([label,key,sub])=>`
+    <div class="consolidated-kpi">
+      <div class="label">${label}</div>
+      <div class="value ${key==='net'?cls(totals[key]):''}">
+        ${canShow ? summaryMoney(totals[key],targetCurrency) : '—'}
+      </div>
+      <div class="sub">${sub}</div>
+    </div>
+  `).join('');
+
+  consolidatedCountryGridEl.innerHTML=[
+    byCountry.GUATEMALA,
+    byCountry.EL_SALVADOR
+  ].filter(item=>item.accounts>0).map(item=>`
+    <div class="consolidated-country">
+      <div class="consolidated-country-head">
+        <b>${item.label}</b>
+        <span>${item.accounts} cuenta${item.accounts===1?'':'s'} · convertido a ${targetCurrency}</span>
+      </div>
+      <div class="consolidated-country-values">
+        <div>
+          <small>Saldo inicial</small>
+          <strong>${canShow ? summaryMoney(item.initial,targetCurrency) : '—'}</strong>
+        </div>
+        <div>
+          <small>Saldo final</small>
+          <strong>${canShow ? summaryMoney(item.final,targetCurrency) : '—'}</strong>
+        </div>
+        <div>
+          <small>Flujo neto</small>
+          <strong class="${cls(item.net)}">${canShow ? summaryMoney(item.net,targetCurrency) : '—'}</strong>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  const warnings=[];
+
+  if(conversionNeeded && !(fxRate>0)){
+    warnings.push(
+      'No hay un tipo de cambio disponible. Espera la consulta automática o ingrésalo manualmente como respaldo.'
+    );
+  }
+
+  if(unsupportedCount>0){
+    warnings.push(
+      'Se detectaron movimientos o cuentas con una moneda distinta de GTQ/USD; esos importes no se incluyen en la conversión consolidada.'
+    );
+  }
+
+  consolidatedWarningEl.textContent=warnings.join(' ');
+  consolidatedWarningEl.classList.toggle(
+    'show',
+    warnings.length>0
+  );
+}
+
+summaryCurrencyEl.addEventListener('change',()=>{
+  try{
+    localStorage.setItem(
+      SUMMARY_STORAGE_KEY,
+      summaryCurrencyEl.value
+    );
+  }catch(_err){}
+
+  renderConsolidatedSummary();
+});
+
+summaryFxRateEl.addEventListener('input',()=>{
+  try{
+    if(Number(summaryFxRateEl.value)>0){
+      localStorage.setItem(
+        FX_STORAGE_KEY,
+        summaryFxRateEl.value
+      );
+    }else{
+      localStorage.removeItem(
+        FX_STORAGE_KEY
+      );
+    }
+  }catch(_err){}
+
+  renderConsolidatedSummary();
+});
+
 function renderHeader(){
   document.querySelectorAll('.currencyLabel').forEach(el=>el.textContent=currencyLabel());
   document.querySelectorAll('.countryLabel').forEach(el=>el.textContent=countryLabel(DATA.meta.country||ACTIVE_COUNTRY));
@@ -1066,6 +1917,7 @@ function renderAll(){
   renderCountrySwitcher();
   renderHeader();
   renderCoverLogos();
+  renderConsolidatedSummary();
   renderKpis();
   renderBankList();
   renderInsights();
@@ -1178,6 +2030,7 @@ document.getElementById('resetDateFilter').addEventListener('click',()=>{
 // Primera carga: también se construye desde los 221 registros reales, no desde el resumen estático.
 DATA=buildFiltered(MIN_DATE,MAX_DATE);
 renderAll();
+loadLiveExchangeRate(false);
 
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.target).classList.add('active');setTimeout(drawAll,80);
