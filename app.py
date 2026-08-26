@@ -17,7 +17,7 @@ import json
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v3.7-stable-static-logos-20260826-2029"
+APP_BUILD = "dashboard-v4.0-country-split-gt-sv-20260826-1455"
 
 
 # ============================================================
@@ -1785,6 +1785,234 @@ def detectar_banco(sheet_name, rows):
     return "BANCO NO IDENTIFICADO"
 
 
+
+# ============================================================
+# CLASIFICACIÓN DE PAÍS: GUATEMALA / EL SALVADOR
+# ============================================================
+
+def normalizar_pais_bancario(value):
+    texto = clean_text(value)
+
+    if texto in {
+        "guatemala",
+        "gt",
+        "gua",
+        "guate"
+    }:
+        return "GUATEMALA"
+
+    if texto in {
+        "el salvador",
+        "salvador",
+        "sv",
+        "slv"
+    }:
+        return "EL_SALVADOR"
+
+    if "guatemala" in texto:
+        return "GUATEMALA"
+
+    if "el salvador" in texto or "salvadoreno" in texto:
+        return "EL_SALVADOR"
+
+    return "NO_IDENTIFICADO"
+
+
+def detectar_pais_bancario(
+    sheet_name="",
+    rows=None,
+    banco="",
+    moneda="N/D",
+    nombre_archivo=""
+):
+    """
+    Clasifica una hoja bancaria como Guatemala o El Salvador.
+
+    Prioridad:
+    1. País escrito explícitamente en la hoja.
+    2. Bancos exclusivos o fuertemente asociados a un país.
+    3. Moneda de la hoja como respaldo para bancos regionales.
+    4. Nombre del archivo como último respaldo.
+
+    No convierte importes ni cambia la moneda detectada.
+    """
+
+    rows = rows or []
+
+    contexto_local = [
+        str(sheet_name or ""),
+        str(banco or "")
+    ]
+
+    for row in rows[:40]:
+        for value in row:
+            if value not in (None, ""):
+                contexto_local.append(str(value))
+
+    texto_local = clean_text(
+        " | ".join(contexto_local)
+    )
+
+    # País explícito dentro de la propia hoja.
+    if (
+        "el salvador" in texto_local
+        or "salvadoreno" in texto_local
+        or "salvadorena" in texto_local
+    ):
+        return "EL_SALVADOR"
+
+    if (
+        "guatemala" in texto_local
+        or "guatemalteco" in texto_local
+        or "guatemalteca" in texto_local
+    ):
+        return "GUATEMALA"
+
+    banco_texto = clean_text(
+        banco
+    )
+
+    # Bancos que identifican con fuerza Guatemala.
+    senales_gt = (
+        "g&t",
+        "gyt",
+        "banrural",
+        "desarrollo rural",
+        "agricola mercantil",
+        "bantrab",
+        "banco de los trabajadores",
+        "credito hipotecario nacional",
+        "banco inmobiliario",
+        "interbanco",
+        "banco internacional",
+        "vivibanco",
+        "banco de antigua",
+        "banco azteca",
+        "banco inv",
+        "ficohsa",
+    )
+
+    if any(
+        signal in banco_texto
+        for signal in senales_gt
+    ):
+        return "GUATEMALA"
+
+    # Bancos que identifican con fuerza El Salvador.
+    senales_sv = (
+        "banco agricola",
+        "cuscatlan",
+        "davivienda",
+        "banco hipotecario",
+        "banco azul",
+        "abank",
+        "banco atlantida",
+        "apoyo integral",
+        "banco integral",
+        "fomento agropecuario",
+        "citibank",
+    )
+
+    if any(
+        signal in banco_texto
+        for signal in senales_sv
+    ):
+        return "EL_SALVADOR"
+
+    # Banco Industrial, BAC y Promerica operan/regionalizan nombres.
+    # Para ellos la moneda de la hoja es el respaldo más seguro disponible
+    # cuando el país no está escrito explícitamente.
+    moneda_codigo = normalizar_codigo_moneda(
+        moneda
+    )
+
+    if moneda_codigo == "GTQ":
+        return "GUATEMALA"
+
+    if moneda_codigo in {
+        "USD",
+        "SVC"
+    }:
+        return "EL_SALVADOR"
+
+    # Banco Industrial sin otra señal conserva Guatemala como respaldo
+    # histórico del parser. Si es El Salvador, normalmente la hoja indicará
+    # USD o "El Salvador" y se clasificará antes de llegar aquí.
+    if "banco industrial" in banco_texto:
+        return "GUATEMALA"
+
+    # Último respaldo: nombre general del archivo.
+    archivo = clean_text(
+        nombre_archivo
+    )
+
+    if "el salvador" in archivo:
+        return "EL_SALVADOR"
+
+    if "guatemala" in archivo:
+        return "GUATEMALA"
+
+    return "NO_IDENTIFICADO"
+
+
+def moneda_pais_dashboard(pais, monedas=None):
+    """
+    Devuelve la moneda visual de la vista país.
+    No realiza conversiones.
+    """
+
+    pais = normalizar_pais_bancario(
+        pais
+    )
+
+    monedas = {
+        normalizar_codigo_moneda(m)
+        for m in (monedas or [])
+        if normalizar_codigo_moneda(m)
+        not in {
+            "",
+            "N/D",
+            "MULTI"
+        }
+    }
+
+    if len(monedas) == 1:
+        return next(iter(monedas))
+
+    # Para el alcance actual del dashboard:
+    # Guatemala se presenta en GTQ y El Salvador en USD.
+    if pais == "GUATEMALA":
+        return "GTQ"
+
+    if pais == "EL_SALVADOR":
+        return "USD"
+
+    if len(monedas) > 1:
+        return "MULTI"
+
+    return "N/D"
+
+
+def _clave_banco_pais_dashboard(
+    pais,
+    clave_banco
+):
+    pais = normalizar_pais_bancario(
+        pais
+    )
+
+    clave_banco = str(
+        clave_banco
+        or "BANCO NO IDENTIFICADO"
+    ).strip()
+
+    return (
+        pais
+        + "|"
+        + clave_banco
+    )
+
+
 def _account_candidate(value):
     if value in (None, ""):
         return ""
@@ -2166,6 +2394,17 @@ def procesar_hoja(
             else "N/D"
         )
 
+    # --------------------------------------------------------
+    # PAÍS DE LA CUENTA / HOJA
+    # --------------------------------------------------------
+    pais = detectar_pais_bancario(
+        sheet_name=worksheet.title,
+        rows=rows,
+        banco=banco,
+        moneda=moneda,
+        nombre_archivo=nombre_archivo
+    )
+
     expected_month, expected_year = detectar_periodo(rows, worksheet.title)
     saldo_inicial = detectar_saldo_inicial(rows, header_index)
 
@@ -2188,8 +2427,9 @@ def procesar_hoja(
         )
 
         if transaction:
-            # Solo metadato visual; no modifica ningún importe.
+            # Metadatos visuales; no modifican ningún importe.
             transaction["moneda"] = moneda
+            transaction["pais"] = pais
             transactions.append(transaction)
             previous_date = transaction["fecha"]
             if transaction["saldo"] != 0 or get_column(row, columns, "saldo") not in (None, ""):
@@ -3603,163 +3843,372 @@ def construir_dashboard_data(
     moneda_preferida="N/D"
 ):
     """
-    Convierte las transacciones normalizadas del parser a la estructura
-    que exige la plantilla ejecutiva de Saldos Bancarios Consolidados.
+    Construye el dashboard con separación real por país.
 
-    La salida contiene:
-      - meta
-      - totals
-      - highlights
-      - banks
-      - accounts
-      - daily
-      - transactions
+    Cada banco/cuenta conserva:
+      - country: GUATEMALA / EL_SALVADOR / NO_IDENTIFICADO
+      - currency: moneda detectada en su hoja
+      - bankKey: llave única PAIS|BANCO
 
-    Los importes NO se convierten de moneda. Solo se presenta la moneda
-    detectada por el parser.
+    De esta forma BAC, Promerica u otros bancos con nombres regionales
+    nunca se mezclan entre Guatemala y El Salvador.
+
+    No se convierten monedas.
     """
 
-    transactions = list(transactions or [])
-
-    if not transactions:
-        data = json.loads(json.dumps(DASHBOARD_CACHE))
-        data["meta"]["file"] = nombre_archivo or ""
-        return data
-
-    # --------------------------------------------------------
-    # MONEDA GENERAL
-    # --------------------------------------------------------
-
-    # Moneda FINAL para presentación del dashboard.
-    # Se resuelve a nivel de archivo para evitar falsos MULTI por
-    # number_format heredados en algunas hojas.
-    moneda_dashboard = resolver_moneda_dashboard_final(
-        transactions,
-        nombre_archivo=nombre_archivo,
-        moneda_contextual=moneda_preferida
+    transactions = list(
+        transactions or []
     )
 
-    # --------------------------------------------------------
-    # IDENTIFICAR CUENTAS Y EVITAR COLISIONES DE ÚLTIMOS 4
-    # --------------------------------------------------------
+    if not transactions:
+        data = json.loads(
+            json.dumps(
+                DASHBOARD_CACHE
+            )
+        )
+        data["meta"]["file"] = (
+            nombre_archivo or ""
+        )
+        data["meta"]["countries"] = []
+        return data
 
+    # Asegurar país incluso para transacciones provenientes de una versión
+    # anterior del parser.
+    for transaction in transactions:
+        pais = normalizar_pais_bancario(
+            transaction.get(
+                "pais"
+            )
+        )
+
+        if pais == "NO_IDENTIFICADO":
+            pais = detectar_pais_bancario(
+                banco=transaction.get(
+                    "banco",
+                    ""
+                ),
+                moneda=transaction.get(
+                    "moneda",
+                    "N/D"
+                ),
+                nombre_archivo=nombre_archivo
+            )
+
+        transaction["pais"] = pais
+
+    # --------------------------------------------------------
+    # MONEDA GENERAL DEL ARCHIVO
+    # --------------------------------------------------------
+    paises_presentes = {
+        normalizar_pais_bancario(
+            transaction.get(
+                "pais"
+            )
+        )
+        for transaction in transactions
+    }
+
+    paises_presentes.discard(
+        "NO_IDENTIFICADO"
+    )
+
+    if len(paises_presentes) > 1:
+        # Nunca usar una sola moneda para sumar/mostrar dos países.
+        moneda_dashboard = "MULTI"
+    else:
+        moneda_dashboard = resolver_moneda_dashboard_final(
+            transactions,
+            nombre_archivo=nombre_archivo,
+            moneda_contextual=moneda_preferida
+        )
+
+    # --------------------------------------------------------
+    # IDENTIFICAR CUENTAS SIN COLISIONES ENTRE PAÍSES
+    # --------------------------------------------------------
     originales_por_banco = {}
     orden_cuentas = []
+    banco_meta = {}
 
     for transaction in transactions:
         banco_original = str(
-            transaction.get("banco", "BANCO NO IDENTIFICADO")
-        ).strip()
-        bank_key = _clave_banco_dashboard(banco_original)
-        cuenta_original = str(
-            transaction.get("cuenta", "N/D")
+            transaction.get(
+                "banco",
+                "BANCO NO IDENTIFICADO"
+            )
         ).strip()
 
-        clave = (bank_key, cuenta_original)
+        canonical = _clave_banco_dashboard(
+            banco_original
+        )
+
+        pais = normalizar_pais_bancario(
+            transaction.get(
+                "pais"
+            )
+        )
+
+        bank_key = _clave_banco_pais_dashboard(
+            pais,
+            canonical
+        )
+
+        cuenta_original = str(
+            transaction.get(
+                "cuenta",
+                "N/D"
+            )
+        ).strip()
+
+        clave = (
+            bank_key,
+            cuenta_original
+        )
 
         if clave not in orden_cuentas:
-            orden_cuentas.append(clave)
+            orden_cuentas.append(
+                clave
+            )
 
         originales_por_banco.setdefault(
             bank_key,
             []
         )
 
-        if cuenta_original not in originales_por_banco[bank_key]:
-            originales_por_banco[bank_key].append(cuenta_original)
+        if (
+            cuenta_original
+            not in originales_por_banco[
+                bank_key
+            ]
+        ):
+            originales_por_banco[
+                bank_key
+            ].append(
+                cuenta_original
+            )
+
+        banco_meta.setdefault(
+            bank_key,
+            {
+                "canonical": canonical,
+                "country": pais,
+                "original": banco_original
+            }
+        )
 
     cuenta_display = {}
 
-    for bank_key, cuentas_originales in originales_por_banco.items():
+    for (
+        bank_key,
+        cuentas_originales
+    ) in originales_por_banco.items():
+
         candidatos = {}
 
         for cuenta_original in cuentas_originales:
-            corta = _cuenta_corta_dashboard(cuenta_original)
-            candidatos.setdefault(corta, []).append(cuenta_original)
+            corta = _cuenta_corta_dashboard(
+                cuenta_original
+            )
 
-        for corta, originales in candidatos.items():
+            candidatos.setdefault(
+                corta,
+                []
+            ).append(
+                cuenta_original
+            )
+
+        for (
+            corta,
+            originales
+        ) in candidatos.items():
+
             if len(originales) == 1:
-                cuenta_display[(bank_key, originales[0])] = corta
+                cuenta_display[
+                    (
+                        bank_key,
+                        originales[0]
+                    )
+                ] = corta
                 continue
 
-            # Si dos cuentas del mismo banco terminan igual, ampliar hasta 6.
             usados = set()
+
             for cuenta_original in originales:
-                digitos = re.sub(r"[^0-9]", "", cuenta_original)
-                visible = digitos[-6:] if len(digitos) > 6 else (digitos or cuenta_original)
+                digitos = re.sub(
+                    r"[^0-9]",
+                    "",
+                    cuenta_original
+                )
+
+                visible = (
+                    digitos[-6:]
+                    if len(digitos) > 6
+                    else (
+                        digitos
+                        or cuenta_original
+                    )
+                )
 
                 if visible in usados:
-                    visible = digitos or cuenta_original
+                    visible = (
+                        digitos
+                        or cuenta_original
+                    )
 
-                usados.add(visible)
-                cuenta_display[(bank_key, cuenta_original)] = visible
+                usados.add(
+                    visible
+                )
+
+                cuenta_display[
+                    (
+                        bank_key,
+                        cuenta_original
+                    )
+                ] = visible
 
     # --------------------------------------------------------
-    # TRANSACCIONES PARA EL FILTRO DE FECHA
+    # TRANSACCIONES CRUDAS DEL DASHBOARD
     # --------------------------------------------------------
-
     raw_transactions = []
     grupos_cuenta = {}
     fechas_validas = []
-    banco_original_por_key = {}
 
-    for indice, transaction in enumerate(transactions, start=2):
+    for (
+        indice,
+        transaction
+    ) in enumerate(
+        transactions,
+        start=2
+    ):
         banco_original = str(
-            transaction.get("banco", "BANCO NO IDENTIFICADO")
+            transaction.get(
+                "banco",
+                "BANCO NO IDENTIFICADO"
+            )
         ).strip()
-        bank_key = _clave_banco_dashboard(banco_original)
-        banco_nombre = _nombre_banco_dashboard(
-            bank_key,
+
+        canonical = _clave_banco_dashboard(
             banco_original
         )
-        banco_original_por_key.setdefault(bank_key, banco_original)
 
-        cuenta_original = str(
-            transaction.get("cuenta", "N/D")
-        ).strip()
-        cuenta_visible = cuenta_display.get(
-            (bank_key, cuenta_original),
-            _cuenta_corta_dashboard(cuenta_original)
+        pais = normalizar_pais_bancario(
+            transaction.get(
+                "pais"
+            )
         )
 
-        fecha = transaction.get("fecha")
-        fecha_iso = fecha_dashboard_iso(fecha)
+        bank_key = _clave_banco_pais_dashboard(
+            pais,
+            canonical
+        )
+
+        banco_nombre = _nombre_banco_dashboard(
+            canonical,
+            banco_original
+        )
+
+        cuenta_original = str(
+            transaction.get(
+                "cuenta",
+                "N/D"
+            )
+        ).strip()
+
+        cuenta_visible = cuenta_display.get(
+            (
+                bank_key,
+                cuenta_original
+            ),
+            _cuenta_corta_dashboard(
+                cuenta_original
+            )
+        )
+
+        fecha_iso = fecha_dashboard_iso(
+            transaction.get(
+                "fecha"
+            )
+        )
 
         if fecha_iso:
-            fechas_validas.append(fecha_iso)
+            fechas_validas.append(
+                fecha_iso
+            )
 
-        debito = abs(float(
-            transaction.get("debito", 0) or 0
-        ))
-        credito = abs(float(
-            transaction.get("credito", 0) or 0
-        ))
+        debito = abs(
+            float(
+                transaction.get(
+                    "debito",
+                    0
+                )
+                or 0
+            )
+        )
+
+        credito = abs(
+            float(
+                transaction.get(
+                    "credito",
+                    0
+                )
+                or 0
+            )
+        )
 
         saldo = None
-        if transaction.get("_tiene_saldo"):
+
+        if transaction.get(
+            "_tiene_saldo"
+        ):
             saldo = _redondear_dashboard(
-                transaction.get("saldo", 0)
+                transaction.get(
+                    "saldo",
+                    0
+                )
             )
+
+        moneda = normalizar_codigo_moneda(
+            transaction.get(
+                "moneda",
+                "N/D"
+            )
+        )
 
         fila = {
             "row": indice,
             "bankKey": bank_key,
+            "bankCanonical": canonical,
             "bank": banco_nombre,
+            "country": pais,
+            "currency": moneda,
             "account": cuenta_visible,
             "original": cuenta_original,
             "date": fecha_iso,
-            "debit": _redondear_dashboard(debito),
-            "credit": _redondear_dashboard(credito),
+            "debit": _redondear_dashboard(
+                debito
+            ),
+            "credit": _redondear_dashboard(
+                credito
+            ),
             "balance": saldo,
             "reference": str(
-                transaction.get("referencia", "") or ""
+                transaction.get(
+                    "referencia",
+                    ""
+                )
+                or ""
             ),
             "description": str(
-                transaction.get("descripcion", "") or ""
+                transaction.get(
+                    "descripcion",
+                    ""
+                )
+                or ""
             )
         }
 
-        raw_transactions.append(fila)
+        raw_transactions.append(
+            fila
+        )
 
         clave_cuenta = (
             bank_key,
@@ -3775,36 +4224,55 @@ def construir_dashboard_data(
             "debit": debito,
             "credit": credito,
             "balance": saldo,
+            "currency": moneda,
+            "country": pais,
             "saldo_inicial_cuenta": transaction.get(
                 "saldo_inicial_cuenta"
             ),
             "has_balance": bool(
-                transaction.get("_tiene_saldo")
+                transaction.get(
+                    "_tiene_saldo"
+                )
             )
         })
 
     raw_transactions = [
-        item for item in raw_transactions
-        if item.get("date")
+        item
+        for item in raw_transactions
+        if item.get(
+            "date"
+        )
     ]
 
     # --------------------------------------------------------
     # CUENTAS
     # --------------------------------------------------------
-
     accounts = []
 
-    for bank_key, cuenta_original in orden_cuentas:
+    for (
+        bank_key,
+        cuenta_original
+    ) in orden_cuentas:
+
         movimientos = grupos_cuenta.get(
-            (bank_key, cuenta_original),
+            (
+                bank_key,
+                cuenta_original
+            ),
             []
         )
 
         movimientos = sorted(
             movimientos,
             key=lambda item: (
-                item.get("date", ""),
-                item.get("order", 0)
+                item.get(
+                    "date",
+                    ""
+                ),
+                item.get(
+                    "order",
+                    0
+                )
             )
         )
 
@@ -3821,136 +4289,369 @@ def construir_dashboard_data(
             initial = _redondear_dashboard(
                 saldo_inicial_explicito
             )
-        elif primero.get("has_balance") and primero.get("balance") is not None:
-            # El débito interno del parser era negativo. Aquí ya está en positivo:
-            # saldo anterior = saldo posterior + débito - crédito.
-            initial = _redondear_dashboard(
-                float(primero.get("balance") or 0)
-                + float(primero.get("debit") or 0)
-                - float(primero.get("credit") or 0)
+
+        elif (
+            primero.get(
+                "has_balance"
             )
+            and primero.get(
+                "balance"
+            )
+            is not None
+        ):
+            initial = _redondear_dashboard(
+                float(
+                    primero.get(
+                        "balance"
+                    )
+                    or 0
+                )
+                + float(
+                    primero.get(
+                        "debit"
+                    )
+                    or 0
+                )
+                - float(
+                    primero.get(
+                        "credit"
+                    )
+                    or 0
+                )
+            )
+
         else:
             initial = 0.0
 
         saldo_final = None
+
         for movimiento in movimientos:
-            if movimiento.get("has_balance") and movimiento.get("balance") is not None:
-                saldo_final = movimiento.get("balance")
+            if (
+                movimiento.get(
+                    "has_balance"
+                )
+                and movimiento.get(
+                    "balance"
+                )
+                is not None
+            ):
+                saldo_final = movimiento.get(
+                    "balance"
+                )
 
         creditos = sum(
-            float(item.get("credit") or 0)
+            float(
+                item.get(
+                    "credit"
+                )
+                or 0
+            )
             for item in movimientos
         )
+
         debitos = sum(
-            float(item.get("debit") or 0)
+            float(
+                item.get(
+                    "debit"
+                )
+                or 0
+            )
             for item in movimientos
         )
 
         if saldo_final is None:
-            saldo_final = initial + creditos - debitos
+            saldo_final = (
+                initial
+                + creditos
+                - debitos
+            )
 
-        final = _redondear_dashboard(saldo_final)
-        change = _redondear_dashboard(final - initial)
+        final = _redondear_dashboard(
+            saldo_final
+        )
+
+        change = _redondear_dashboard(
+            final
+            - initial
+        )
+
         change_pct = (
-            _redondear_dashboard(change / initial * 100)
+            _redondear_dashboard(
+                change
+                / initial
+                * 100
+            )
             if initial != 0
             else None
         )
 
-        banco_original = banco_original_por_key.get(
+        meta_banco = banco_meta.get(
             bank_key,
-            bank_key
+            {}
+        )
+
+        canonical = meta_banco.get(
+            "canonical",
+            bank_key.split(
+                "|",
+                1
+            )[-1]
+        )
+
+        pais = meta_banco.get(
+            "country",
+            primero.get(
+                "country",
+                "NO_IDENTIFICADO"
+            )
+        )
+
+        banco_original = meta_banco.get(
+            "original",
+            canonical
+        )
+
+        moneda_cuenta = moneda_pais_dashboard(
+            pais,
+            [
+                item.get(
+                    "currency"
+                )
+                for item in movimientos
+            ]
         )
 
         accounts.append({
             "bankKey": bank_key,
+            "bankCanonical": canonical,
             "bank": _nombre_banco_dashboard(
-                bank_key,
+                canonical,
                 banco_original
             ),
+            "country": pais,
+            "currency": moneda_cuenta,
             "account": cuenta_display.get(
-                (bank_key, cuenta_original),
-                _cuenta_corta_dashboard(cuenta_original)
+                (
+                    bank_key,
+                    cuenta_original
+                ),
+                _cuenta_corta_dashboard(
+                    cuenta_original
+                )
             ),
             "original": cuenta_original,
             "initial": initial,
             "final": final,
             "change": change,
             "changePct": change_pct,
-            "credits": _redondear_dashboard(creditos),
-            "debits": _redondear_dashboard(debitos),
-            "movements": len(movimientos)
+            "credits": _redondear_dashboard(
+                creditos
+            ),
+            "debits": _redondear_dashboard(
+                debitos
+            ),
+            "movements": len(
+                movimientos
+            )
         })
 
     # --------------------------------------------------------
     # BANCOS
     # --------------------------------------------------------
-
     bank_keys = []
 
     for account in accounts:
-        if account["bankKey"] not in bank_keys:
-            bank_keys.append(account["bankKey"])
+        if (
+            account[
+                "bankKey"
+            ]
+            not in bank_keys
+        ):
+            bank_keys.append(
+                account[
+                    "bankKey"
+                ]
+            )
 
-    total_final = _redondear_dashboard(
-        sum(account["final"] for account in accounts)
-    )
+    total_final_por_pais = {}
+
+    for account in accounts:
+        pais = account.get(
+            "country",
+            "NO_IDENTIFICADO"
+        )
+
+        total_final_por_pais[
+            pais
+        ] = (
+            total_final_por_pais.get(
+                pais,
+                0.0
+            )
+            + float(
+                account.get(
+                    "final"
+                )
+                or 0
+            )
+        )
 
     banks = []
 
-    for indice, bank_key in enumerate(bank_keys):
+    for (
+        indice,
+        bank_key
+    ) in enumerate(
+        bank_keys
+    ):
+
         cuentas_banco = [
             account
             for account in accounts
-            if account["bankKey"] == bank_key
+            if account[
+                "bankKey"
+            ]
+            == bank_key
         ]
 
         trans_banco = [
             item
             for item in raw_transactions
-            if item["bankKey"] == bank_key
+            if item[
+                "bankKey"
+            ]
+            == bank_key
         ]
 
+        if not cuentas_banco:
+            continue
+
+        pais = cuentas_banco[
+            0
+        ].get(
+            "country",
+            "NO_IDENTIFICADO"
+        )
+
+        canonical = cuentas_banco[
+            0
+        ].get(
+            "bankCanonical",
+            bank_key.split(
+                "|",
+                1
+            )[-1]
+        )
+
         initial = _redondear_dashboard(
-            sum(account["initial"] for account in cuentas_banco)
+            sum(
+                account[
+                    "initial"
+                ]
+                for account
+                in cuentas_banco
+            )
         )
+
         final = _redondear_dashboard(
-            sum(account["final"] for account in cuentas_banco)
+            sum(
+                account[
+                    "final"
+                ]
+                for account
+                in cuentas_banco
+            )
         )
+
         credits = _redondear_dashboard(
-            sum(item["credit"] for item in trans_banco)
+            sum(
+                item[
+                    "credit"
+                ]
+                for item
+                in trans_banco
+            )
         )
+
         debits = _redondear_dashboard(
-            sum(item["debit"] for item in trans_banco)
+            sum(
+                item[
+                    "debit"
+                ]
+                for item
+                in trans_banco
+            )
         )
-        change = _redondear_dashboard(final - initial)
+
+        change = _redondear_dashboard(
+            final
+            - initial
+        )
+
         change_pct = (
-            _redondear_dashboard(change / initial * 100)
+            _redondear_dashboard(
+                change
+                / initial
+                * 100
+            )
             if initial != 0
             else None
         )
+
         net_flow = _redondear_dashboard(
-            credits - debits
+            credits
+            - debits
         )
+
+        total_pais = _redondear_dashboard(
+            total_final_por_pais.get(
+                pais,
+                0.0
+            )
+        )
+
         share = (
-            _redondear_dashboard(final / total_final * 100)
-            if total_final != 0
+            _redondear_dashboard(
+                final
+                / total_pais
+                * 100
+            )
+            if total_pais != 0
             else 0.0
         )
 
-        banco_original = banco_original_por_key.get(
+        meta_banco = banco_meta.get(
             bank_key,
-            bank_key
+            {}
+        )
+
+        banco_original = meta_banco.get(
+            "original",
+            canonical
+        )
+
+        moneda_banco = moneda_pais_dashboard(
+            pais,
+            [
+                item.get(
+                    "currency"
+                )
+                for item
+                in trans_banco
+            ]
         )
 
         banks.append({
             "key": bank_key,
+            "canonicalKey": canonical,
             "name": _nombre_banco_dashboard(
-                bank_key,
+                canonical,
                 banco_original
             ),
+            "country": pais,
+            "currency": moneda_banco,
             "color": _color_banco_dashboard(
-                bank_key,
+                canonical,
                 indice
             ),
             "initial": initial,
@@ -3961,18 +4662,24 @@ def construir_dashboard_data(
             "debits": debits,
             "netFlow": net_flow,
             "share": share,
-            "accounts": len(cuentas_banco),
-            "movements": len(trans_banco)
+            "accounts": len(
+                cuentas_banco
+            ),
+            "movements": len(
+                trans_banco
+            )
         })
 
     # --------------------------------------------------------
-    # RESUMEN DIARIO
+    # RESUMEN DIARIO GLOBAL
+    # El HTML lo vuelve a calcular por país y por filtro de fecha.
     # --------------------------------------------------------
-
     por_fecha = {}
 
     for item in raw_transactions:
-        fecha_iso = item.get("date")
+        fecha_iso = item.get(
+            "date"
+        )
 
         if not fecha_iso:
             continue
@@ -3987,94 +4694,263 @@ def construir_dashboard_data(
             }
         )
 
-        registro["moves"] += 1
-        registro["debits"] += float(
-            item.get("debit") or 0
+        registro[
+            "moves"
+        ] += 1
+
+        registro[
+            "debits"
+        ] += float(
+            item.get(
+                "debit"
+            )
+            or 0
         )
-        registro["credits"] += float(
-            item.get("credit") or 0
+
+        registro[
+            "credits"
+        ] += float(
+            item.get(
+                "credit"
+            )
+            or 0
         )
 
     daily = []
 
-    for fecha_iso in sorted(por_fecha.keys()):
-        item = por_fecha[fecha_iso]
+    for fecha_iso in sorted(
+        por_fecha.keys()
+    ):
+        item = por_fecha[
+            fecha_iso
+        ]
+
         debits = _redondear_dashboard(
-            item["debits"]
+            item[
+                "debits"
+            ]
         )
+
         credits = _redondear_dashboard(
-            item["credits"]
+            item[
+                "credits"
+            ]
         )
 
         try:
             label = datetime.strptime(
                 fecha_iso,
                 "%Y-%m-%d"
-            ).strftime("%d/%m")
+            ).strftime(
+                "%d/%m"
+            )
+
         except Exception:
             label = fecha_iso
 
         daily.append({
             "date": fecha_iso,
             "label": label,
-            "moves": int(item["moves"]),
+            "moves": int(
+                item[
+                    "moves"
+                ]
+            ),
             "debits": debits,
             "credits": credits,
             "net": _redondear_dashboard(
-                credits - debits
+                credits
+                - debits
+            )
+        })
+
+    max_credit = (
+        max(
+            daily,
+            key=lambda item: item[
+                "credits"
+            ]
+        )
+        if daily
+        else None
+    )
+
+    max_debit = (
+        max(
+            daily,
+            key=lambda item: item[
+                "debits"
+            ]
+        )
+        if daily
+        else None
+    )
+
+    max_net = (
+        max(
+            daily,
+            key=lambda item: item[
+                "net"
+            ]
+        )
+        if daily
+        else None
+    )
+
+    min_net = (
+        min(
+            daily,
+            key=lambda item: item[
+                "net"
+            ]
+        )
+        if daily
+        else None
+    )
+
+    # --------------------------------------------------------
+    # RESÚMENES POR PAÍS
+    # --------------------------------------------------------
+    country_summaries = []
+
+    for pais in (
+        "GUATEMALA",
+        "EL_SALVADOR",
+        "NO_IDENTIFICADO"
+    ):
+        trans_pais = [
+            item
+            for item in raw_transactions
+            if item.get(
+                "country"
+            )
+            == pais
+        ]
+
+        cuentas_pais = [
+            item
+            for item in accounts
+            if item.get(
+                "country"
+            )
+            == pais
+        ]
+
+        bancos_pais = [
+            item
+            for item in banks
+            if item.get(
+                "country"
+            )
+            == pais
+        ]
+
+        if not (
+            trans_pais
+            or cuentas_pais
+            or bancos_pais
+        ):
+            continue
+
+        currency = moneda_pais_dashboard(
+            pais,
+            [
+                item.get(
+                    "currency"
+                )
+                for item in trans_pais
+            ]
+        )
+
+        country_summaries.append({
+            "key": pais,
+            "label": (
+                "Guatemala"
+                if pais == "GUATEMALA"
+                else (
+                    "El Salvador"
+                    if pais == "EL_SALVADOR"
+                    else "Sin clasificar"
+                )
+            ),
+            "currency": currency,
+            "banks": len(
+                bancos_pais
+            ),
+            "accounts": len(
+                cuentas_pais
+            ),
+            "movementCount": len(
+                trans_pais
             )
         })
 
     # --------------------------------------------------------
-    # HIGHLIGHTS
+    # META GENERAL
     # --------------------------------------------------------
-
-    max_credit = (
-        max(daily, key=lambda item: item["credits"])
-        if daily else None
-    )
-    max_debit = (
-        max(daily, key=lambda item: item["debits"])
-        if daily else None
-    )
-    max_net = (
-        max(daily, key=lambda item: item["net"])
-        if daily else None
-    )
-    min_net = (
-        min(daily, key=lambda item: item["net"])
-        if daily else None
-    )
-
-    # --------------------------------------------------------
-    # TOTALES / META
-    # --------------------------------------------------------
-
     total_initial = _redondear_dashboard(
-        sum(account["initial"] for account in accounts)
-    )
-    total_final = _redondear_dashboard(
-        sum(account["final"] for account in accounts)
-    )
-    total_credits = _redondear_dashboard(
-        sum(item["credit"] for item in raw_transactions)
-    )
-    total_debits = _redondear_dashboard(
-        sum(item["debit"] for item in raw_transactions)
-    )
-    net_flow = _redondear_dashboard(
-        total_credits - total_debits
+        sum(
+            account[
+                "initial"
+            ]
+            for account
+            in accounts
+        )
     )
 
-    # La plantilla define "Variación entradas vs salidas" como flujo neto
-    # y el porcentaje respecto a las salidas/débitos.
+    total_final = _redondear_dashboard(
+        sum(
+            account[
+                "final"
+            ]
+            for account
+            in accounts
+        )
+    )
+
+    total_credits = _redondear_dashboard(
+        sum(
+            item[
+                "credit"
+            ]
+            for item
+            in raw_transactions
+        )
+    )
+
+    total_debits = _redondear_dashboard(
+        sum(
+            item[
+                "debit"
+            ]
+            for item
+            in raw_transactions
+        )
+    )
+
+    net_flow = _redondear_dashboard(
+        total_credits
+        - total_debits
+    )
+
     change_pct = (
-        _redondear_dashboard(net_flow / total_debits * 100)
+        _redondear_dashboard(
+            net_flow
+            / total_debits
+            * 100
+        )
         if total_debits != 0
         else 0.0
     )
 
-    latest_iso = max(fechas_validas) if fechas_validas else ""
+    latest_iso = (
+        max(
+            fechas_validas
+        )
+        if fechas_validas
+        else ""
+    )
+
     latest_display = ""
 
     if latest_iso:
@@ -4082,7 +4958,10 @@ def construir_dashboard_data(
             latest_display = datetime.strptime(
                 latest_iso,
                 "%Y-%m-%d"
-            ).strftime("%d/%m/%Y")
+            ).strftime(
+                "%d/%m/%Y"
+            )
+
         except Exception:
             latest_display = latest_iso
 
@@ -4097,9 +4976,22 @@ def construir_dashboard_data(
             "fileCut": file_cut,
             "latestMovement": latest_display,
             "currency": moneda_dashboard,
-            "accounts": len(accounts),
-            "banks": len(banks),
-            "movementCount": len(raw_transactions),
+            "accounts": len(
+                accounts
+            ),
+            "banks": len(
+                banks
+            ),
+            "movementCount": len(
+                raw_transactions
+            ),
+            "mixedCountries": (
+                len(
+                    paises_presentes
+                )
+                > 1
+            ),
+            "countries": country_summaries,
             "generatedAt": datetime.now().strftime(
                 "%d/%m/%Y %H:%M"
             )
@@ -4124,6 +5016,7 @@ def construir_dashboard_data(
         "daily": daily,
         "transactions": raw_transactions
     }
+
 
 
 def guardar_dashboard_data(
@@ -4556,6 +5449,11 @@ def process_excel():
                             transactions[0].get("moneda", "N/D")
                             if transactions
                             else "N/D"
+                        ),
+                        "country": (
+                            transactions[0].get("pais", "NO_IDENTIFICADO")
+                            if transactions
+                            else "NO_IDENTIFICADO"
                         )
                     })
 
