@@ -4588,8 +4588,9 @@ def actualizar_tablero(
 
 def crear_versiones_por_moneda(workbook, transactions):
     """
-    Genera reportes separados por moneda.
-    Cuando existen varias monedas NO conserva hojas mezcladas.
+    Separa reportes por moneda manteniendo las hojas base.
+    Las hojas base se utilizan para la moneda principal (preferiblemente GTQ)
+    porque finalize-batch depende de esos nombres exactos.
     """
     monedas = sorted({
         normalizar_codigo_moneda(t.get("moneda"))
@@ -4600,56 +4601,42 @@ def crear_versiones_por_moneda(workbook, transactions):
     if len(monedas) <= 1:
         return
 
-    bases = [
-        (SHEET_SALDOS, escribir_saldos_por_cuenta),
-        (SHEET_ESTADOS, escribir_estados_consolidados),
-        (SHEET_REPORTE, escribir_reporte_creditos),
-        (SHEET_TABLERO, actualizar_tablero),
-    ]
+    # GTQ queda en hojas base. Si no existe GTQ, usa la primera moneda.
+    moneda_base = "GTQ" if "GTQ" in monedas else monedas[0]
 
-    # Eliminar hojas originales para evitar información mezclada.
-    for hoja, _ in bases:
-        if hoja in workbook.sheetnames:
-            del workbook[hoja]
+    grupos = [(moneda_base, None)]
+    grupos += [(m, m) for m in monedas if m != moneda_base]
 
-    for moneda in monedas:
+    for moneda, sufijo in grupos:
         trans_moneda = [
             t for t in transactions
             if normalizar_codigo_moneda(t.get("moneda")) == moneda
         ]
-
         if not trans_moneda:
             continue
 
-        # Crear hojas nuevas desde la plantilla original.
-        # Se usa una hoja temporal existente de la plantilla.
-        for nombre, _ in bases:
-            ws = workbook.create_sheet(f"{nombre} {moneda}")
+        if sufijo:
+            nombres = {
+                SHEET_SALDOS: f"{SHEET_SALDOS} {sufijo}",
+                SHEET_ESTADOS: f"{SHEET_ESTADOS} {sufijo}",
+                SHEET_REPORTE: f"{SHEET_REPORTE} {sufijo}",
+                SHEET_TABLERO: f"{SHEET_TABLERO} {sufijo}",
+            }
+            for nombre in nombres.values():
+                if nombre not in workbook.sheetnames:
+                    workbook.create_sheet(nombre)
+        else:
+            nombres = {
+                SHEET_SALDOS: SHEET_SALDOS,
+                SHEET_ESTADOS: SHEET_ESTADOS,
+                SHEET_REPORTE: SHEET_REPORTE,
+                SHEET_TABLERO: SHEET_TABLERO,
+            }
 
-        escribir_saldos_por_cuenta(
-            workbook,
-            trans_moneda,
-            sheet_name=f"{SHEET_SALDOS} {moneda}"
-        )
-
-        escribir_estados_consolidados(
-            workbook,
-            trans_moneda,
-            sheet_name=f"{SHEET_ESTADOS} {moneda}"
-        )
-
-        escribir_reporte_creditos(
-            workbook,
-            trans_moneda,
-            sheet_name=f"{SHEET_REPORTE} {moneda}"
-        )
-
-        actualizar_tablero(
-            workbook,
-            trans_moneda,
-            sheet_name=f"{SHEET_TABLERO} {moneda}"
-        )
-
+        escribir_saldos_por_cuenta(workbook, trans_moneda, sheet_name=nombres[SHEET_SALDOS])
+        escribir_estados_consolidados(workbook, trans_moneda, sheet_name=nombres[SHEET_ESTADOS])
+        escribir_reporte_creditos(workbook, trans_moneda, sheet_name=nombres[SHEET_REPORTE])
+        actualizar_tablero(workbook, trans_moneda, sheet_name=nombres[SHEET_TABLERO])
 
 def generar_por_moneda_si_aplica(workbook, transactions):
     monedas = {
