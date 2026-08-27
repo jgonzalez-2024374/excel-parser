@@ -9,6 +9,7 @@ from copy import copy
 from datetime import datetime, date
 from difflib import SequenceMatcher
 import os
+import io
 import tempfile
 import unicodedata
 import re
@@ -22,7 +23,7 @@ import xml.etree.ElementTree as ET
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.3-batch-consolidated-20260827-0735"
+APP_BUILD = "dashboard-v4.4-bank-image-ocr-20260827-0935"
 
 
 # ============================================================
@@ -1056,7 +1057,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.3-safe-currency-parser"
+PARSER_VERSION = "universal-3.4-safe-currency-bank-image-ocr"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -2535,6 +2536,346 @@ def detectar_banco(sheet_name, rows):
     return "BANCO NO IDENTIFICADO"
 
 
+# ============================================================
+# OCR DE RESPALDO PARA LOGOS / IMÁGENES DE BANCOS EN EXCEL
+# ============================================================
+#
+# Esta lógica NO reemplaza la detección actual por texto. Solamente se activa
+# cuando el nombre de la hoja y las celdas no permiten reconocer un banco del
+# catálogo KNOWN_BANKS. Así los archivos que ya funcionan siguen usando el
+# mismo camino rápido y el OCR se reserva para estados que traen el banco como
+# imagen (por ejemplo un logo BAC CREDOMATIC).
+#
+# Dependencias opcionales en requirements.txt:
+#   Pillow
+#   numpy
+#   rapidocr-onnxruntime
+#
+# Si estas dependencias no están disponibles, el parser NO se cae: conserva el
+# comportamiento anterior y deja una advertencia en el log de Render.
+
+_OCR_ENGINE = None
+_OCR_ENGINE_ERROR = None
+
+
+def _buscar_banco_catalogo_en_texto(texto):
+    """Busca un banco de KNOWN_BANKS dentro de cualquier texto libre."""
+    normal = clean_text(texto)
+
+    if not normal:
+        return None
+
+    for aliases, canonical in KNOWN_BANKS:
+        for alias in aliases:
+            a = clean_text(alias)
+
+            if not a:
+                continue
+
+            # Alias cortos como BAC, BI o BAM deben respetar límites de palabra
+            # para no coincidir accidentalmente dentro de otra palabra.
+            if len(a) <= 4 and re.fullmatch(r"[a-z0-9]+", a):
+                if re.search(rf"\b{re.escape(a)}\b", normal):
+                    return canonical
+            elif a in normal:
+                return canonical
+
+    return None
+
+
+def _obtener_motor_ocr():
+    """Inicializa RapidOCR una sola vez por proceso de Render."""
+    global _OCR_ENGINE, _OCR_ENGINE_ERROR
+
+    if _OCR_ENGINE is not None:
+        return _OCR_ENGINE
+
+    if _OCR_ENGINE_ERROR is not None:
+        return None
+
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+
+        _OCR_ENGINE = RapidOCR()
+        return _OCR_ENGINE
+
+    except Exception as error:
+        _OCR_ENGINE_ERROR = str(error)
+        print(
+            "OCR bancario no disponible. "
+            "Agrega Pillow, numpy y rapidocr-onnxruntime a requirements.txt:",
+            str(error)
+        )
+        return None
+
+
+def _extraer_textos_resultado_ocr(resultado):
+    """Tolera distintas versiones de RapidOCR y devuelve una lista de textos."""
+    if resultado is None:
+        return []
+
+    # RapidOCR reciente puede devolver un objeto con .txts
+    if hasattr(resultado, "txts"):
+        try:
+            return [
+                str(texto)
+                for texto in (resultado.txts or [])
+                if str(texto or "").strip()
+            ]
+        except Exception:
+            pass
+
+    # Versiones clásicas suelen devolver (result, elapsed)
+    if isinstance(resultado, tuple):
+        resultado = resultado[0] if resultado else None
+
+    if resultado is None:
+        return []
+
+    textos = []
+
+    try:
+        for item in resultado:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                texto = str(item[1] or "").strip()
+                if texto:
+                    textos.append(texto)
+            elif isinstance(item, str) and item.strip():
+                textos.append(item.strip())
+    except Exception:
+        pass
+
+    return textos
+
+
+def _ocr_texto_imagen_bytes(image_bytes):
+    """Lee texto visual dentro de una imagen y devuelve una cadena unificada."""
+    engine = _obtener_motor_ocr()
+
+    if engine is None or not image_bytes:
+        return ""
+
+    try:
+        from PIL import Image, ImageOps
+        import numpy as np
+
+        imagen = Image.open(
+            io.BytesIO(image_bytes)
+        ).convert("RGB")
+
+        # Logos pequeños se reconocen mejor al ampliarlos. Se limita el tamaño
+        # para no disparar el consumo de memoria en Render.
+        width, height = imagen.size
+        lado_mayor = max(width, height)
+
+        if lado_mayor and lado_mayor < 1200:
+            escala = min(
+                3.0,
+                max(1.0, 1200.0 / float(lado_mayor))
+            )
+
+            if escala > 1.05:
+                nuevo_tamano = (
+                    max(1, int(width * escala)),
+                    max(1, int(height * escala))
+                )
+
+                try:
+                    resample = Image.Resampling.LANCZOS
+                except AttributeError:
+                    resample = Image.LANCZOS
+
+                imagen = imagen.resize(
+                    nuevo_tamano,
+                    resample
+                )
+
+        variantes = [imagen]
+
+        try:
+            variantes.append(
+                ImageOps.autocontrast(imagen)
+            )
+        except Exception:
+            pass
+
+        textos_totales = []
+
+        for variante in variantes:
+            try:
+                salida = engine(
+                    np.asarray(variante)
+                )
+                textos = _extraer_textos_resultado_ocr(
+                    salida
+                )
+                textos_totales.extend(textos)
+
+                # Si ya apareció un banco conocido, no gastar otra pasada.
+                texto_parcial = " | ".join(textos_totales)
+                if _buscar_banco_catalogo_en_texto(texto_parcial):
+                    break
+
+            except Exception as error:
+                print(
+                    "Advertencia OCR en una imagen:",
+                    str(error)
+                )
+
+        return " | ".join(textos_totales)
+
+    except Exception as error:
+        print(
+            "No se pudo preparar imagen para OCR:",
+            str(error)
+        )
+        return ""
+
+
+def _hojas_que_requieren_ocr(workbook):
+    """Detecta qué hojas no tienen un banco conocido en título/celdas."""
+    pendientes = []
+
+    for worksheet in workbook.worksheets:
+        rows_contexto = []
+
+        try:
+            for row_index, row in enumerate(
+                worksheet.iter_rows(values_only=True),
+                start=1
+            ):
+                if row_index > 20:
+                    break
+
+                values = [
+                    value if value is not None else ""
+                    for value in row
+                ]
+
+                if any(value != "" for value in values):
+                    rows_contexto.append(values)
+
+        except Exception:
+            rows_contexto = []
+
+        banco_textual = detectar_banco(
+            worksheet.title,
+            rows_contexto
+        )
+
+        if not _buscar_banco_catalogo_en_texto(
+            banco_textual
+        ):
+            pendientes.append(
+                worksheet.title
+            )
+
+    return pendientes
+
+
+def detectar_bancos_desde_imagenes_excel(
+    input_path,
+    hojas_objetivo=None
+):
+    """
+    Abre una segunda copia NO read_only del Excel para acceder a ws._images.
+    Cada imagen queda asociada a su hoja, por lo que un libro con varios bancos
+    puede reconocer un logo diferente en cada pestaña.
+
+    Retorna:
+        {
+            "Report1": "BAC",
+            "Estado": "BANCO AGRÍCOLA"
+        }
+    """
+    if not input_path:
+        return {}
+
+    engine = _obtener_motor_ocr()
+    if engine is None:
+        return {}
+
+    objetivo = set(
+        hojas_objetivo or []
+    )
+
+    encontrados = {}
+    workbook_images = None
+
+    try:
+        workbook_images = load_workbook(
+            input_path,
+            data_only=True,
+            read_only=False
+        )
+
+        for worksheet in workbook_images.worksheets:
+            if objetivo and worksheet.title not in objetivo:
+                continue
+
+            images = list(
+                getattr(
+                    worksheet,
+                    "_images",
+                    []
+                )
+                or []
+            )
+
+            if not images:
+                continue
+
+            for image in images[:12]:
+                try:
+                    image_bytes = image._data()
+                except Exception as error:
+                    print(
+                        "No se pudo extraer una imagen de la hoja",
+                        worksheet.title,
+                        ":",
+                        str(error)
+                    )
+                    continue
+
+                texto_ocr = _ocr_texto_imagen_bytes(
+                    image_bytes
+                )
+
+                banco = _buscar_banco_catalogo_en_texto(
+                    texto_ocr
+                )
+
+                if banco:
+                    encontrados[
+                        worksheet.title
+                    ] = banco
+
+                    print(
+                        "Banco detectado por imagen/OCR:",
+                        worksheet.title,
+                        "=>",
+                        banco,
+                        "| OCR:",
+                        texto_ocr[:180]
+                    )
+                    break
+
+    except Exception as error:
+        print(
+            "No se pudieron analizar imágenes del Excel:",
+            str(error)
+        )
+
+    finally:
+        if workbook_images is not None:
+            try:
+                workbook_images.close()
+            except Exception:
+                pass
+
+    return encontrados
+
+
 
 # ============================================================
 # CLASIFICACIÓN DE PAÍS: GUATEMALA / EL SALVADOR
@@ -3082,7 +3423,8 @@ def extraer_transaccion(
 def procesar_hoja(
     worksheet,
     moneda_respaldo="N/D",
-    nombre_archivo=""
+    nombre_archivo="",
+    banco_respaldo_ocr=""
 ):
     rows = []
 
@@ -3099,6 +3441,19 @@ def procesar_hoja(
         return []
 
     banco = detectar_banco(worksheet.title, rows)
+
+    # El OCR es únicamente un respaldo. Si el detector normal ya encontró un
+    # banco del catálogo, se conserva. Si devolvió un nombre genérico de hoja
+    # (Report1, Sheet, etc.) y el logo sí fue reconocido, usar el resultado OCR.
+    banco_catalogo = _buscar_banco_catalogo_en_texto(
+        banco
+    )
+
+    if banco_catalogo:
+        banco = banco_catalogo
+    elif banco_respaldo_ocr:
+        banco = banco_respaldo_ocr
+
     cuenta = detectar_cuenta(worksheet.title, rows, header_index)
 
     # --------------------------------------------------------
@@ -6171,6 +6526,26 @@ def process_excel():
             moneda_archivo
         )
 
+        # ====================================================
+        # OCR BANCARIO SOLO PARA HOJAS NO IDENTIFICADAS
+        # ====================================================
+        hojas_ocr = _hojas_que_requieren_ocr(
+            workbook
+        )
+
+        bancos_ocr_por_hoja = {}
+
+        if hojas_ocr:
+            print(
+                "Hojas que requieren OCR bancario:",
+                hojas_ocr
+            )
+
+            bancos_ocr_por_hoja = detectar_bancos_desde_imagenes_excel(
+                input_path,
+                hojas_ocr
+            )
+
         all_transactions = []
         processed_sheets = []
 
@@ -6185,7 +6560,11 @@ def process_excel():
                 transactions = procesar_hoja(
                     worksheet,
                     moneda_respaldo=moneda_archivo,
-                    nombre_archivo=file.filename
+                    nombre_archivo=file.filename,
+                    banco_respaldo_ocr=bancos_ocr_por_hoja.get(
+                        worksheet.title,
+                        ""
+                    )
                 )
 
                 if transactions:
@@ -6208,6 +6587,16 @@ def process_excel():
                             transactions[0].get("pais", "NO_IDENTIFICADO")
                             if transactions
                             else "NO_IDENTIFICADO"
+                        ),
+                        "bank": (
+                            transactions[0].get("banco", "N/D")
+                            if transactions
+                            else "N/D"
+                        ),
+                        "bank_source": (
+                            "ocr_image"
+                            if worksheet.title in bancos_ocr_por_hoja
+                            else "text"
                         )
                     })
 
