@@ -3653,13 +3653,15 @@ def escribir_estados_consolidados(
     sheet_name=None
 ):
 
-    if (sheet_name or SHEET_ESTADOS) not in workbook.sheetnames:
+    if SHEET_ESTADOS not in workbook.sheetnames:
 
         raise Exception(
             f"No existe la hoja '{SHEET_ESTADOS}'"
         )
 
-    ws = workbook[sheet_name or SHEET_ESTADOS]
+    ws = workbook[
+        SHEET_ESTADOS
+    ]
 
     start_row = 2
 
@@ -3809,10 +3811,10 @@ def escribir_saldos_por_cuenta(
     transactions,
     sheet_name=None
 ):
-    if (sheet_name or SHEET_SALDOS) not in workbook.sheetnames:
+    if SHEET_SALDOS not in workbook.sheetnames:
         raise Exception(f"No existe la hoja '{SHEET_SALDOS}'")
 
-    ws = workbook[sheet_name or SHEET_SALDOS]
+    ws = workbook[SHEET_SALDOS]
     start_row = 5
     cuentas = {}
 
@@ -3880,10 +3882,10 @@ def escribir_reporte_creditos(
       y los dos campos de resumen se mueven al final con su formato correcto.
     """
 
-    if (sheet_name or SHEET_REPORTE) not in workbook.sheetnames:
+    if SHEET_REPORTE not in workbook.sheetnames:
         raise Exception(f"No existe la hoja '{SHEET_REPORTE}'")
 
-    ws = workbook[sheet_name or SHEET_REPORTE]
+    ws = workbook[SHEET_REPORTE]
 
     data = {}
     cuentas = {}
@@ -4407,7 +4409,7 @@ def actualizar_tablero(
     if SHEET_TABLERO not in workbook.sheetnames or SHEET_REPORTE not in workbook.sheetnames:
         return
 
-    ws = workbook[sheet_name or SHEET_TABLERO]
+    ws = workbook[SHEET_TABLERO]
     reporte = workbook[SHEET_REPORTE]
 
     fechas = [
@@ -4586,8 +4588,8 @@ def actualizar_tablero(
 
 def crear_versiones_por_moneda(workbook, transactions):
     """
-    Separa completamente los reportes por moneda.
-    Si hay GTQ y USD crea un juego completo de hojas para cada moneda.
+    Genera reportes separados por moneda.
+    Cuando existen varias monedas NO conserva hojas mezcladas.
     """
     monedas = sorted({
         normalizar_codigo_moneda(t.get("moneda"))
@@ -4598,12 +4600,17 @@ def crear_versiones_por_moneda(workbook, transactions):
     if len(monedas) <= 1:
         return
 
-    hojas = [
+    bases = [
         (SHEET_SALDOS, escribir_saldos_por_cuenta),
         (SHEET_ESTADOS, escribir_estados_consolidados),
         (SHEET_REPORTE, escribir_reporte_creditos),
         (SHEET_TABLERO, actualizar_tablero),
     ]
+
+    # Eliminar hojas originales para evitar información mezclada.
+    for hoja, _ in bases:
+        if hoja in workbook.sheetnames:
+            del workbook[hoja]
 
     for moneda in monedas:
         trans_moneda = [
@@ -4614,34 +4621,44 @@ def crear_versiones_por_moneda(workbook, transactions):
         if not trans_moneda:
             continue
 
-        for base, _ in hojas:
-            nuevo_nombre = f"{base} {moneda}"
-
-            if nuevo_nombre in workbook.sheetnames:
-                del workbook[nuevo_nombre]
-
-            copia = workbook.copy_worksheet(workbook[base])
-            copia.title = nuevo_nombre
+        # Crear hojas nuevas desde la plantilla original.
+        # Se usa una hoja temporal existente de la plantilla.
+        for nombre, _ in bases:
+            ws = workbook.create_sheet(f"{nombre} {moneda}")
 
         escribir_saldos_por_cuenta(
-            workbook, trans_moneda,
+            workbook,
+            trans_moneda,
             sheet_name=f"{SHEET_SALDOS} {moneda}"
         )
 
         escribir_estados_consolidados(
-            workbook, trans_moneda,
+            workbook,
+            trans_moneda,
             sheet_name=f"{SHEET_ESTADOS} {moneda}"
         )
 
         escribir_reporte_creditos(
-            workbook, trans_moneda,
+            workbook,
+            trans_moneda,
             sheet_name=f"{SHEET_REPORTE} {moneda}"
         )
 
         actualizar_tablero(
-            workbook, trans_moneda,
+            workbook,
+            trans_moneda,
             sheet_name=f"{SHEET_TABLERO} {moneda}"
         )
+
+
+def generar_por_moneda_si_aplica(workbook, transactions):
+    monedas = {
+        normalizar_codigo_moneda(t.get("moneda"))
+        for t in transactions
+        if normalizar_codigo_moneda(t.get("moneda")) not in {"N/D", ""}
+    }
+
+    return len(monedas) > 1
 
 
 def insertar_en_plantilla(
@@ -4649,65 +4666,54 @@ def insertar_en_plantilla(
     output_path
 ):
 
-    if not os.path.exists(TEMPLATE_FILE):
-        raise Exception("No existe la plantilla: " + TEMPLATE_FILE)
+    if not os.path.exists(
+        TEMPLATE_FILE
+    ):
 
-    workbook = load_workbook(TEMPLATE_FILE)
+        raise Exception(
+            "No existe la plantilla: "
+            + TEMPLATE_FILE
+        )
+
+    workbook = load_workbook(
+        TEMPLATE_FILE
+    )
 
     try:
-        monedas = sorted({
+
+        # Si hay varias monedas, NO generar primero las hojas mixtas.
+        # Cada moneda tendrá su propio juego de reportes.
+        monedas = {
             normalizar_codigo_moneda(t.get("moneda"))
             for t in transactions
             if normalizar_codigo_moneda(t.get("moneda")) not in {"N/D", ""}
-        })
+        }
 
-        # Una sola moneda: conserva el comportamiento original.
-        if len(monedas) <= 1:
+        if len(monedas) > 1:
+            crear_versiones_por_moneda(workbook, transactions)
+        else:
             escribir_estados_consolidados(workbook, transactions)
             escribir_saldos_por_cuenta(workbook, transactions)
             escribir_reporte_creditos(workbook, transactions)
             actualizar_tablero(workbook, transactions)
-            aplicar_formato_moneda_excel(workbook, transactions)
 
-        else:
-            # Varias monedas: cada moneda recibe su propio grupo de hojas.
-            hojas = [
-                (SHEET_SALDOS, escribir_saldos_por_cuenta),
-                (SHEET_ESTADOS, escribir_estados_consolidados),
-                (SHEET_REPORTE, escribir_reporte_creditos),
-                (SHEET_TABLERO, actualizar_tablero),
-            ]
+        # 5
+        # Adaptar únicamente los símbolos/formato de moneda
+        # según lo detectado en los archivos bancarios.
+        aplicar_formato_moneda_excel(
+            workbook,
+            transactions
+        )
 
-            for moneda in monedas:
-                trans_moneda = [
-                    t for t in transactions
-                    if normalizar_codigo_moneda(t.get("moneda")) == moneda
-                ]
-
-                if not trans_moneda:
-                    continue
-
-                for base, _ in hojas:
-                    nombre = f"{base} {moneda}"
-                    if nombre in workbook.sheetnames:
-                        del workbook[nombre]
-                    copia = workbook.copy_worksheet(workbook[base])
-                    copia.title = nombre
-
-                escribir_saldos_por_cuenta(workbook, trans_moneda, f"{SHEET_SALDOS} {moneda}")
-                escribir_estados_consolidados(workbook, trans_moneda, f"{SHEET_ESTADOS} {moneda}")
-                escribir_reporte_creditos(workbook, trans_moneda, f"{SHEET_REPORTE} {moneda}")
-                actualizar_tablero(workbook, trans_moneda, f"{SHEET_TABLERO} {moneda}")
-
-            # eliminar hojas mezcladas originales
-            for base in [SHEET_SALDOS, SHEET_ESTADOS, SHEET_REPORTE, SHEET_TABLERO]:
-                if base in workbook.sheetnames:
-                    del workbook[base]
-
+        # Recalcular fórmulas/gráficas al abrir el resultado.
         forzar_recalculo_excel(workbook)
-        workbook.save(output_path)
+
+        workbook.save(
+            output_path
+        )
 
     finally:
+
         workbook.close()
 
 
