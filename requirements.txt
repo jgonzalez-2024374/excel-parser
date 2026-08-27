@@ -1,3 +1,5 @@
-Flask
-openpyxl
-gunicorn
+# Agregar estas dependencias al requirements.txt existente de Render.
+# No reemplaces las dependencias que ya tienes; solo añade las que falten.
+Pillow
+numpy
+rapidocr-onnxruntime
