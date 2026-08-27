@@ -3653,15 +3653,13 @@ def escribir_estados_consolidados(
     sheet_name=None
 ):
 
-    if SHEET_ESTADOS not in workbook.sheetnames:
+    if (sheet_name or SHEET_ESTADOS) not in workbook.sheetnames:
 
         raise Exception(
             f"No existe la hoja '{SHEET_ESTADOS}'"
         )
 
-    ws = workbook[
-        SHEET_ESTADOS
-    ]
+    ws = workbook[sheet_name or SHEET_ESTADOS]
 
     start_row = 2
 
@@ -3811,10 +3809,10 @@ def escribir_saldos_por_cuenta(
     transactions,
     sheet_name=None
 ):
-    if SHEET_SALDOS not in workbook.sheetnames:
+    if (sheet_name or SHEET_SALDOS) not in workbook.sheetnames:
         raise Exception(f"No existe la hoja '{SHEET_SALDOS}'")
 
-    ws = workbook[SHEET_SALDOS]
+    ws = workbook[sheet_name or SHEET_SALDOS]
     start_row = 5
     cuentas = {}
 
@@ -3882,10 +3880,10 @@ def escribir_reporte_creditos(
       y los dos campos de resumen se mueven al final con su formato correcto.
     """
 
-    if SHEET_REPORTE not in workbook.sheetnames:
+    if (sheet_name or SHEET_REPORTE) not in workbook.sheetnames:
         raise Exception(f"No existe la hoja '{SHEET_REPORTE}'")
 
-    ws = workbook[SHEET_REPORTE]
+    ws = workbook[sheet_name or SHEET_REPORTE]
 
     data = {}
     cuentas = {}
@@ -4409,7 +4407,7 @@ def actualizar_tablero(
     if SHEET_TABLERO not in workbook.sheetnames or SHEET_REPORTE not in workbook.sheetnames:
         return
 
-    ws = workbook[SHEET_TABLERO]
+    ws = workbook[sheet_name or SHEET_TABLERO]
     reporte = workbook[SHEET_REPORTE]
 
     fechas = [
@@ -4651,68 +4649,65 @@ def insertar_en_plantilla(
     output_path
 ):
 
-    if not os.path.exists(
-        TEMPLATE_FILE
-    ):
+    if not os.path.exists(TEMPLATE_FILE):
+        raise Exception("No existe la plantilla: " + TEMPLATE_FILE)
 
-        raise Exception(
-            "No existe la plantilla: "
-            + TEMPLATE_FILE
-        )
-
-    workbook = load_workbook(
-        TEMPLATE_FILE
-    )
+    workbook = load_workbook(TEMPLATE_FILE)
 
     try:
+        monedas = sorted({
+            normalizar_codigo_moneda(t.get("moneda"))
+            for t in transactions
+            if normalizar_codigo_moneda(t.get("moneda")) not in {"N/D", ""}
+        })
 
-        # 1
-        escribir_estados_consolidados(
-            workbook,
-            transactions
-        )
+        # Una sola moneda: conserva el comportamiento original.
+        if len(monedas) <= 1:
+            escribir_estados_consolidados(workbook, transactions)
+            escribir_saldos_por_cuenta(workbook, transactions)
+            escribir_reporte_creditos(workbook, transactions)
+            actualizar_tablero(workbook, transactions)
+            aplicar_formato_moneda_excel(workbook, transactions)
 
-        # 2
-        escribir_saldos_por_cuenta(
-            workbook,
-            transactions
-        )
+        else:
+            # Varias monedas: cada moneda recibe su propio grupo de hojas.
+            hojas = [
+                (SHEET_SALDOS, escribir_saldos_por_cuenta),
+                (SHEET_ESTADOS, escribir_estados_consolidados),
+                (SHEET_REPORTE, escribir_reporte_creditos),
+                (SHEET_TABLERO, actualizar_tablero),
+            ]
 
-        # 3
-        escribir_reporte_creditos(
-            workbook,
-            transactions
-        )
+            for moneda in monedas:
+                trans_moneda = [
+                    t for t in transactions
+                    if normalizar_codigo_moneda(t.get("moneda")) == moneda
+                ]
 
-        # 4
-        actualizar_tablero(
-            workbook,
-            transactions
-        )
+                if not trans_moneda:
+                    continue
 
-        # 5
-        # Adaptar únicamente los símbolos/formato de moneda
-        # según lo detectado en los archivos bancarios.
-        aplicar_formato_moneda_excel(
-            workbook,
-            transactions
-        )
+                for base, _ in hojas:
+                    nombre = f"{base} {moneda}"
+                    if nombre in workbook.sheetnames:
+                        del workbook[nombre]
+                    copia = workbook.copy_worksheet(workbook[base])
+                    copia.title = nombre
 
-        # Crear hojas separadas para monedas adicionales (USD, EUR, etc.).
-        crear_versiones_por_moneda(
-            workbook,
-            transactions
-        )
+                escribir_saldos_por_cuenta(workbook, trans_moneda, f"{SHEET_SALDOS} {moneda}")
+                escribir_estados_consolidados(workbook, trans_moneda, f"{SHEET_ESTADOS} {moneda}")
+                escribir_reporte_creditos(workbook, trans_moneda, f"{SHEET_REPORTE} {moneda}")
+                actualizar_tablero(workbook, trans_moneda, f"{SHEET_TABLERO} {moneda}")
 
-        # Recalcular fórmulas/gráficas al abrir el resultado.
+            # eliminar hojas mezcladas originales
+            for base in [SHEET_SALDOS, SHEET_ESTADOS, SHEET_REPORTE, SHEET_TABLERO]:
+                if base in workbook.sheetnames:
+                    del workbook[base]
+
         forzar_recalculo_excel(workbook)
-
-        workbook.save(
-            output_path
-        )
+        workbook.save(output_path)
 
     finally:
-
         workbook.close()
 
 
