@@ -13,6 +13,8 @@ import tempfile
 import unicodedata
 import re
 import json
+import pickle
+import shutil
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -20,7 +22,7 @@ import xml.etree.ElementTree as ET
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.2-live-fx-banguat-20260826-1518"
+APP_BUILD = "dashboard-v4.3-batch-consolidated-20260827-0735"
 
 
 # ============================================================
@@ -71,6 +73,386 @@ os.makedirs(
     DASHBOARD_DATA_DIR,
     exist_ok=True
 )
+
+
+# ============================================================
+# PROCESAMIENTO POR LOTES
+# ============================================================
+
+# Los lotes viven en /tmp mientras dura la ejecución/instancia de Render.
+# Es suficiente para el flujo de Make: todos los archivos se procesan
+# consecutivamente y luego se finaliza el lote.
+BATCH_ROOT = os.path.join(
+    tempfile.gettempdir(),
+    "excel_parser_batches"
+)
+
+os.makedirs(
+    BATCH_ROOT,
+    exist_ok=True
+)
+
+BATCH_MAX_AGE_SECONDS = 6 * 60 * 60
+
+
+def _sanitizar_batch_id(value):
+    """
+    Permite únicamente caracteres seguros para usar el batch_id en rutas.
+    """
+    value = str(value or "").strip()
+
+    if not value:
+        return ""
+
+    value = re.sub(
+        r"[^A-Za-z0-9_-]",
+        "_",
+        value
+    )
+
+    return value[:120]
+
+
+def _batch_dir(batch_id):
+    batch_id = _sanitizar_batch_id(
+        batch_id
+    )
+
+    if not batch_id:
+        raise ValueError(
+            "batch_id vacío o inválido"
+        )
+
+    return os.path.join(
+        BATCH_ROOT,
+        batch_id
+    )
+
+
+def _batch_state_path(batch_id):
+    return os.path.join(
+        _batch_dir(batch_id),
+        "state.pkl"
+    )
+
+
+def _batch_result_path(batch_id):
+    return os.path.join(
+        _batch_dir(batch_id),
+        "Consolidacion_Estados_Financieros.xlsx"
+    )
+
+
+def _limpiar_lotes_antiguos():
+    """
+    Evita acumular archivos temporales indefinidamente.
+    """
+    try:
+        now_ts = time.time()
+
+        for name in os.listdir(
+            BATCH_ROOT
+        ):
+            path = os.path.join(
+                BATCH_ROOT,
+                name
+            )
+
+            if not os.path.isdir(
+                path
+            ):
+                continue
+
+            try:
+                age = (
+                    now_ts
+                    - os.path.getmtime(
+                        path
+                    )
+                )
+
+                if age > BATCH_MAX_AGE_SECONDS:
+                    shutil.rmtree(
+                        path,
+                        ignore_errors=True
+                    )
+
+            except Exception:
+                pass
+
+    except Exception:
+        pass
+
+
+def _crear_estado_lote(batch_id):
+    now_iso = datetime.now().isoformat(
+        timespec="seconds"
+    )
+
+    return {
+        "batch_id": batch_id,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "finalized": False,
+        "files": {},
+        "dashboard_payload": None,
+        "result_path": None
+    }
+
+
+def _cargar_estado_lote(
+    batch_id,
+    create=False
+):
+    batch_id = _sanitizar_batch_id(
+        batch_id
+    )
+
+    if not batch_id:
+        raise ValueError(
+            "batch_id requerido"
+        )
+
+    directory = _batch_dir(
+        batch_id
+    )
+
+    state_path = _batch_state_path(
+        batch_id
+    )
+
+    if os.path.exists(
+        state_path
+    ):
+        with open(
+            state_path,
+            "rb"
+        ) as fh:
+            state = pickle.load(
+                fh
+            )
+
+        return state
+
+    if not create:
+        return None
+
+    os.makedirs(
+        directory,
+        exist_ok=True
+    )
+
+    state = _crear_estado_lote(
+        batch_id
+    )
+
+    _guardar_estado_lote(
+        batch_id,
+        state
+    )
+
+    return state
+
+
+def _guardar_estado_lote(
+    batch_id,
+    state
+):
+    directory = _batch_dir(
+        batch_id
+    )
+
+    os.makedirs(
+        directory,
+        exist_ok=True
+    )
+
+    state["updated_at"] = datetime.now().isoformat(
+        timespec="seconds"
+    )
+
+    destination = _batch_state_path(
+        batch_id
+    )
+
+    temp_path = (
+        destination
+        + ".tmp"
+    )
+
+    with open(
+        temp_path,
+        "wb"
+    ) as fh:
+        pickle.dump(
+            state,
+            fh,
+            protocol=pickle.HIGHEST_PROTOCOL
+        )
+
+    os.replace(
+        temp_path,
+        destination
+    )
+
+
+def _agregar_archivo_a_lote(
+    batch_id,
+    file_id,
+    file_name,
+    transactions,
+    processed_sheets,
+    currency
+):
+    """
+    Agrega/reemplaza un archivo dentro del mismo lote.
+
+    file_id permite que un retry de Make no duplique movimientos.
+    """
+    _limpiar_lotes_antiguos()
+
+    batch_id = _sanitizar_batch_id(
+        batch_id
+    )
+
+    state = _cargar_estado_lote(
+        batch_id,
+        create=True
+    )
+
+    file_key = str(
+        file_id
+        or file_name
+        or (
+            "file_"
+            + str(
+                len(
+                    state.get(
+                        "files",
+                        {}
+                    )
+                )
+                + 1
+            )
+        )
+    ).strip()
+
+    state.setdefault(
+        "files",
+        {}
+    )
+
+    state["files"][
+        file_key
+    ] = {
+        "file_id": str(
+            file_id
+            or ""
+        ),
+        "file_name": str(
+            file_name
+            or ""
+        ),
+        "currency": str(
+            currency
+            or "N/D"
+        ),
+        "processed_sheets": processed_sheets,
+        "transactions": transactions,
+        "received_at": datetime.now().isoformat(
+            timespec="seconds"
+        )
+    }
+
+    # Si se vuelve a usar el mismo batch después de finalizarlo,
+    # obligar a finalizar nuevamente con el conjunto actualizado.
+    state["finalized"] = False
+    state["dashboard_payload"] = None
+    state["result_path"] = None
+
+    _guardar_estado_lote(
+        batch_id,
+        state
+    )
+
+    return state
+
+
+def _transacciones_del_lote(
+    state
+):
+    transactions = []
+
+    for file_info in state.get(
+        "files",
+        {}
+    ).values():
+
+        transactions.extend(
+            file_info.get(
+                "transactions",
+                []
+            )
+            or []
+        )
+
+    return transactions
+
+
+def _moneda_preferida_lote(
+    state
+):
+    currencies = {
+        str(
+            info.get(
+                "currency",
+                "N/D"
+            )
+        ).upper()
+        for info in state.get(
+            "files",
+            {}
+        ).values()
+        if str(
+            info.get(
+                "currency",
+                "N/D"
+            )
+        ).upper()
+        not in {
+            "",
+            "N/D",
+            "MULTI"
+        }
+    }
+
+    if len(currencies) == 1:
+        return next(
+            iter(
+                currencies
+            )
+        )
+
+    if len(currencies) > 1:
+        return "MULTI"
+
+    return "N/D"
+
+
+def _dashboard_lote(
+    batch_id
+):
+    state = _cargar_estado_lote(
+        batch_id,
+        create=False
+    )
+
+    if not state:
+        return None
+
+    return state.get(
+        "dashboard_payload"
+    )
 
 
 # Cache del tipo de cambio de referencia USD/GTQ.
@@ -133,7 +515,13 @@ def home():
         "message": "Excel Parser funcionando",
         "parser_version": PARSER_VERSION if "PARSER_VERSION" in globals() else "legacy",
         "template_exists": os.path.exists(TEMPLATE_FILE),
-        "endpoint": "/process-excel"
+        "endpoint": "/process-excel",
+        "batch_endpoints": {
+            "finalize": "/finalize-batch",
+            "excel": "/result-excel?batch_id=...",
+            "dashboard": "/dashboard-file?batch_id=...",
+            "status": "/batch-status?batch_id=..."
+        }
     })
 
 
@@ -436,7 +824,30 @@ def dashboard():
         }), 404
 
     try:
-        html = renderizar_dashboard_nueva_plantilla()
+        batch_id = _sanitizar_batch_id(
+            request.args.get(
+                "batch_id",
+                ""
+            )
+        )
+
+        datos = None
+
+        if batch_id:
+            datos = _dashboard_lote(
+                batch_id
+            )
+
+            if datos is None:
+                return jsonify({
+                    "success": False,
+                    "error": "Lote no encontrado o todavía no finalizado",
+                    "batch_id": batch_id
+                }), 404
+
+        html = renderizar_dashboard_nueva_plantilla(
+            datos
+        )
         response = make_response(html)
         response.headers["Content-Type"] = "text/html; charset=utf-8"
         response.headers["Cache-Control"] = (
@@ -461,8 +872,30 @@ def dashboard():
 )
 def dashboard_data_endpoint():
 
+    batch_id = _sanitizar_batch_id(
+        request.args.get(
+            "batch_id",
+            ""
+        )
+    )
+
+    data = (
+        _dashboard_lote(
+            batch_id
+        )
+        if batch_id
+        else cargar_dashboard_data()
+    )
+
+    if data is None:
+        return jsonify({
+            "success": False,
+            "error": "Lote no encontrado o todavía no finalizado",
+            "batch_id": batch_id
+        }), 404
+
     response = jsonify(
-        cargar_dashboard_data()
+        data
     )
 
     response.headers["Cache-Control"] = (
@@ -485,7 +918,30 @@ def dashboard_file():
     """
 
     try:
-        html = renderizar_dashboard_nueva_plantilla()
+        batch_id = _sanitizar_batch_id(
+            request.args.get(
+                "batch_id",
+                ""
+            )
+        )
+
+        datos = None
+
+        if batch_id:
+            datos = _dashboard_lote(
+                batch_id
+            )
+
+            if datos is None:
+                return jsonify({
+                    "success": False,
+                    "error": "Lote no encontrado o todavía no finalizado",
+                    "batch_id": batch_id
+                }), 404
+
+        html = renderizar_dashboard_nueva_plantilla(
+            datos
+        )
 
         fecha_nombre = datetime.now().strftime(
             "%Y%m%d_%H%M%S"
@@ -5401,7 +5857,7 @@ def _etiqueta_moneda_dashboard(codigo):
     return etiquetas.get(codigo, codigo)
 
 
-def renderizar_dashboard_nueva_plantilla():
+def renderizar_dashboard_nueva_plantilla(datos_override=None):
     """
     Renderiza templates/dashboard/index.html y sustituye automáticamente
     los dos bloques de datos fijos que trae la plantilla nueva:
@@ -5419,7 +5875,11 @@ def renderizar_dashboard_nueva_plantilla():
             + DASHBOARD_TEMPLATE
         )
 
-    datos = cargar_dashboard_data()
+    datos = (
+        datos_override
+        if datos_override is not None
+        else cargar_dashboard_data()
+    )
 
     # Primero pasa por Jinja por compatibilidad con versiones anteriores
     # del dashboard que puedan contener {{ dashboard_data | tojson }}.
@@ -5780,6 +6240,95 @@ def process_excel():
             }), 400
 
         # ====================================================
+        # MODO LOTE
+        # ====================================================
+
+        batch_id = _sanitizar_batch_id(
+            request.form.get(
+                "batch_id",
+                ""
+            )
+        )
+
+        file_id = str(
+            request.form.get(
+                "file_id",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if batch_id:
+
+            state = _agregar_archivo_a_lote(
+                batch_id=batch_id,
+                file_id=file_id,
+                file_name=file.filename,
+                transactions=all_transactions,
+                processed_sheets=processed_sheets,
+                currency=moneda_archivo
+            )
+
+            if (
+                input_path
+                and os.path.exists(
+                    input_path
+                )
+            ):
+                try:
+                    os.remove(
+                        input_path
+                    )
+                    input_path = None
+                except Exception:
+                    pass
+
+            files_count = len(
+                state.get(
+                    "files",
+                    {}
+                )
+            )
+
+            total_transactions = sum(
+                len(
+                    item.get(
+                        "transactions",
+                        []
+                    )
+                    or []
+                )
+                for item
+                in state.get(
+                    "files",
+                    {}
+                ).values()
+            )
+
+            return jsonify({
+                "success": True,
+                "mode": "batch",
+                "batch_id": batch_id,
+                "file_id": file_id,
+                "file_name": file.filename,
+                "file_transactions": len(
+                    all_transactions
+                ),
+                "files_in_batch": files_count,
+                "transactions_in_batch": total_transactions,
+                "currency": moneda_archivo,
+                "processed_sheets": processed_sheets,
+                "message": (
+                    "Archivo agregado al lote. "
+                    "El dashboard se generará en /finalize-batch."
+                )
+            })
+
+        # ====================================================
+        # MODO INDIVIDUAL / COMPATIBILIDAD
+        # ====================================================
+
+        # ====================================================
         # ARCHIVO FINAL TEMPORAL
         # ====================================================
 
@@ -5963,6 +6512,348 @@ def process_excel():
             except Exception:
 
                 pass
+
+
+
+# ============================================================
+# ENDPOINTS DE LOTES
+# ============================================================
+
+@app.route(
+    "/finalize-batch",
+    methods=["POST"]
+)
+def finalize_batch():
+
+    payload = request.get_json(
+        silent=True
+    ) or {}
+
+    batch_id = _sanitizar_batch_id(
+        payload.get(
+            "batch_id"
+        )
+        or request.form.get(
+            "batch_id",
+            ""
+        )
+        or request.args.get(
+            "batch_id",
+            ""
+        )
+    )
+
+    if not batch_id:
+        return jsonify({
+            "success": False,
+            "error": "batch_id requerido"
+        }), 400
+
+    try:
+        state = _cargar_estado_lote(
+            batch_id,
+            create=False
+        )
+
+        if not state:
+            return jsonify({
+                "success": False,
+                "error": "No existe ese lote",
+                "batch_id": batch_id
+            }), 404
+
+        files = state.get(
+            "files",
+            {}
+        )
+
+        if not files:
+            return jsonify({
+                "success": False,
+                "error": "El lote no contiene archivos",
+                "batch_id": batch_id
+            }), 400
+
+        all_transactions = _transacciones_del_lote(
+            state
+        )
+
+        if not all_transactions:
+            return jsonify({
+                "success": False,
+                "error": "El lote no contiene movimientos bancarios compatibles",
+                "batch_id": batch_id
+            }), 400
+
+        result_path = _batch_result_path(
+            batch_id
+        )
+
+        insertar_en_plantilla(
+            all_transactions,
+            result_path
+        )
+
+        batch_file_name = (
+            "Lote "
+            + batch_id
+            + " - "
+            + str(
+                len(
+                    files
+                )
+            )
+            + " archivos"
+        )
+
+        dashboard_payload = construir_dashboard_data(
+            all_transactions,
+            batch_file_name,
+            moneda_preferida=_moneda_preferida_lote(
+                state
+            )
+        )
+
+        # Mantener también el dashboard global para compatibilidad.
+        guardar_dashboard_data(
+            dashboard_payload
+        )
+
+        state["dashboard_payload"] = dashboard_payload
+        state["result_path"] = result_path
+        state["finalized"] = True
+        state["finalized_at"] = datetime.now().isoformat(
+            timespec="seconds"
+        )
+
+        _guardar_estado_lote(
+            batch_id,
+            state
+        )
+
+        base_url = request.host_url.rstrip(
+            "/"
+        )
+
+        dashboard_url = (
+            base_url
+            + "/dashboard?batch_id="
+            + batch_id
+        )
+
+        dashboard_file_url = (
+            base_url
+            + "/dashboard-file?batch_id="
+            + batch_id
+        )
+
+        excel_url = (
+            base_url
+            + "/result-excel?batch_id="
+            + batch_id
+        )
+
+        countries = dashboard_payload.get(
+            "meta",
+            {}
+        ).get(
+            "countries",
+            []
+        )
+
+        return jsonify({
+            "success": True,
+            "batch_id": batch_id,
+            "files_processed": len(
+                files
+            ),
+            "transactions": len(
+                all_transactions
+            ),
+            "banks": dashboard_payload.get(
+                "meta",
+                {}
+            ).get(
+                "banks",
+                0
+            ),
+            "accounts": dashboard_payload.get(
+                "meta",
+                {}
+            ).get(
+                "accounts",
+                0
+            ),
+            "countries": countries,
+            "currency": dashboard_payload.get(
+                "meta",
+                {}
+            ).get(
+                "currency",
+                "N/D"
+            ),
+            "dashboard_url": dashboard_url,
+            "dashboard_file_url": dashboard_file_url,
+            "excel_url": excel_url,
+            "message": (
+                "Lote finalizado. Se generó un único Excel "
+                "y un único dashboard consolidado."
+            )
+        })
+
+    except Exception as error:
+        return jsonify({
+            "success": False,
+            "error": str(
+                error
+            ),
+            "error_type": type(
+                error
+            ).__name__,
+            "batch_id": batch_id,
+            "app_build": APP_BUILD
+        }), 500
+
+
+@app.route(
+    "/result-excel",
+    methods=["GET"]
+)
+def result_excel_batch():
+
+    batch_id = _sanitizar_batch_id(
+        request.args.get(
+            "batch_id",
+            ""
+        )
+    )
+
+    if not batch_id:
+        return jsonify({
+            "success": False,
+            "error": "batch_id requerido"
+        }), 400
+
+    state = _cargar_estado_lote(
+        batch_id,
+        create=False
+    )
+
+    if not state:
+        return jsonify({
+            "success": False,
+            "error": "Lote no encontrado",
+            "batch_id": batch_id
+        }), 404
+
+    result_path = state.get(
+        "result_path"
+    ) or _batch_result_path(
+        batch_id
+    )
+
+    if (
+        not state.get(
+            "finalized"
+        )
+        or not os.path.exists(
+            result_path
+        )
+    ):
+        return jsonify({
+            "success": False,
+            "error": "El lote todavía no ha sido finalizado",
+            "batch_id": batch_id
+        }), 409
+
+    return send_file(
+        result_path,
+        as_attachment=True,
+        download_name=OUTPUT_FILENAME,
+        mimetype=(
+            "application/vnd.openxmlformats-"
+            "officedocument.spreadsheetml.sheet"
+        )
+    )
+
+
+@app.route(
+    "/batch-status",
+    methods=["GET"]
+)
+def batch_status():
+
+    batch_id = _sanitizar_batch_id(
+        request.args.get(
+            "batch_id",
+            ""
+        )
+    )
+
+    if not batch_id:
+        return jsonify({
+            "success": False,
+            "error": "batch_id requerido"
+        }), 400
+
+    state = _cargar_estado_lote(
+        batch_id,
+        create=False
+    )
+
+    if not state:
+        return jsonify({
+            "success": False,
+            "error": "Lote no encontrado",
+            "batch_id": batch_id
+        }), 404
+
+    files = state.get(
+        "files",
+        {}
+    )
+
+    return jsonify({
+        "success": True,
+        "batch_id": batch_id,
+        "files_in_batch": len(
+            files
+        ),
+        "transactions_in_batch": sum(
+            len(
+                item.get(
+                    "transactions",
+                    []
+                )
+                or []
+            )
+            for item
+            in files.values()
+        ),
+        "finalized": bool(
+            state.get(
+                "finalized"
+            )
+        ),
+        "files": [
+            {
+                "file_id": item.get(
+                    "file_id",
+                    ""
+                ),
+                "file_name": item.get(
+                    "file_name",
+                    ""
+                ),
+                "currency": item.get(
+                    "currency",
+                    "N/D"
+                )
+            }
+            for item
+            in files.values()
+        ]
+    })
 
 
 # ============================================================
