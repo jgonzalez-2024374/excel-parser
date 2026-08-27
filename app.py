@@ -23,7 +23,7 @@ import xml.etree.ElementTree as ET
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.4-bank-image-ocr-20260827-0935"
+APP_BUILD = "dashboard-v4.4-bank-text-20260827"
 
 
 # ============================================================
@@ -1057,7 +1057,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.4-safe-currency-bank-image-ocr"
+PARSER_VERSION = "universal-3.4-safe-currency-bank"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -6527,24 +6527,12 @@ def process_excel():
         )
 
         # ====================================================
-        # OCR BANCARIO SOLO PARA HOJAS NO IDENTIFICADAS
+        # IDENTIFICACION BANCARIA
         # ====================================================
-        hojas_ocr = _hojas_que_requieren_ocr(
-            workbook
-        )
-
+        # OCR de imágenes deshabilitado temporalmente para mantener
+        # estabilidad y velocidad del servicio en Render.
+        # La identificación utiliza el catálogo KNOWN_BANKS mediante texto.
         bancos_ocr_por_hoja = {}
-
-        if hojas_ocr:
-            print(
-                "Hojas que requieren OCR bancario:",
-                hojas_ocr
-            )
-
-            bancos_ocr_por_hoja = detectar_bancos_desde_imagenes_excel(
-                input_path,
-                hojas_ocr
-            )
 
         all_transactions = []
         processed_sheets = []
