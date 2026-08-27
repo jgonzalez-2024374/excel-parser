@@ -4581,6 +4581,66 @@ def actualizar_tablero(
 # PROCESAR PLANTILLA COMPLETA
 # ============================================================
 
+
+def crear_versiones_por_moneda(workbook, transactions):
+    """
+    Crea copias de las hojas principales cuando existen múltiples monedas.
+    La moneda principal conserva las hojas originales.
+    Las monedas adicionales reciben hojas con sufijo.
+    """
+    monedas = sorted({
+        normalizar_codigo_moneda(t.get("moneda"))
+        for t in transactions
+        if normalizar_codigo_moneda(t.get("moneda")) not in {"N/D", ""}
+    })
+
+    if len(monedas) <= 1:
+        return
+
+    hojas_base = [
+        SHEET_SALDOS,
+        SHEET_ESTADOS,
+        SHEET_REPORTE,
+        SHEET_TABLERO
+    ]
+
+    moneda_principal = monedas[0]
+
+    for moneda in monedas[1:]:
+        trans_moneda = [
+            t for t in transactions
+            if normalizar_codigo_moneda(t.get("moneda")) == moneda
+        ]
+
+        if not trans_moneda:
+            continue
+
+        nombres = {
+            SHEET_SALDOS: f"{SHEET_SALDOS} {moneda}",
+            SHEET_ESTADOS: f"{SHEET_ESTADOS} {moneda}",
+            SHEET_REPORTE: f"{SHEET_REPORTE} {moneda}",
+            SHEET_TABLERO: f"{SHEET_TABLERO} {moneda}",
+        }
+
+        for base in hojas_base:
+            if base not in workbook.sheetnames:
+                continue
+
+            if nombres[base] in workbook.sheetnames:
+                del workbook[nombres[base]]
+
+            ws_origen = workbook[base]
+            ws_nuevo = workbook.copy_worksheet(ws_origen)
+            ws_nuevo.title = nombres[base]
+
+        # Limpiamos y volvemos a escribir las hojas copiadas con la moneda filtrada.
+        escribir_estados_consolidados(workbook, trans_moneda, sheet_name=nombres[SHEET_ESTADOS])
+        escribir_saldos_por_cuenta(workbook, trans_moneda, sheet_name=nombres[SHEET_SALDOS])
+        escribir_reporte_creditos(workbook, trans_moneda, sheet_name=nombres[SHEET_REPORTE])
+        actualizar_tablero(workbook, trans_moneda, sheet_name=nombres[SHEET_TABLERO])
+
+
+
 def insertar_en_plantilla(
     transactions,
     output_path
@@ -4629,6 +4689,12 @@ def insertar_en_plantilla(
         # Adaptar únicamente los símbolos/formato de moneda
         # según lo detectado en los archivos bancarios.
         aplicar_formato_moneda_excel(
+            workbook,
+            transactions
+        )
+
+        # Crear hojas separadas para monedas adicionales (USD, EUR, etc.).
+        crear_versiones_por_moneda(
             workbook,
             transactions
         )
