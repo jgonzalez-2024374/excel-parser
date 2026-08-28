@@ -2533,6 +2533,15 @@ def detectar_banco(sheet_name, rows):
                         return canonical
 
             if re.search(r"\bbanco\b|\bbank\b", text) and len(text) <= 80:
+                # Evita duplicados como BANCO PROMERICA y PROMERICA.
+                # Si el texto corresponde a un banco del catálogo, usar
+                # siempre el nombre estándar.
+                for aliases, canonical in KNOWN_BANKS:
+                    for alias in aliases:
+                        a = clean_text(alias)
+                        if a and a in text:
+                            return canonical
+
                 # Quita etiquetas genéricas y conserva un nombre legible.
                 candidate = re.sub(r"(?i)^.*?(?:banco|bank)\s*[:\-]?\s*", "BANCO ", raw).strip()
                 if candidate:
