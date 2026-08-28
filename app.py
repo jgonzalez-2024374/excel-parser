@@ -22,6 +22,23 @@ import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
+
+def normalizar_banco_agricola(nombre):
+    """
+    Normaliza todas las variantes de Banco Agrícola.
+    """
+    n = clean_text(nombre)
+
+    equivalencias = {
+        "AGRICOLA": "AGRICOLA",
+        "BANCO AGRICOLA": "AGRICOLA",
+        "BANCO AGRÍCOLA": "AGRICOLA",
+        "AGRICOLA": "AGRICOLA",
+    }
+
+    return equivalencias.get(n, n)
+
+
 # Identificador visible para confirmar qué versión está ejecutando Render.
 APP_BUILD = "dashboard-v4.5-strict-bank-detection-20260828"
 
