@@ -1085,33 +1085,28 @@ HEADER_ALIASES = {
         "debito", "debit", "debe", "cargo", "cargos", "retiro", "retiros",
         "egreso", "egresos", "withdrawal", "withdrawals", "valor -",
         "monto debito", "debito de transaccion", "cargo debito",
-        "deb", "db", "dr",
     ],
     "credito": [
         "credito", "credit", "haber", "abono", "abonos", "deposito",
         "depositos", "ingreso", "ingresos", "deposit", "valor +",
         "monto credito", "credito de transaccion", "abono credito",
-        "cr",
     ],
     "saldo": [
         "saldo", "balance", "saldo contable", "saldo disponible",
         "available balance", "running balance", "balance de transaccion",
-        "saldo final", "book balance", "saldo real",
-        "saldos",
+        "saldo final", "book balance",
     ],
     "monto": [
-        "monto", "amount", "importe", "valor", "valor transaccion",
-        "valor de transaccion", "monto transaccion", "transaction amount",
-        "importe movimiento", "montos",
+        "monto", "amount", "importe", "valor transaccion", "valor de transaccion",
+        "monto transaccion", "transaction amount", "importe movimiento",
     ],
     "tipo": [
         "tipo", "naturaleza", "d/c", "dc", "dr/cr", "dr cr", "deb cred",
         "signo", "transaction type", "tipo movimiento",
-        "deb./cred.", "deb./cred", "deb/cred",
     ],
 }
 
-\n\n# Soporte adicional bancos regionales:\n# Cuscatlán utiliza Deb./Cred. + Valor + Saldo Real/Disponible.\n# La clasificación final se realiza con el signo del movimiento (+/-).\n\nGENERIC_SHEET_NAMES = {
+GENERIC_SHEET_NAMES = {
     "hoja", "hoja1", "hoja 1", "sheet", "sheet1", "sheet 1",
     "movimientos", "transacciones", "estado de cuenta", "estado cuenta",
 }
@@ -1160,7 +1155,7 @@ def clean_text(value):
     text = str(value).replace("\xa0", " ").replace("\u200b", " ")
 
     # Elimina acentos y también tolera encabezados con codificación dañada
-    # (ej.: "Descripci髇", "D閎ito", "Cr閐ito", "D bito").
+    # (ej.: "Descripci髇", "D閎ito", "Cr閐ito", "D�bito").
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
