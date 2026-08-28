@@ -23,7 +23,7 @@ import xml.etree.ElementTree as ET
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.4-bank-text-20260827"
+APP_BUILD = "dashboard-v4.5-strict-bank-detection-20260828"
 
 
 # ============================================================
@@ -2502,56 +2502,36 @@ def detectar_periodo(rows, sheet_name=""):
 
 
 def detectar_banco(sheet_name, rows):
+    """
+    Detecta bancos únicamente contra KNOWN_BANKS.
+
+    REGLA IMPORTANTE:
+    - Nunca inventa un banco a partir de la palabra "Banco".
+    - Nunca usa Guatemala / El Salvador / GTQ / USD como nombre de banco.
+    - Nunca usa el nombre de la hoja como banco si no coincide con el catálogo.
+    - Si no existe coincidencia textual, devuelve BANCO NO IDENTIFICADO para que
+      posteriormente pueda actuar el respaldo OCR.
+    """
+
     title = clean_text(sheet_name)
 
-    # 1) Catálogo opcional. Sirve para estandarizar nombres, pero el parser no
-    # depende de que el banco esté en esta lista.
-    for aliases, canonical in KNOWN_BANKS:
-        for alias in aliases:
-            a = clean_text(alias)
-            if a in {"bi", "ban"}:
-                if re.search(rf"\b{re.escape(a)}\b", title):
-                    return canonical
-            elif a and a in title:
-                return canonical
+    # 1) Buscar banco conocido en el nombre de la hoja.
+    banco_catalogo = _buscar_banco_catalogo_en_texto(title)
+    if banco_catalogo:
+        return banco_catalogo
 
-    # 2) Buscar nombre de institución en el encabezado.
-    for row in rows[:20]:
+    # 2) Buscar únicamente bancos conocidos dentro de las primeras filas.
+    # No se acepta texto genérico del tipo "Banco Guatemala", "Banco", etc.
+    for row in rows[:40]:
         for value in row:
-            raw = str(value).strip() if value not in (None, "") else ""
-            text = clean_text(raw)
-            if not text:
+            if value in (None, ""):
                 continue
 
-            for aliases, canonical in KNOWN_BANKS:
-                for alias in aliases:
-                    a = clean_text(alias)
-                    if a in {"bi", "ban"}:
-                        if re.search(rf"\b{re.escape(a)}\b", text):
-                            return canonical
-                    elif a and a in text:
-                        return canonical
+            banco_catalogo = _buscar_banco_catalogo_en_texto(value)
+            if banco_catalogo:
+                return banco_catalogo
 
-            if re.search(r"\bbanco\b|\bbank\b", text) and len(text) <= 80:
-                # Evita duplicados como BANCO PROMERICA y PROMERICA.
-                # Si el texto corresponde a un banco del catálogo, usar
-                # siempre el nombre estándar.
-                for aliases, canonical in KNOWN_BANKS:
-                    for alias in aliases:
-                        a = clean_text(alias)
-                        if a and a in text:
-                            return canonical
-
-                # Quita etiquetas genéricas y conserva un nombre legible.
-                candidate = re.sub(r"(?i)^.*?(?:banco|bank)\s*[:\-]?\s*", "BANCO ", raw).strip()
-                if candidate:
-                    return candidate.upper()
-
-    # 3) Banco desconocido: usar el nombre de la hoja si es informativo.
-    if title not in GENERIC_SHEET_NAMES and title:
-        cleaned = re.sub(r"\s+(0?[1-9]|1[0-2])[.\-_/ ](20\d{2}|\d{2})\s*$", "", str(sheet_name), flags=re.I).strip()
-        return cleaned or str(sheet_name).strip()
-
+    # 3) Sin coincidencia real: NO fabricar un nombre.
     return "BANCO NO IDENTIFICADO"
 
 
