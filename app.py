@@ -4187,11 +4187,12 @@ def escribir_reporte_creditos(
         total = 0.0
         cuentas_con_abono = 0
 
-        # Primero dejar vacías todas las columnas de cuenta del día.
+        # Inicializar columnas de cuenta con 0.00 para mantener valores numéricos.
+        # Evita celdas vacías/N/D en el reporte de créditos diarios.
         for col in range(2, total_column):
-            limpiar_celda_segura(ws, index, col)
+            escribir_celda_segura(ws, index, col, 0.00)
 
-        # Después escribir solamente valores reales del archivo fuente.
+        # Después escribir valores reales del archivo fuente.
         for clave, column in column_map.items():
             banco, cuenta = clave
 
