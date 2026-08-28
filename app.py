@@ -1111,7 +1111,12 @@ HEADER_ALIASES = {
     ],
 }
 
-\n\n# Soporte adicional bancos regionales:\n# Cuscatlán utiliza Deb./Cred. + Valor + Saldo Real/Disponible.\n# La clasificación final se realiza con el signo del movimiento (+/-).\n\nGENERIC_SHEET_NAMES = {
+
+
+# Soporte adicional bancos regionales:
+# Cuscatlán utiliza Deb./Cred. + Valor + Saldo Real/Disponible.
+# La clasificación final se realiza con el signo del movimiento (+/-).
+\nGENERIC_SHEET_NAMES = {
     "hoja", "hoja1", "hoja 1", "sheet", "sheet1", "sheet 1",
     "movimientos", "transacciones", "estado de cuenta", "estado cuenta",
 }
@@ -1160,7 +1165,7 @@ def clean_text(value):
     text = str(value).replace("\xa0", " ").replace("\u200b", " ")
 
     # Elimina acentos y también tolera encabezados con codificación dañada
-    # (ej.: "Descripci髇", "D閎ito", "Cr閐ito", "D bito").
+    # (ej.: "Descripci髇", "D閎ito", "Cr閐ito", "D�bito").
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
