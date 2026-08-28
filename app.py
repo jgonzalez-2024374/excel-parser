@@ -1116,7 +1116,7 @@ HEADER_ALIASES = {
 # Soporte adicional bancos regionales:
 # Cuscatlán utiliza Deb./Cred. + Valor + Saldo Real/Disponible.
 # La clasificación final se realiza con el signo del movimiento (+/-).
-\nGENERIC_SHEET_NAMES = {
+GENERIC_SHEET_NAMES = {
     "hoja", "hoja1", "hoja 1", "sheet", "sheet1", "sheet 1",
     "movimientos", "transacciones", "estado de cuenta", "estado cuenta",
 }
