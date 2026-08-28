@@ -3163,46 +3163,6 @@ def detectar_cuenta(sheet_name, rows, header_index=None):
                     return digits
 
 
-
-    # A.1) Cuscatlán: algunos estados colocan el número de cuenta
-    # en la columna "Referencia", ubicada después de "Oficina".
-    # Se revisan encabezados de tabla para capturar esa columna.
-    for row in rows[:limit]:
-        headers = [clean_text(str(v)) for v in row if v not in (None, "")]
-
-        if "referencia" in headers:
-            idx = headers.index("referencia")
-
-            for data_row in rows[rows.index(row)+1:rows.index(row)+5]:
-                values = list(data_row)
-
-                if len(values) > idx:
-                    valor_ref = str(values[idx]).strip()
-
-                    if re.fullmatch(r"\d{6,30}", valor_ref):
-                        return valor_ref
-
-    # Respaldo: buscar números largos en filas donde aparece Referencia
-    for row in rows[:limit]:
-        joined = " | ".join(str(v) for v in row if v not in (None, ""))
-        normalized = clean_text(joined)
-
-        if "referencia" in normalized:
-            posibles = re.findall(r"(?<!\d)(\d{8,30})(?!\d)", joined)
-            if posibles:
-                return posibles[0]
-
-
-    # la etiqueta "Referencia" en lugar de "Cuenta".
-    for row in rows[:limit]:
-        joined = " | ".join(str(v) for v in row if v not in (None, ""))
-        normalized = clean_text(joined)
-
-        if "referencia" in normalized:
-            posibles = re.findall(r"(?<!\d)(\d{8,30})(?!\d)", normalized)
-            if posibles:
-                return posibles[0]
-
     # B) Encabezado tipo tabla: Cuenta / Producto / Account en una fila y valor
     # debajo (muy común en exports de BAC y otros bancos regionales).
     for r in range(max(0, limit - 1)):
