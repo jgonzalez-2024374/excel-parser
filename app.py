@@ -3140,7 +3140,14 @@ def detectar_cuenta(sheet_name, rows, header_index=None):
 
     # A) Formato etiqueta/valor en la misma fila o celda.
     regexes = [
+        # Cuenta estándar:
+        # Cuenta: 95510021962
         r"(?:numero|nro|no\.?|#)?\s*(?:de\s+)?[#:]?\s*cuenta\s*[:#\-]?\s*([0-9][0-9\- ]{3,30})",
+
+        # Davivienda / estados con etiqueta:
+        # Cuenta corriente 95510021962
+        r"cuenta\s+(?:corriente|ahorro|monetaria|corriente\s+no\.?)\s*[:#\-]?\s*([0-9][0-9\- ]{3,30})",
+
         r"account(?:\s+number|\s+no\.?)?\s*[:#\-]?\s*([0-9][0-9\- ]{3,30})",
         r"iban\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\- ]{5,34})",
     ]
@@ -3154,6 +3161,18 @@ def detectar_cuenta(sheet_name, rows, header_index=None):
                 digits = re.sub(r"[^0-9]", "", match.group(1))
                 if len(digits) >= 5:
                     return digits
+
+
+    # A.1) Cuscatlán: algunos estados colocan el número de cuenta bajo
+    # la etiqueta "Referencia" en lugar de "Cuenta".
+    for row in rows[:limit]:
+        joined = " | ".join(str(v) for v in row if v not in (None, ""))
+        normalized = clean_text(joined)
+
+        if "referencia" in normalized:
+            posibles = re.findall(r"(?<!\d)(\d{8,30})(?!\d)", normalized)
+            if posibles:
+                return posibles[0]
 
     # B) Encabezado tipo tabla: Cuenta / Producto / Account en una fila y valor
     # debajo (muy común en exports de BAC y otros bancos regionales).
