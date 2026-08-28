@@ -22,23 +22,6 @@ import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
-
-def normalizar_banco_agricola(nombre):
-    """
-    Normaliza todas las variantes de Banco Agrícola.
-    """
-    n = clean_text(nombre)
-
-    equivalencias = {
-        "AGRICOLA": "AGRICOLA",
-        "BANCO AGRICOLA": "AGRICOLA",
-        "BANCO AGRÍCOLA": "AGRICOLA",
-        "AGRICOLA": "AGRICOLA",
-    }
-
-    return equivalencias.get(n, n)
-
-
 # Identificador visible para confirmar qué versión está ejecutando Render.
 APP_BUILD = "dashboard-v4.5-strict-bank-detection-20260828"
 
@@ -3141,80 +3124,439 @@ def _account_candidate(value):
     return ""
 
 
-def detectar_cuenta(sheet_name, rows, header_index=None, banco=None):
-    """
-    Detecta cuenta bancaria con reglas por banco.
-    No toma números de referencia, fechas, movimientos o montos como cuenta.
-    """
+def detectar_cuenta(sheet_name, rows, header_index=None):
+    limit = min((header_index + 1) if header_index is not None else 25, len(rows))
 
-    banco_txt = clean_text(banco or "")
+    # A) Formato etiqueta/valor en la misma fila o celda.
+    regexes = [
+        # Cuenta estándar:
+        # Cuenta: 95510021962
+        r"(?:numero|nro|no\.?|#)?\s*(?:de\s+)?[#:]?\s*cuenta\s*[:#\-]?\s*([0-9][0-9\- ]{3,30})",
 
-    # 1) BAC: usa Producto
-    if "bac" in banco_txt:
-        for row in rows[:80]:
-            for i, val in enumerate(row):
-                if clean_text(val) == "producto":
-                    if i + 1 < len(row):
-                        posible = str(row[i+1]).strip()
-                        if re.fullmatch(r"\d{5,30}", posible):
-                            return posible
+        # Davivienda / estados con etiqueta:
+        # Cuenta corriente 95510021962
+        r"cuenta\s+(?:corriente|ahorro|monetaria|corriente\s+no\.?)\s*[:#\-]?\s*([0-9][0-9\- ]{3,30})",
 
-    # 2) Davivienda
-    if "davivienda" in banco_txt:
-        patrones = [
-            r"cuenta\s+(?:corriente|ahorro|monetaria)\s*[:\-]?\s*(\d{6,30})",
-            r"cuenta\s*[:\-]?\s*(\d{6,30})"
-        ]
-        texto = " ".join(
-            str(v) for row in rows[:50] for v in row if v not in (None, "")
-        ).lower()
+        r"account(?:\s+number|\s+no\.?)?\s*[:#\-]?\s*([0-9][0-9\- ]{3,30})",
+        r"iban\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\- ]{5,34})",
+    ]
 
-        for p in patrones:
-            m = re.search(p, texto)
-            if m:
-                return m.group(1)
+    for row in rows[:limit]:
+        joined = " | ".join(str(v) for v in row if v not in (None, ""))
+        normalized = clean_text(joined)
+        for pattern in regexes:
+            match = re.search(pattern, normalized, re.I)
+            if match:
+                digits = re.sub(r"[^0-9]", "", match.group(1))
+                if len(digits) >= 5:
+                    return digits
 
-    # 3) Promerica:
-    # Solo acepta etiquetas explícitas de cuenta.
-    if "promerica" in banco_txt:
-        patrones = [
-            r"numero\s+de\s+cuenta\s*[:\-]?\s*(\d{5,30})",
-            r"n[uú]mero\s+cuenta\s*[:\-]?\s*(\d{5,30})",
-            r"cuenta\s*[:\-]?\s*(\d{5,30})"
-        ]
 
-        texto = " ".join(
-            str(v) for row in rows[:50] for v in row if v not in (None, "")
-        ).lower()
+    # B) Encabezado tipo tabla: Cuenta / Producto / Account en una fila y valor
+    # debajo (muy común en exports de BAC y otros bancos regionales).
+    for r in range(max(0, limit - 1)):
+        row = rows[r]
+        next_row = rows[r + 1] if r + 1 < len(rows) else []
+        for c, value in enumerate(row):
+            label = compact_text(value)
+            if not label:
+                continue
+            if (
+                "cuenta" in label
+                or label in {"account", "account number", "producto", "product"}
+                or "numero de cuenta" in label
+            ):
+                # Misma fila: algunos exports dejan una celda vacía entre
+                # etiqueta y valor por celdas combinadas. Revisar las próximas 3.
+                for cc in range(c + 1, min(len(row), c + 4)):
+                    candidate = _account_candidate(row[cc])
+                    if candidate:
+                        return candidate
+                # Fila siguiente: misma columna y vecinas cercanas.
+                for cc in range(c, min(len(next_row), c + 3)):
+                    candidate = _account_candidate(next_row[cc])
+                    if candidate:
+                        return candidate
 
-        for p in patrones:
-            m = re.search(p, texto)
-            if m:
-                return m.group(1)
+    # C) Nombre de hoja. Solo como último recurso.
+    candidates = re.findall(r"(?<!\d)(\d{3,30})(?!\d)", str(sheet_name))
+    # Ignora secuencias que parecen periodo 0826 / 2026.
+    candidates = [x for x in candidates if x not in {"2024", "2025", "2026", "2027", "2028"}]
+    if candidates:
+        return max(candidates, key=len)
 
-        # NO buscar números sueltos en todo el archivo.
-        return "N/D"
+    return ""
 
-    # 4) Banco Agrícola
-    if "agricola" in banco_txt:
-        texto = " ".join(
-            str(v) for row in rows[:50] for v in row if v not in (None, "")
-        ).lower()
 
-        m = re.search(r"numero\s+de\s+cuenta\s*[:\-]?\s*(\d{5,30})", texto)
-        if m:
-            return m.group(1)
+def detectar_columnas(rows):
+    best = None
 
-    # 5) Genérico: solo etiquetas de cuenta.
-    texto = " ".join(
-        str(v) for row in rows[:50] for v in row if v not in (None, "")
-    ).lower()
+    for row_index, row in enumerate(rows):
+        columnas = {}
+        confidences = {}
 
-    m = re.search(r"(?:cuenta|account)\s*(?:no\.?|numero|number)?\s*[:#\-]?\s*(\d{6,30})", texto)
-    if m:
-        return m.group(1)
+        for index, value in enumerate(row):
+            field, score = _header_field(value)
+            if not field:
+                continue
 
-    return "N/D"
+            # "valor" sin contexto puede ser monto, pero no debe desplazar
+            # débito/crédito/saldo si ya existe un match más fuerte.
+            if field not in columnas or score > confidences.get(field, 0):
+                columnas[field] = index
+                confidences[field] = score
+
+        has_date = "fecha" in columnas
+        has_desc_or_ref = "descripcion" in columnas or "referencia" in columnas
+        has_pair = "debito" in columnas and "credito" in columnas
+        has_amount = "monto" in columnas
+        has_financial = has_pair or has_amount or (
+            "saldo" in columnas and ("debito" in columnas or "credito" in columnas)
+        )
+
+        if not (has_date and has_desc_or_ref and has_financial):
+            continue
+
+        score = 0
+        weights = {
+            "fecha": 4, "descripcion": 3, "referencia": 2, "codigo": 1,
+            "debito": 3, "credito": 3, "monto": 3, "saldo": 3, "tipo": 1,
+        }
+        for field in columnas:
+            score += weights.get(field, 1)
+        score += sum(confidences.values())
+
+        candidate = (score, row_index, columnas)
+        if best is None or candidate[0] > best[0]:
+            best = candidate
+
+    if best:
+        return best[1], best[2]
+    return None, {}
+
+
+def get_column(row, columns, name):
+    index = columns.get(name)
+    if index is None or index >= len(row):
+        return ""
+    return row[index]
+
+
+def _looks_like_summary(row):
+    values = [str(v) for v in row if v not in (None, "")]
+    if not values:
+        return True
+    joined = clean_text(" | ".join(values))
+    first = compact_text(values[0])
+    first_words = re.sub(r"[^a-z0-9 ]+", " ", first)
+    first_words = re.sub(r"\s+", " ", first_words).strip()
+
+    normalized_prefixes = [
+        re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", compact_text(p))).strip()
+        for p in SUMMARY_PREFIXES
+    ]
+    if any(first_words.startswith(prefix) for prefix in normalized_prefixes if prefix):
+        return True
+    if (
+        first_words.startswith("no credito")
+        or first_words.startswith("no debito")
+        or first_words.startswith("cantidad credito")
+        or first_words.startswith("cantidad debito")
+        or first_words.startswith("monto credito")
+        or first_words.startswith("monto debito")
+    ):
+        return True
+    if "resumen de estado" in joined or "summary of" in joined:
+        return True
+    return False
+
+
+def _movement_direction(text):
+    t = compact_text(text)
+    if not t:
+        return None
+
+    # Match de palabras completas cuando son códigos cortos.
+    tokens = set(re.findall(r"[a-z]+", t))
+    if tokens.intersection({"cr", "credit", "credito", "abono", "deposito", "deposit", "haber", "ingreso"}):
+        return "credit"
+    if tokens.intersection({"dr", "db", "debit", "debito", "cargo", "retiro", "debe", "egreso"}):
+        return "debit"
+
+    if any(h in t for h in CREDIT_HINTS if len(h) > 2):
+        return "credit"
+    if any(h in t for h in DEBIT_HINTS if len(h) > 2):
+        return "debit"
+    return None
+
+
+def detectar_saldo_inicial(rows, header_index):
+    limit = min(header_index + 1, len(rows)) if header_index is not None else min(25, len(rows))
+
+    for r in range(limit):
+        row = rows[r]
+        for c, value in enumerate(row):
+            label = compact_text(value)
+            if not label:
+                continue
+
+            if any(key in label for key in (
+                "saldo inicial", "saldo anterior", "balance inicial",
+                "beginning balance", "opening balance", "previous balance",
+            )):
+                # Número embebido en la misma celda.
+                numbers = re.findall(r"[-+]?\d[\d., ]*\d|[-+]?\d", str(value))
+                for n in reversed(numbers):
+                    parsed = parse_number(n)
+                    if parsed is not None:
+                        return parsed
+
+                # Celda siguiente.
+                if c + 1 < len(row):
+                    parsed = parse_number(row[c + 1])
+                    if parsed is not None:
+                        return parsed
+
+                # Misma columna, fila siguiente.
+                if r + 1 < len(rows) and c < len(rows[r + 1]):
+                    parsed = parse_number(rows[r + 1][c])
+                    if parsed is not None:
+                        return parsed
+
+    return None
+
+
+def extraer_transaccion(
+    row,
+    columns,
+    banco,
+    cuenta,
+    expected_month=None,
+    expected_year=None,
+    previous_balance=None,
+    previous_date=None,
+    saldo_inicial_cuenta=None,
+):
+    raw_date = get_column(row, columns, "fecha")
+    referencia = get_column(row, columns, "referencia")
+    codigo = get_column(row, columns, "codigo")
+    descripcion = get_column(row, columns, "descripcion")
+    tipo = get_column(row, columns, "tipo")
+
+    fecha = clean_date(raw_date, expected_month, expected_year)
+
+    # Permite estados donde la fecha aparece una sola vez y las siguientes
+    # líneas pertenecen al mismo día, pero evita usar esto en resúmenes.
+    if not isinstance(fecha, datetime) and previous_date and raw_date in (None, ""):
+        fecha = previous_date
+
+    if not isinstance(fecha, datetime):
+        return None
+
+    if _looks_like_summary(row):
+        return None
+
+    debit_raw = get_column(row, columns, "debito")
+    credit_raw = get_column(row, columns, "credito")
+    amount_raw = get_column(row, columns, "monto")
+    balance_raw = get_column(row, columns, "saldo")
+
+    debit_val = parse_number(debit_raw)
+    credit_val = parse_number(credit_raw)
+    amount_val = parse_number(amount_raw)
+    balance_val = parse_number(balance_raw)
+
+    debito = -abs(debit_val) if debit_val not in (None, 0) else 0.0
+    credito = abs(credit_val) if credit_val not in (None, 0) else 0.0
+
+    # Formato de una sola columna de monto.
+    if debito == 0 and credito == 0 and amount_val not in (None, 0):
+        direction_text = " ".join(str(v) for v in (tipo, codigo, descripcion) if v not in (None, ""))
+        direction = _movement_direction(direction_text)
+
+        if amount_val < 0:
+            direction = "debit"
+
+        # El saldo corrido permite resolver formatos que muestran el monto
+        # siempre positivo pero no indican explícitamente D/C.
+        if direction is None and previous_balance is not None and balance_val is not None:
+            delta = balance_val - previous_balance
+            if abs(delta) > 0.000001:
+                direction = "credit" if delta > 0 else "debit"
+
+        if direction == "debit":
+            debito = -abs(amount_val)
+        else:
+            # Para columnas firmadas, un positivo normalmente es crédito.
+            credito = abs(amount_val)
+
+    # Formato sin monto explícito, pero con saldo corrido.
+    if debito == 0 and credito == 0 and balance_val is not None and previous_balance is not None:
+        delta = balance_val - previous_balance
+        if abs(delta) > 0.000001:
+            if delta > 0:
+                credito = abs(delta)
+            else:
+                debito = -abs(delta)
+
+    texto_desc = str(descripcion).strip() if descripcion not in (None, "") else ""
+    texto_ref = str(referencia).strip() if referencia not in (None, "") else ""
+    texto_codigo = str(codigo).strip() if codigo not in (None, "") else ""
+
+    # Una transacción real necesita monto/movimiento y alguna identificación.
+    has_money = debito != 0 or credito != 0 or balance_val is not None
+    has_identity = bool(texto_desc or texto_ref or texto_codigo)
+    if not (has_money and has_identity):
+        return None
+
+    return {
+        "banco": valor_o_nd(banco),
+        "cuenta": valor_o_nd(cuenta),
+        "fecha": fecha,
+        "referencia": texto_ref or texto_codigo,
+        "codigo": texto_codigo,
+        "descripcion": texto_desc or texto_codigo or texto_ref,
+        "debito": debito,
+        "credito": credito,
+        "saldo": balance_val if balance_val is not None else 0.0,
+        "saldo_inicial_cuenta": saldo_inicial_cuenta,
+        # Conserva si el dato existía realmente en el estado de cuenta.
+        "_tiene_debito": debit_val is not None or (amount_val not in (None, 0) and debito != 0),
+        "_tiene_credito": credit_val is not None or (amount_val not in (None, 0) and credito != 0),
+        "_tiene_saldo": balance_val is not None,
+    }
+
+
+def procesar_hoja(
+    worksheet,
+    moneda_respaldo="N/D",
+    nombre_archivo="",
+    banco_respaldo_ocr=""
+):
+    rows = []
+
+    for row in worksheet.iter_rows(values_only=True):
+        values = [value if value is not None else "" for value in row]
+        if any(value != "" for value in values):
+            rows.append(values)
+
+    if not rows:
+        return []
+
+    header_index, columns = detectar_columnas(rows)
+    if header_index is None:
+        return []
+
+    banco = detectar_banco(worksheet.title, rows)
+
+    # El OCR es únicamente un respaldo. Si el detector normal ya encontró un
+    # banco del catálogo, se conserva. Si devolvió un nombre genérico de hoja
+    # (Report1, Sheet, etc.) y el logo sí fue reconocido, usar el resultado OCR.
+    banco_catalogo = _buscar_banco_catalogo_en_texto(
+        banco
+    )
+
+    if banco_catalogo:
+        banco = banco_catalogo
+    elif banco_respaldo_ocr:
+        banco = banco_respaldo_ocr
+
+    cuenta = detectar_cuenta(worksheet.title, rows, header_index)
+
+    # --------------------------------------------------------
+    # MONEDA
+    # --------------------------------------------------------
+    # 1) Prioridad máxima: moneda escrita en el estado de cuenta.
+    # 2) Si no existe, usar la moneda contextual del archivo.
+    # 3) Solo al final revisar el number_format de las celdas.
+    #
+    # Esto evita que un formato viejo de Excel (ej. Q) gane sobre
+    # un texto real como "MONETARIO (USD)".
+    try:
+        moneda_textual = detectar_moneda_textual(
+            rows,
+            worksheet.title,
+            nombre_archivo
+        )
+
+        if moneda_textual not in {"N/D", "MULTI"}:
+            moneda = moneda_textual
+
+        elif moneda_respaldo not in {"N/D", "MULTI", ""}:
+            moneda = moneda_respaldo
+
+        else:
+            moneda = detectar_moneda(
+                worksheet,
+                rows,
+                header_index
+            )
+
+    except Exception as currency_error:
+        print(
+            "No se pudo detectar moneda en hoja",
+            worksheet.title,
+            ":",
+            str(currency_error)
+        )
+
+        moneda = (
+            moneda_respaldo
+            if moneda_respaldo not in {"N/D", "MULTI", ""}
+            else "N/D"
+        )
+
+    # --------------------------------------------------------
+    # PAÍS DE LA CUENTA / HOJA
+    # --------------------------------------------------------
+    pais = detectar_pais_bancario(
+        sheet_name=worksheet.title,
+        rows=rows,
+        banco=banco,
+        moneda=moneda,
+        nombre_archivo=nombre_archivo
+    )
+
+    expected_month, expected_year = detectar_periodo(rows, worksheet.title)
+    saldo_inicial = detectar_saldo_inicial(rows, header_index)
+
+    transactions = []
+    previous_balance = saldo_inicial
+    previous_date = None
+    invalid_streak = 0
+
+    for row in rows[header_index + 1:]:
+        transaction = extraer_transaccion(
+            row,
+            columns,
+            banco,
+            cuenta,
+            expected_month=expected_month,
+            expected_year=expected_year,
+            previous_balance=previous_balance,
+            previous_date=previous_date,
+            saldo_inicial_cuenta=saldo_inicial,
+        )
+
+        if transaction:
+            # Metadatos visuales; no modifican ningún importe.
+            transaction["moneda"] = moneda
+            transaction["pais"] = pais
+            transactions.append(transaction)
+            previous_date = transaction["fecha"]
+            if transaction["saldo"] != 0 or get_column(row, columns, "saldo") not in (None, ""):
+                previous_balance = transaction["saldo"]
+            invalid_streak = 0
+        else:
+            invalid_streak += 1
+
+            # No corta inmediatamente al ver un resumen: algunos bancos ponen
+            # subtotales entre grupos. Solo deja de recorrer después de un bloque
+            # largo sin movimientos reales.
+            if transactions and invalid_streak >= 25:
+                break
+
+    return transactions
 
 
 # ============================================================
