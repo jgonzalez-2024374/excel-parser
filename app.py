@@ -6303,64 +6303,14 @@ def renderizar_dashboard_nueva_plantilla(datos_override=None):
         else cargar_dashboard_data()
     )
 
-    # Primero pasa por Jinja por compatibilidad con versiones anteriores
-    # del dashboard que puedan contener {{ dashboard_data | tojson }}.
+    # Jinja inyecta los datos del dashboard para que la plantilla
+    # quede limpia y la lógica del cliente viva en assets/js/dashboard.js.
     html = render_template(
         "dashboard/index.html",
         dashboard_data=datos,
         base_data=datos,
         raw_transactions=datos.get("transactions", [])
     )
-
-    base_data = dict(datos)
-    raw_transactions = list(
-        base_data.pop("transactions", []) or []
-    )
-
-    base_json = json.dumps(
-        base_data,
-        ensure_ascii=False,
-        separators=(",", ":")
-    ).replace("</", "<\\/")
-
-    transactions_json = json.dumps(
-        raw_transactions,
-        ensure_ascii=False,
-        separators=(",", ":")
-    ).replace("</", "<\\/")
-
-    # Sustituye BASE_DATA incluso si la plantilla original trae un JSON enorme.
-    html, cambios_base = re.subn(
-        r"const\s+BASE_DATA\s*=\s*.*?;\s*let\s+DATA\s*=\s*null\s*;",
-        "const BASE_DATA = " + base_json + ";\\nlet DATA = null;",
-        html,
-        count=1,
-        flags=re.S
-    )
-
-    # Sustituye RAW_TRANSACTIONS hasta justo antes de BANK_LOGOS.
-    html, cambios_tx = re.subn(
-        r"const\s+RAW_TRANSACTIONS\s*=\s*.*?;\s*(?=const\s+BANK_LOGOS\s*=)",
-        "const RAW_TRANSACTIONS = " + transactions_json + ";\\n",
-        html,
-        count=1,
-        flags=re.S
-    )
-
-    if cambios_base == 0:
-        raise ValueError(
-            "La nueva plantilla no contiene el bloque 'const BASE_DATA = ...'."
-        )
-
-    if cambios_tx == 0:
-        raise ValueError(
-            "La nueva plantilla no contiene el bloque 'const RAW_TRANSACTIONS = ...'."
-        )
-
-    # La moneda se resuelve completamente dentro de index.html.
-    # Python solo inyecta BASE_DATA y RAW_TRANSACTIONS.
-    # Así todas las pestañas usan el mismo formateador monetario.
-
 
     return html
 
