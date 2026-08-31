@@ -63,7 +63,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v5.1-dinero-disponible-por-cuenta-y-general-20260831"
+APP_BUILD = "dashboard-v5.2-fix-normalizar-moneda-20260831"
 
 
 # ============================================================
@@ -4043,12 +4043,14 @@ def escribir_saldos_por_cuenta(
         escribir_celda_segura(ws, row_number, 5, valor_o_nd(dinero_disponible))
 
         # Mantener formato monetario también en la nueva columna.
-        moneda_fila = normalizar_moneda(ultimo.get("moneda")) or inferir_moneda_por_pais(ultimo.get("pais"))
-        formato_fila = formato_moneda_excel(moneda_fila)
-        for col in (3, 4, 5):
-            celda = obtener_celda_segura(ws, row_number, col)
-            if celda:
-                celda.number_format = formato_fila
+        # Usa la función de normalización que ya existe en este proyecto.
+        moneda_fila = normalizar_codigo_moneda(ultimo.get("moneda"))
+        if moneda_fila:
+            formato_fila = formato_moneda_excel(moneda_fila)
+            for col in (3, 4, 5):
+                celda = obtener_celda_segura(ws, row_number, col)
+                if celda:
+                    celda.number_format = formato_fila
 
         row_number += 1
 
