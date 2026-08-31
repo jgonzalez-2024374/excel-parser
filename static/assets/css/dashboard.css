@@ -1134,14 +1134,14 @@
       justify-content: center;
       gap: 8px;
       border: 1px solid #465064;
-      background: #2A313D;
+      background: #2C3340;
       color: #CBD5E1;
       border-radius: 12px;
-      padding: 8px 12px;
+      padding: 10px 14px;
       cursor: pointer;
       font-weight: 800;
       transition: .18s ease;
-      min-height: 42px;
+      min-height: 52px;
       line-height: 1.2;
       transform: translateY(0);
     }
@@ -1222,31 +1222,33 @@
     .country-currency-control {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       min-width: 0;
-      padding: 8px 10px;
-      border: 1px solid #394252;
+      padding: 8px 12px;
+      border: 1px solid #465064;
       border-radius: 14px;
-      background: #1E2430;
+      background: #2C3340;
+      min-height: 52px;
     }
 
     .country-currency-copy {
       min-width: 0;
-      flex: 1
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .country-currency-copy strong {
-      display: block;
-      font-size: 13px;
-      color: #F8FAFC
+      display: none;
     }
 
     .exchange-info {
       display: block;
       font-size: 11px;
       color: #AAB4C3;
-      margin-top: 3px;
-      line-height: 1.25
+      line-height: 1.2;
+      white-space: nowrap;
     }
 
     .currency-toggle {
