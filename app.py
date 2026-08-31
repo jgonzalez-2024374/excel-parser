@@ -23,7 +23,7 @@ import xml.etree.ElementTree as ET
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.5-strict-bank-detection-20260828"
+APP_BUILD = "dashboard-v4.6-safe-bank-logo-ocr-20260830"
 
 
 # ============================================================
@@ -1057,7 +1057,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.4-safe-currency-bank"
+PARSER_VERSION = "universal-3.5-safe-currency-bank-logo-ocr"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -2556,6 +2556,12 @@ def detectar_banco(sheet_name, rows):
 _OCR_ENGINE = None
 _OCR_ENGINE_ERROR = None
 
+# OCR seguro para Render/Make: solo se usa como respaldo cuando el banco no
+# aparece en texto. Se limita tanto por cantidad de imágenes como por tiempo
+# total para evitar que /process-excel se prolongue innecesariamente.
+OCR_MAX_IMAGES_PER_SHEET = 3
+OCR_MAX_SECONDS_PER_FILE = 12
+
 
 def _buscar_banco_catalogo_en_texto(texto):
     """Busca un banco de KNOWN_BANKS dentro de cualquier texto libre."""
@@ -2774,7 +2780,9 @@ def _hojas_que_requieren_ocr(workbook):
 
 def detectar_bancos_desde_imagenes_excel(
     input_path,
-    hojas_objetivo=None
+    hojas_objetivo=None,
+    max_images_per_sheet=OCR_MAX_IMAGES_PER_SHEET,
+    max_seconds=OCR_MAX_SECONDS_PER_FILE
 ):
     """
     Abre una segunda copia NO read_only del Excel para acceder a ws._images.
@@ -2789,6 +2797,8 @@ def detectar_bancos_desde_imagenes_excel(
     """
     if not input_path:
         return {}
+
+    inicio_ocr = time.monotonic()
 
     engine = _obtener_motor_ocr()
     if engine is None:
@@ -2809,6 +2819,13 @@ def detectar_bancos_desde_imagenes_excel(
         )
 
         for worksheet in workbook_images.worksheets:
+            if (time.monotonic() - inicio_ocr) >= max_seconds:
+                print(
+                    "OCR bancario detenido por límite de tiempo:",
+                    f"{max_seconds}s"
+                )
+                break
+
             if objetivo and worksheet.title not in objetivo:
                 continue
 
@@ -2824,7 +2841,14 @@ def detectar_bancos_desde_imagenes_excel(
             if not images:
                 continue
 
-            for image in images[:12]:
+            for image in images[:max_images_per_sheet]:
+                if (time.monotonic() - inicio_ocr) >= max_seconds:
+                    print(
+                        "OCR bancario detenido por límite de tiempo:",
+                        f"{max_seconds}s"
+                    )
+                    break
+
                 try:
                     image_bytes = image._data()
                 except Exception as error:
@@ -6546,10 +6570,38 @@ def process_excel():
         # ====================================================
         # IDENTIFICACION BANCARIA
         # ====================================================
-        # OCR de imágenes deshabilitado temporalmente para mantener
-        # estabilidad y velocidad del servicio en Render.
-        # La identificación utiliza el catálogo KNOWN_BANKS mediante texto.
+        # Camino principal: texto (rápido). OCR se activa SOLO para hojas donde
+        # el banco no pudo identificarse por nombre de hoja/celdas. Además está
+        # limitado a pocas imágenes y a un presupuesto total de tiempo para no
+        # comprometer la respuesta de /process-excel dentro de Make/Render.
         bancos_ocr_por_hoja = {}
+
+        try:
+            hojas_para_ocr = _hojas_que_requieren_ocr(
+                workbook
+            )
+
+            if hojas_para_ocr:
+                print(
+                    "Hojas candidatas a OCR bancario:",
+                    hojas_para_ocr
+                )
+
+                bancos_ocr_por_hoja = detectar_bancos_desde_imagenes_excel(
+                    input_path,
+                    hojas_objetivo=hojas_para_ocr,
+                    max_images_per_sheet=OCR_MAX_IMAGES_PER_SHEET,
+                    max_seconds=OCR_MAX_SECONDS_PER_FILE
+                )
+
+        except Exception as ocr_error:
+            # El OCR es solo respaldo: cualquier problema debe dejar continuar
+            # el procesamiento normal del archivo.
+            print(
+                "Advertencia: OCR bancario omitido:",
+                str(ocr_error)
+            )
+            bancos_ocr_por_hoja = {}
 
         all_transactions = []
         processed_sheets = []
