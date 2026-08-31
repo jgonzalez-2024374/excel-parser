@@ -63,7 +63,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v5.4-disponible-general-sin-columna-por-cuenta-20260831"
+APP_BUILD = "dashboard-v5.5-solo-saldo-final-tablero-20260831"
 
 
 # ============================================================
@@ -2342,9 +2342,6 @@ def aplicar_formato_moneda_excel(
         if saldo_final_cell:
             saldo_final_cell.number_format = formato_general
 
-        dinero_disponible_cell = obtener_celda_segura(ws, 8, 11)
-        if dinero_disponible_cell:
-            dinero_disponible_cell.number_format = formato_general
 
         total_row = 15 + len(cuentas)
         total_cell = obtener_celda_segura(ws, total_row, 8)
@@ -4646,8 +4643,7 @@ def actualizar_tablero(
     - Mayor día.
     - Cuentas con abono.
     - Saldo final total (último saldo contable/final por cuenta).
-    - Dinero disponible general (calculado internamente; no se publica por cuenta).
-    - Total de créditos por cuenta.
+        - Total de créditos por cuenta.
 
     Reglas de SALDO FINAL TOTAL:
     - CUENTA seleccionada: saldo final de esa cuenta.
@@ -4920,23 +4916,31 @@ def actualizar_tablero(
         f'=IFERROR(MAX(B{tablero_start}:B{evolution_end}),0)'
     )
 
-    # SALDO FINAL TOTAL en I:J y DINERO DISPONIBLE GENERAL en K:L.
-    # Saldo final: se mantiene dinámico con filtros de cuenta/banco.
-    # Dinero disponible: es un consolidado general calculado directamente
-    # desde los estados bancarios del juego de moneda.
+    # SALDO FINAL TOTAL en I:J.
+    # Se conserva únicamente este KPI en TABLERO CREDITOS.
     try:
         current_merges = {str(r) for r in ws.merged_cells.ranges}
 
-        for merge_range in ("I7:J7", "I8:J8", "K7:L7", "K8:L8"):
+        for merge_range in ("I7:J7", "I8:J8"):
             if merge_range not in current_merges:
                 ws.merge_cells(merge_range)
                 current_merges.add(merge_range)
 
+        # Quitar cualquier bloque anterior de DINERO DISPONIBLE en K:L.
+        for merge_range in ("K7:L7", "K8:L8"):
+            if merge_range in current_merges:
+                try:
+                    ws.unmerge_cells(merge_range)
+                except Exception:
+                    pass
+
+        for row in (7, 8):
+            for col in range(11, 13):
+                limpiar_celda_segura(ws, row, col)
+
         for source_coord, target_coord in (
             ("G7", "I7"),
             ("G8", "I8"),
-            ("G7", "K7"),
-            ("G8", "K8"),
         ):
             source = ws[source_coord]
             target = ws[target_coord]
@@ -4953,11 +4957,9 @@ def actualizar_tablero(
                 target.border = copy(source.border)
 
         ws["I7"] = "SALDO FINAL TOTAL"
-        ws["K7"] = "DINERO DISPONIBLE"
 
     except Exception:
         escribir_celda_segura(ws, 7, 9, "SALDO FINAL TOTAL")
-        escribir_celda_segura(ws, 7, 11, "DINERO DISPONIBLE")
 
     saldos_start = 5
     saldos_end = ultima_fila_con_valor(
@@ -4980,9 +4982,6 @@ def actualizar_tablero(
         )
 
     escribir_celda_segura(ws, 8, 9, saldo_final_formula)
-
-    dinero_disponible_general = calcular_dinero_disponible_general(transactions)
-    escribir_celda_segura(ws, 8, 11, dinero_disponible_general)
 
     # Forzar recálculo de fórmulas del tablero al abrir el archivo.
     calculation = getattr(workbook, "calculation", None)
@@ -5085,7 +5084,6 @@ def aplicar_formato_juego_moneda(
         "promedio diario",
         "mayor dia",
         "saldo final total",
-        "dinero disponible",
     )
     titulo_cantidad = "cuentas con abono"
 
@@ -5132,9 +5130,6 @@ def aplicar_formato_juego_moneda(
     if saldo_final_cell:
         saldo_final_cell.number_format = formato
 
-    dinero_disponible_cell = obtener_celda_segura(ws_tablero, 8, 11)
-    if dinero_disponible_cell:
-        dinero_disponible_cell.number_format = formato
 
     # Eje monetario de las gráficas.
     for chart in getattr(ws_tablero, "_charts", []):
