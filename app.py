@@ -1167,7 +1167,7 @@ def clean_text(value):
     text = str(value).replace("\xa0", " ").replace("\u200b", " ")
 
     # Elimina acentos y también tolera encabezados con codificación dañada
-    # (ej.: "Descripci髇", "D閎ito", "Cr閐ito", "D�bito").
+    # (ej.: "Descripci髇", "D閎ito", "Cr閐ito", "D bito").
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     text = text.lower().strip()
     text = re.sub(r"\s+", " ", text)
@@ -3730,14 +3730,16 @@ def escribir_estados_consolidados(
     sheet_name=None
 ):
 
-    if SHEET_ESTADOS not in workbook.sheetnames:
+    target_sheet = sheet_name or SHEET_ESTADOS
+
+    if target_sheet not in workbook.sheetnames:
 
         raise Exception(
-            f"No existe la hoja '{SHEET_ESTADOS}'"
+            f"No existe la hoja '{target_sheet}'"
         )
 
     ws = workbook[
-        SHEET_ESTADOS
+        target_sheet
     ]
 
     start_row = 2
@@ -3888,10 +3890,12 @@ def escribir_saldos_por_cuenta(
     transactions,
     sheet_name=None
 ):
-    if SHEET_SALDOS not in workbook.sheetnames:
-        raise Exception(f"No existe la hoja '{SHEET_SALDOS}'")
+    target_sheet = sheet_name or SHEET_SALDOS
 
-    ws = workbook[SHEET_SALDOS]
+    if target_sheet not in workbook.sheetnames:
+        raise Exception(f"No existe la hoja '{target_sheet}'")
+
+    ws = workbook[target_sheet]
     start_row = 5
     cuentas = {}
 
@@ -3959,10 +3963,12 @@ def escribir_reporte_creditos(
       y los dos campos de resumen se mueven al final con su formato correcto.
     """
 
-    if SHEET_REPORTE not in workbook.sheetnames:
-        raise Exception(f"No existe la hoja '{SHEET_REPORTE}'")
+    target_sheet = sheet_name or SHEET_REPORTE
 
-    ws = workbook[SHEET_REPORTE]
+    if target_sheet not in workbook.sheetnames:
+        raise Exception(f"No existe la hoja '{target_sheet}'")
+
+    ws = workbook[target_sheet]
 
     data = {}
     cuentas = {}
@@ -4482,13 +4488,17 @@ def forzar_recalculo_excel(workbook):
 def actualizar_tablero(
     workbook,
     transactions,
-    sheet_name=None
+    sheet_name=None,
+    reporte_sheet_name=None
 ):
-    if SHEET_TABLERO not in workbook.sheetnames or SHEET_REPORTE not in workbook.sheetnames:
+    target_sheet = sheet_name or SHEET_TABLERO
+    target_reporte = reporte_sheet_name or SHEET_REPORTE
+
+    if target_sheet not in workbook.sheetnames or target_reporte not in workbook.sheetnames:
         return
 
-    ws = workbook[SHEET_TABLERO]
-    reporte = workbook[SHEET_REPORTE]
+    ws = workbook[target_sheet]
+    reporte = workbook[target_reporte]
 
     fechas = [
         t["fecha"] for t in transactions
@@ -4568,21 +4578,21 @@ def actualizar_tablero(
 
         if report_row <= report_end:
             formula_fecha = (
-                f'=IF(AND(\'{SHEET_REPORTE}\'!A{report_row}>=$A$5,'
-                f'\'{SHEET_REPORTE}\'!A{report_row}<=$C$5),'
-                f'\'{SHEET_REPORTE}\'!A{report_row},"")'
+                f'=IF(AND(\'{target_reporte}\'!A{report_row}>=$A$5,'
+                f'\'{target_reporte}\'!A{report_row}<=$C$5),'
+                f'\'{target_reporte}\'!A{report_row},"")'
             )
             escribir_celda_segura(ws, row, 1, formula_fecha)
 
             formula_credito = (
                 f'=IF(A{row}="",0,'
                 f'IF($E$5<>"TODAS",'
-                f'IFERROR(INDEX(\'{SHEET_REPORTE}\'!${first_account_letter}$5:${last_account_letter}${report_end},'
-                f'MATCH(A{row},\'{SHEET_REPORTE}\'!$A$5:$A${report_end},0),'
-                f'MATCH($E$5,\'{SHEET_REPORTE}\'!${first_account_letter}$4:${last_account_letter}$4,0)),0),'
+                f'IFERROR(INDEX(\'{target_reporte}\'!${first_account_letter}$5:${last_account_letter}${report_end},'
+                f'MATCH(A{row},\'{target_reporte}\'!$A$5:$A${report_end},0),'
+                f'MATCH($E$5,\'{target_reporte}\'!${first_account_letter}$4:${last_account_letter}$4,0)),0),'
                 f'IF($G$5="TODOS",'
-                f'IFERROR(SUMIF(\'{SHEET_REPORTE}\'!$A$5:$A${report_end},A{row},'
-                f'\'{SHEET_REPORTE}\'!${total_letter}$5:${total_letter}${report_end}),0),0)))'
+                f'IFERROR(SUMIF(\'{target_reporte}\'!$A$5:$A${report_end},A{row},'
+                f'\'{target_reporte}\'!${total_letter}$5:${total_letter}${report_end}),0),0)))'
             )
             escribir_celda_segura(ws, row, 2, formula_credito)
 
@@ -4593,8 +4603,8 @@ def actualizar_tablero(
 
             formula_cuentas = (
                 f'=IF(A{row}="",0,'
-                f'IF($G$5="TODOS",IFERROR(INDEX(\'{SHEET_REPORTE}\'!${count_letter}$5:${count_letter}${report_end},'
-                f'MATCH(A{row},\'{SHEET_REPORTE}\'!$A$5:$A${report_end},0)),0),IF(B{row}>0,1,0)))'
+                f'IF($G$5="TODOS",IFERROR(INDEX(\'{target_reporte}\'!${count_letter}$5:${count_letter}${report_end},'
+                f'MATCH(A{row},\'{target_reporte}\'!$A$5:$A${report_end},0)),0),IF(B{row}>0,1,0)))'
             )
             escribir_celda_segura(ws, row, 4, formula_cuentas)
 
@@ -4638,9 +4648,9 @@ def actualizar_tablero(
             formula = (
                 f'=IF(AND(OR($G$5="TODOS",TRIM($G$5)=TRIM(F{index})),'
                 f'OR($E$5="TODAS",TEXT($E$5,"0")=TEXT(G{index},"0"))),'
-                f'SUMIFS(\'{SHEET_REPORTE}\'!${col_letter}$5:${col_letter}${report_end},'
-                f'\'{SHEET_REPORTE}\'!$A$5:$A${report_end},">="&$A$5,'
-                f'\'{SHEET_REPORTE}\'!$A$5:$A${report_end},"<="&$C$5),0)'
+                f'SUMIFS(\'{target_reporte}\'!${col_letter}$5:${col_letter}${report_end},'
+                f'\'{target_reporte}\'!$A$5:$A${report_end},">="&$A$5,'
+                f'\'{target_reporte}\'!$A$5:$A${report_end},"<="&$C$5),0)'
             )
             escribir_celda_segura(ws, index, 8, formula)
 
@@ -4666,9 +4676,13 @@ def actualizar_tablero(
 
 def crear_versiones_por_moneda(workbook, transactions):
     """
-    Separa reportes por moneda manteniendo las hojas base.
-    Las hojas base se utilizan para la moneda principal (preferiblemente GTQ)
-    porque finalize-batch depende de esos nombres exactos.
+    Separa físicamente los reportes por moneda.
+
+    - Las hojas base conservan la moneda principal (GTQ si existe).
+    - Para cada moneda adicional se COPIAN las hojas base para conservar
+      formato, anchos, altos, celdas combinadas y configuración visual.
+    - Cada juego de hojas se llena únicamente con las transacciones de
+      su propia moneda.
     """
     monedas = sorted({
         normalizar_codigo_moneda(t.get("moneda"))
@@ -4679,42 +4693,107 @@ def crear_versiones_por_moneda(workbook, transactions):
     if len(monedas) <= 1:
         return
 
-    # GTQ queda en hojas base. Si no existe GTQ, usa la primera moneda.
     moneda_base = "GTQ" if "GTQ" in monedas else monedas[0]
+    monedas_adicionales = [m for m in monedas if m != moneda_base]
 
-    grupos = [(moneda_base, None)]
-    grupos += [(m, m) for m in monedas if m != moneda_base]
+    # Crear TODAS las copias antes de modificar las hojas base.
+    # Así cada moneda parte de la plantilla original, no de datos ya escritos.
+    nombres_por_moneda = {
+        moneda_base: {
+            SHEET_SALDOS: SHEET_SALDOS,
+            SHEET_ESTADOS: SHEET_ESTADOS,
+            SHEET_REPORTE: SHEET_REPORTE,
+            SHEET_TABLERO: SHEET_TABLERO,
+        }
+    }
 
-    for moneda, sufijo in grupos:
+    for moneda in monedas_adicionales:
+        nombres = {}
+        for base_name in (
+            SHEET_SALDOS,
+            SHEET_ESTADOS,
+            SHEET_REPORTE,
+            SHEET_TABLERO
+        ):
+            nuevo_nombre = f"{base_name} {moneda}"
+
+            if nuevo_nombre in workbook.sheetnames:
+                del workbook[nuevo_nombre]
+
+            hoja_copia = workbook.copy_worksheet(
+                workbook[base_name]
+            )
+            hoja_copia.title = nuevo_nombre
+            nombres[base_name] = nuevo_nombre
+
+        nombres_por_moneda[moneda] = nombres
+
+    # Escribir cada moneda exclusivamente en su propio juego de hojas.
+    for moneda in [moneda_base] + monedas_adicionales:
         trans_moneda = [
             t for t in transactions
             if normalizar_codigo_moneda(t.get("moneda")) == moneda
         ]
+
         if not trans_moneda:
             continue
 
-        if sufijo:
-            nombres = {
-                SHEET_SALDOS: f"{SHEET_SALDOS} {sufijo}",
-                SHEET_ESTADOS: f"{SHEET_ESTADOS} {sufijo}",
-                SHEET_REPORTE: f"{SHEET_REPORTE} {sufijo}",
-                SHEET_TABLERO: f"{SHEET_TABLERO} {sufijo}",
-            }
-            for nombre in nombres.values():
-                if nombre not in workbook.sheetnames:
-                    workbook.create_sheet(nombre)
-        else:
-            nombres = {
-                SHEET_SALDOS: SHEET_SALDOS,
-                SHEET_ESTADOS: SHEET_ESTADOS,
-                SHEET_REPORTE: SHEET_REPORTE,
-                SHEET_TABLERO: SHEET_TABLERO,
-            }
+        nombres = nombres_por_moneda[moneda]
 
-        escribir_saldos_por_cuenta(workbook, trans_moneda, sheet_name=nombres[SHEET_SALDOS])
-        escribir_estados_consolidados(workbook, trans_moneda, sheet_name=nombres[SHEET_ESTADOS])
-        escribir_reporte_creditos(workbook, trans_moneda, sheet_name=nombres[SHEET_REPORTE])
-        actualizar_tablero(workbook, trans_moneda, sheet_name=nombres[SHEET_TABLERO])
+        escribir_saldos_por_cuenta(
+            workbook,
+            trans_moneda,
+            sheet_name=nombres[SHEET_SALDOS]
+        )
+
+        escribir_estados_consolidados(
+            workbook,
+            trans_moneda,
+            sheet_name=nombres[SHEET_ESTADOS]
+        )
+
+        escribir_reporte_creditos(
+            workbook,
+            trans_moneda,
+            sheet_name=nombres[SHEET_REPORTE]
+        )
+
+        actualizar_tablero(
+            workbook,
+            trans_moneda,
+            sheet_name=nombres[SHEET_TABLERO],
+            reporte_sheet_name=nombres[SHEET_REPORTE]
+        )
+
+        # Aplicar el símbolo correcto al detalle de estados de esta moneda.
+        formato = formato_moneda_excel(moneda)
+        ws_estados = workbook[nombres[SHEET_ESTADOS]]
+        for row_number in range(2, 2 + len(trans_moneda)):
+            for column in (6, 7, 8):
+                cell = obtener_celda_segura(
+                    ws_estados,
+                    row_number,
+                    column
+                )
+                if cell:
+                    cell.number_format = formato
+
+        # Saldos por cuenta: columnas de saldo inicial/final.
+        ws_saldos = workbook[nombres[SHEET_SALDOS]]
+        cuentas_moneda = {
+            (t.get("banco"), t.get("cuenta"))
+            for t in trans_moneda
+        }
+        for row_number in range(5, 5 + len(cuentas_moneda)):
+            for column in (3, 4):
+                cell = obtener_celda_segura(
+                    ws_saldos,
+                    row_number,
+                    column
+                )
+                if cell:
+                    cell.number_format = formato
+
 
 def generar_por_moneda_si_aplica(workbook, transactions):
     monedas = {
