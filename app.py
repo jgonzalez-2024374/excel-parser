@@ -63,7 +63,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.9-saldo-disponible-multimoneda-20260831"
+APP_BUILD = "dashboard-v5.1-dinero-disponible-por-cuenta-y-general-20260831"
 
 
 # ============================================================
@@ -1100,7 +1100,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.5-safe-currency-bank-logo-ocr"
+PARSER_VERSION = "universal-3.6-saldo-disponible-separado"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -1136,9 +1136,14 @@ HEADER_ALIASES = {
         "monto credito", "credito de transaccion", "abono credito",
         "cr",
     ],
+    "saldo_disponible": [
+        "saldo final total",
+            "dinero disponible", "available balance", "balance disponible",
+        "disponible", "available",
+    ],
     "saldo": [
-        "saldo", "balance", "saldo contable", "saldo disponible",
-        "available balance", "running balance", "balance de transaccion",
+        "saldo", "balance", "saldo contable",
+        "running balance", "balance de transaccion",
         "saldo final", "book balance", "saldo real",
         "saldos",
     ],
@@ -2012,7 +2017,8 @@ def aplicar_formato_moneda_excel(
 
             for column in (
                 3,
-                4
+                4,
+                5
             ):
 
                 cell = obtener_celda_segura(
@@ -2334,9 +2340,13 @@ def aplicar_formato_moneda_excel(
                 )
 
         # Saldo Disponible y Total usan la moneda única del libro.
-        saldo_disponible_cell = obtener_celda_segura(ws, 8, 9)
-        if saldo_disponible_cell:
-            saldo_disponible_cell.number_format = formato_general
+        saldo_final_cell = obtener_celda_segura(ws, 8, 9)
+        if saldo_final_cell:
+            saldo_final_cell.number_format = formato_general
+
+        dinero_disponible_cell = obtener_celda_segura(ws, 8, 11)
+        if dinero_disponible_cell:
+            dinero_disponible_cell.number_format = formato_general
 
         total_row = 15 + len(cuentas)
         total_cell = obtener_celda_segura(ws, total_row, 8)
@@ -2499,7 +2509,18 @@ def _header_field(value):
                 score = max(score, 0.96)
             elif field == "fecha" and (text == "fecha" or text.startswith("fecha ") or " date" in f" {text}"):
                 score = max(score, 0.98)
-            elif field == "saldo" and ("saldo" in text or "balance" in text):
+            elif field == "saldo_disponible" and (
+                ("saldo" in text and "dispon" in text)
+                or "available balance" in text
+                or text == "disponible"
+                or text == "available"
+            ):
+                score = max(score, 1.0)
+            elif field == "saldo" and (
+                ("saldo" in text or "balance" in text)
+                and "dispon" not in text
+                and "available" not in text
+            ):
                 score = max(score, 0.98)
             elif field == "referencia" and any(root in text for root in ("refer", "no doc", "document", "secuencial", "trace")):
                 score = max(score, 0.97)
@@ -3334,7 +3355,8 @@ def detectar_columnas(rows):
         score = 0
         weights = {
             "fecha": 4, "descripcion": 3, "referencia": 2, "codigo": 1,
-            "debito": 3, "credito": 3, "monto": 3, "saldo": 3, "tipo": 1,
+            "debito": 3, "credito": 3, "monto": 3,
+            "saldo": 3, "saldo_disponible": 3, "tipo": 1,
         }
         for field in columnas:
             score += weights.get(field, 1)
@@ -3474,11 +3496,13 @@ def extraer_transaccion(
     credit_raw = get_column(row, columns, "credito")
     amount_raw = get_column(row, columns, "monto")
     balance_raw = get_column(row, columns, "saldo")
+    available_raw = get_column(row, columns, "saldo_disponible")
 
     debit_val = parse_number(debit_raw)
     credit_val = parse_number(credit_raw)
     amount_val = parse_number(amount_raw)
     balance_val = parse_number(balance_raw)
+    available_val = parse_number(available_raw)
 
     debito = -abs(debit_val) if debit_val not in (None, 0) else 0.0
     credito = abs(credit_val) if credit_val not in (None, 0) else 0.0
@@ -3533,11 +3557,15 @@ def extraer_transaccion(
         "debito": debito,
         "credito": credito,
         "saldo": balance_val if balance_val is not None else 0.0,
+        # Saldo disponible se conserva por separado cuando el banco lo reporta.
+        # Si el banco no trae esa columna, se deja None y el reporte usa saldo final como respaldo.
+        "saldo_disponible": available_val,
         "saldo_inicial_cuenta": saldo_inicial_cuenta,
         # Conserva si el dato existía realmente en el estado de cuenta.
         "_tiene_debito": debit_val is not None or (amount_val not in (None, 0) and debito != 0),
         "_tiene_credito": credit_val is not None or (amount_val not in (None, 0) and credito != 0),
         "_tiene_saldo": balance_val is not None,
+        "_tiene_saldo_disponible": available_val is not None,
     }
 
 
@@ -3955,7 +3983,10 @@ def escribir_saldos_por_cuenta(
         clave = (transaction["banco"], transaction["cuenta"])
         cuentas.setdefault(clave, []).append(transaction)
 
-    limpiar_filas(ws, start_row, ws.max_row, 1, 4)
+    limpiar_filas(ws, start_row, ws.max_row, 1, 5)
+
+    # Quinta columna auxiliar visible: dinero realmente disponible.
+    escribir_celda_segura(ws, 4, 5, "Dinero disponible")
 
     required_last_row = start_row + len(cuentas) - 1
     if required_last_row > ws.max_row:
@@ -3987,10 +4018,38 @@ def escribir_saldos_por_cuenta(
 
         saldo_final = ultimo["saldo"] if ultimo.get("_tiene_saldo") else "N/D"
 
+        # Usar el saldo disponible más reciente reportado por el banco.
+        # Si el estado solo tiene una columna de saldo, el saldo final es el mejor respaldo.
+        dinero_disponible = None
+
+        for mov in reversed(movimientos):
+            if mov.get("_tiene_saldo_disponible"):
+                dinero_disponible = mov.get("saldo_disponible")
+                break
+
+        if dinero_disponible is None:
+            # Si el banco no publica una columna separada de disponible,
+            # el último saldo final/contable es el respaldo operativo.
+            dinero_disponible = saldo_final
+
+        # Evitar celdas vacías en DINERO DISPONIBLE cuando hay saldo final.
+        if dinero_disponible in (None, "", "N/D") and isinstance(saldo_final, (int, float)):
+            dinero_disponible = saldo_final
+
         escribir_celda_segura(ws, row_number, 1, valor_o_nd(banco_corto(banco)))
         escribir_celda_segura(ws, row_number, 2, valor_o_nd(cuenta))
         escribir_celda_segura(ws, row_number, 3, saldo_inicial)
         escribir_celda_segura(ws, row_number, 4, saldo_final)
+        escribir_celda_segura(ws, row_number, 5, valor_o_nd(dinero_disponible))
+
+        # Mantener formato monetario también en la nueva columna.
+        moneda_fila = normalizar_moneda(ultimo.get("moneda")) or inferir_moneda_por_pais(ultimo.get("pais"))
+        formato_fila = formato_moneda_excel(moneda_fila)
+        for col in (3, 4, 5):
+            celda = obtener_celda_segura(ws, row_number, col)
+            if celda:
+                celda.number_format = formato_fila
+
         row_number += 1
 
 
@@ -4538,10 +4597,11 @@ def actualizar_tablero(
     - Promedio diario.
     - Mayor día.
     - Cuentas con abono.
-    - Saldo disponible (saldo final real de SALDOS POR CUENTA).
+    - Saldo final total (último saldo contable/final por cuenta).
+    - Dinero disponible (saldo disponible reportado por el banco; respaldo: saldo final).
     - Total de créditos por cuenta.
 
-    Reglas de SALDO DISPONIBLE:
+    Reglas de SALDO FINAL TOTAL / DINERO DISPONIBLE:
     - CUENTA seleccionada: saldo final de esa cuenta.
     - BANCO seleccionado: suma de saldos finales de sus cuentas.
     - TODAS / TODOS: suma consolidada de saldos finales del juego de moneda.
@@ -4812,20 +4872,22 @@ def actualizar_tablero(
         f'=IFERROR(MAX(B{tablero_start}:B{evolution_end}),0)'
     )
 
-    # SALDO DISPONIBLE en I:J.
+    # SALDO FINAL TOTAL en I:J y DINERO DISPONIBLE en K:L.
+    # Ambos respetan los filtros CUENTA/BANCO y el juego de moneda actual.
     try:
         current_merges = {str(r) for r in ws.merged_cells.ranges}
 
-        if "I7:J7" not in current_merges:
-            ws.merge_cells("I7:J7")
+        for merge_range in ("I7:J7", "I8:J8", "K7:L7", "K8:L8"):
+            if merge_range not in current_merges:
+                ws.merge_cells(merge_range)
+                current_merges.add(merge_range)
 
-        current_merges = {str(r) for r in ws.merged_cells.ranges}
-        if "I8:J8" not in current_merges:
-            ws.merge_cells("I8:J8")
-
+        # Heredar exactamente el estilo del KPI CUENTAS CON ABONO.
         for source_coord, target_coord in (
             ("G7", "I7"),
-            ("G8", "I8")
+            ("G8", "I8"),
+            ("G7", "K7"),
+            ("G8", "K8"),
         ):
             source = ws[source_coord]
             target = ws[target_coord]
@@ -4841,10 +4903,12 @@ def actualizar_tablero(
             if source.border:
                 target.border = copy(source.border)
 
-        ws["I7"] = "SALDO DISPONIBLE"
+        ws["I7"] = "SALDO FINAL TOTAL"
+        ws["K7"] = "DINERO DISPONIBLE"
 
     except Exception:
-        escribir_celda_segura(ws, 7, 9, "SALDO DISPONIBLE")
+        escribir_celda_segura(ws, 7, 9, "SALDO FINAL TOTAL")
+        escribir_celda_segura(ws, 7, 11, "DINERO DISPONIBLE")
 
     saldos_start = 5
     saldos_end = ultima_fila_con_valor(
@@ -4854,9 +4918,11 @@ def actualizar_tablero(
     )
 
     if saldos_end < saldos_start:
-        saldo_formula = "=0"
+        saldo_final_formula = "=0"
+        disponible_formula = "=0"
     else:
-        saldo_formula = (
+        # Cuenta tiene prioridad; banco aplica solo con CUENTA = TODAS.
+        saldo_final_formula = (
             f'=IF($E$5<>"TODAS",'
             f'IFERROR(SUMIF(\'{target_saldos}\'!$B${saldos_start}:$B${saldos_end},'
             f'$E$5,\'{target_saldos}\'!$D${saldos_start}:$D${saldos_end}),0),'
@@ -4866,7 +4932,25 @@ def actualizar_tablero(
             f'IFERROR(SUM(\'{target_saldos}\'!$D${saldos_start}:$D${saldos_end}),0)))'
         )
 
-    escribir_celda_segura(ws, 8, 9, saldo_formula)
+        disponible_formula = (
+            f'=IF($E$5<>"TODAS",'
+            f'IFERROR(SUMIF(\'{target_saldos}\'!$B${saldos_start}:$B${saldos_end},'
+            f'$E$5,\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),0),'
+            f'IF($G$5<>"TODOS",'
+            f'IFERROR(SUMIF(\'{target_saldos}\'!$A${saldos_start}:$A${saldos_end},'
+            f'$G$5,\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),0),'
+            f'IFERROR(SUM(\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),0)))'
+        )
+
+    escribir_celda_segura(ws, 8, 9, saldo_final_formula)
+    escribir_celda_segura(ws, 8, 11, disponible_formula)
+
+    # Forzar recálculo de los KPI al abrir el archivo.
+    calculation = getattr(workbook, "calculation", None)
+    if calculation is not None:
+        calculation.calcMode = "auto"
+        calculation.fullCalcOnLoad = True
+        calculation.forceFullCalc = True
 
     actualizar_graficas_dinamicas(
         ws,
@@ -4912,7 +4996,7 @@ def aplicar_formato_juego_moneda(
             cuentas.append(clave)
 
     for row_number in range(5, 5 + len(cuentas)):
-        for column in (3, 4):
+        for column in (3, 4, 5):
             cell = obtener_celda_segura(ws_saldos, row_number, column)
             if cell:
                 cell.number_format = formato
@@ -4961,7 +5045,8 @@ def aplicar_formato_juego_moneda(
         "creditos en rango",
         "promedio diario",
         "mayor dia",
-        "saldo disponible",
+        "saldo final total",
+        "dinero disponible",
     )
     titulo_cantidad = "cuentas con abono"
 
@@ -5004,9 +5089,13 @@ def aplicar_formato_juego_moneda(
     if total_cell:
         total_cell.number_format = formato
 
-    saldo_disponible_cell = obtener_celda_segura(ws_tablero, 8, 9)
-    if saldo_disponible_cell:
-        saldo_disponible_cell.number_format = formato
+    saldo_final_cell = obtener_celda_segura(ws_tablero, 8, 9)
+    if saldo_final_cell:
+        saldo_final_cell.number_format = formato
+
+    dinero_disponible_cell = obtener_celda_segura(ws_tablero, 8, 11)
+    if dinero_disponible_cell:
+        dinero_disponible_cell.number_format = formato
 
     # Eje monetario de las gráficas.
     for chart in getattr(ws_tablero, "_charts", []):
