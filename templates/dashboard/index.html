@@ -77,11 +77,11 @@
           <div class="cover-copy">Resumen visual del comportamiento bancario consolidado, incluyendo saldos, créditos,
             débitos, variación entre entradas y salidas, movimientos y detalle individual por banco y cuenta.</div>
           <div class="cover-badges">
-            <span>📅 Período: <b id="coverCut"></b></span>
-            <span>🌎 País: <b class="countryLabel">—</b></span>
-            <span>💵 Moneda: <b class="currencyLabel">—</b></span>
-            <span>🏦 <b id="coverBanks"></b> bancos</span>
-            <span>💳 <b id="coverAccounts"></b> cuentas</span>
+            <span><img src="/static/assets/img/tiempo.png" alt="Periodo"> Período: <b id="coverCut"></b></span>
+            <span><img src="/static/assets/img/pais.png" alt="País"> País: <b class="countryLabel">—</b></span>
+            <span><img src="/static/assets/img/moneda.png" alt="Moneda"> Moneda: <b class="currencyLabel">—</b></span>
+            <span><img src="/static/assets/img/banco.png" alt="Banco"> <b id="coverBanks"></b> bancos</span>
+            <span><img src="/static/assets/img/cuenta.png" alt="Cuenta"> <b id="coverAccounts"></b> cuentas</span>
           </div>
         </div>
         <div class="cover-bank-strip" id="coverBankLogos"></div>
@@ -89,13 +89,10 @@
     </section>
     <header class="hero">
       <div class="hero-left">
-        <div class="eyebrow">Análisis financiero ejecutivo</div>
-        <h1>Saldos Bancarios Consolidados</h1>
-        <div class="sub">Vista ejecutiva de saldos, créditos, débitos y comportamiento diario con base exclusiva en el
-          archivo consolidado.</div>
+       
         <div class="meta">
           <div class="date-filter" aria-label="Filtro de fecha">
-            <span class="date-filter-title">📅 Período</span>
+            <span class="date-filter-title"><img src="/static/assets/img/tiempo.png" alt="Periodo"> Período</span>
             <label>Desde <input type="date" id="dateFrom" aria-label="Fecha desde"></label>
             <span class="date-sep">—</span>
             <label>Hasta <input type="date" id="dateTo" aria-label="Fecha hasta"></label>
@@ -103,11 +100,11 @@
             <button type="button" class="date-reset" id="resetDateFilter" title="Restablecer período"
               aria-label="Restablecer período">↺</button>
           </div>
-          <span>🌎 País: <b class="countryLabel">—</b></span>
-          <span>💵 Moneda: <b class="currencyLabel">—</b></span>
-          <span>🏦 <b id="bankCount"></b> bancos</span>
-          <span>💳 <b id="accountCount"></b> cuentas</span>
-          <span>🧾 Último movimiento consolidado: <b id="latestMovement"></b></span>
+          <span><img src="/static/assets/img/pais.png" alt="País"> País: <b class="countryLabel">—</b></span>
+          <span><img src="/static/assets/img/moneda.png" alt="Moneda"> Moneda: <b class="currencyLabel">—</b></span>
+          <span><img src="/static/assets/img/banco.png" alt="Banco"> <b id="bankCount"></b> bancos</span>
+          <span><img src="/static/assets/img/cuenta.png" alt="Cuenta"> <b id="accountCount"></b> cuentas</span>
+          <span><img src="/static/assets/img/movimiento.png" alt="Movimiento"> Último movimiento: <b id="latestMovement"></b></span>
         </div>
       </div>
 
