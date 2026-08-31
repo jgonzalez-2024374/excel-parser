@@ -2501,6 +2501,42 @@ def detectar_periodo(rows, sheet_name=""):
     return month, year
 
 
+
+def detectar_banco_por_nombre_archivo(nombre_archivo):
+    """
+    Detecta el banco usando primero el nombre REAL del archivo recibido.
+
+    Se usan alias conservadores para los nombres operativos de los estados
+    salvadoreños. Esto evita OCR innecesario en Make/Render y reduce falsos
+    positivos. Si no hay una coincidencia clara, devuelve None y el parser
+    continúa con hoja/celdas y, como último respaldo, OCR.
+    """
+    texto = clean_text(os.path.basename(str(nombre_archivo or "")))
+
+    if not texto:
+        return None
+
+    # Primero intentar el catálogo general con nombres completos.
+    banco_catalogo = _buscar_banco_catalogo_en_texto(texto)
+    if banco_catalogo:
+        return banco_catalogo
+
+    # Alias de archivo usados en los estados de cuenta de El Salvador.
+    # Se exigen límites de palabra para evitar coincidencias accidentales.
+    patrones_archivo = (
+        (r"\bpromerica\b", "PROMERICA"),
+        (r"\bdav(?:ivienda)?\b", "DAVIVIENDA"),
+        (r"\bcusca(?:tlan)?\b", "CUSCATLÁN"),
+        (r"\bbac\b", "BAC"),
+        (r"\bagricola\b", "BANCO AGRÍCOLA"),
+    )
+
+    for patron, banco in patrones_archivo:
+        if re.search(patron, texto, re.I):
+            return banco
+
+    return None
+
 def detectar_banco(sheet_name, rows):
     """
     Detecta bancos únicamente contra KNOWN_BANKS.
@@ -3471,19 +3507,27 @@ def procesar_hoja(
     if header_index is None:
         return []
 
-    banco = detectar_banco(worksheet.title, rows)
-
-    # El OCR es únicamente un respaldo. Si el detector normal ya encontró un
-    # banco del catálogo, se conserva. Si devolvió un nombre genérico de hoja
-    # (Report1, Sheet, etc.) y el logo sí fue reconocido, usar el resultado OCR.
-    banco_catalogo = _buscar_banco_catalogo_en_texto(
-        banco
+    # PRIORIDAD DE IDENTIFICACIÓN BANCARIA:
+    # 1) Nombre del archivo (rápido y confiable para los estados SV).
+    # 2) Nombre de hoja / texto de celdas.
+    # 3) OCR de imágenes únicamente como último respaldo.
+    banco_archivo = detectar_banco_por_nombre_archivo(
+        nombre_archivo
     )
 
-    if banco_catalogo:
-        banco = banco_catalogo
-    elif banco_respaldo_ocr:
-        banco = banco_respaldo_ocr
+    if banco_archivo:
+        banco = banco_archivo
+    else:
+        banco = detectar_banco(worksheet.title, rows)
+
+        banco_catalogo = _buscar_banco_catalogo_en_texto(
+            banco
+        )
+
+        if banco_catalogo:
+            banco = banco_catalogo
+        elif banco_respaldo_ocr:
+            banco = banco_respaldo_ocr
 
     cuenta = detectar_cuenta(worksheet.title, rows, header_index)
 
@@ -6576,32 +6620,46 @@ def process_excel():
         # comprometer la respuesta de /process-excel dentro de Make/Render.
         bancos_ocr_por_hoja = {}
 
-        try:
-            hojas_para_ocr = _hojas_que_requieren_ocr(
-                workbook
-            )
+        # Si el nombre del archivo ya identifica claramente el banco, NO ejecutar
+        # OCR. Esto mantiene rápido /process-excel y evita falsos positivos.
+        banco_archivo = detectar_banco_por_nombre_archivo(
+            file.filename
+        )
 
-            if hojas_para_ocr:
-                print(
-                    "Hojas candidatas a OCR bancario:",
-                    hojas_para_ocr
-                )
-
-                bancos_ocr_por_hoja = detectar_bancos_desde_imagenes_excel(
-                    input_path,
-                    hojas_objetivo=hojas_para_ocr,
-                    max_images_per_sheet=OCR_MAX_IMAGES_PER_SHEET,
-                    max_seconds=OCR_MAX_SECONDS_PER_FILE
-                )
-
-        except Exception as ocr_error:
-            # El OCR es solo respaldo: cualquier problema debe dejar continuar
-            # el procesamiento normal del archivo.
+        if banco_archivo:
             print(
-                "Advertencia: OCR bancario omitido:",
-                str(ocr_error)
+                "Banco detectado por nombre de archivo:",
+                file.filename,
+                "=>",
+                banco_archivo
             )
-            bancos_ocr_por_hoja = {}
+        else:
+            try:
+                hojas_para_ocr = _hojas_que_requieren_ocr(
+                    workbook
+                )
+
+                if hojas_para_ocr:
+                    print(
+                        "Hojas candidatas a OCR bancario:",
+                        hojas_para_ocr
+                    )
+
+                    bancos_ocr_por_hoja = detectar_bancos_desde_imagenes_excel(
+                        input_path,
+                        hojas_objetivo=hojas_para_ocr,
+                        max_images_per_sheet=OCR_MAX_IMAGES_PER_SHEET,
+                        max_seconds=OCR_MAX_SECONDS_PER_FILE
+                    )
+
+            except Exception as ocr_error:
+                # El OCR es solo respaldo: cualquier problema debe dejar continuar
+                # el procesamiento normal del archivo.
+                print(
+                    "Advertencia: OCR bancario omitido:",
+                    str(ocr_error)
+                )
+                bancos_ocr_por_hoja = {}
 
         all_transactions = []
         processed_sheets = []
