@@ -4649,6 +4649,11 @@ def actualizar_tablero(
         )
         escribir_celda_segura(ws, row, 1, formula_fecha)
 
+        # Excel guarda las fechas como números seriales; forzar formato visible.
+        fecha_cell = obtener_celda_segura(ws, row, 1)
+        if fecha_cell:
+            fecha_cell.number_format = "dd/mm/yyyy"
+
         formula_credito = (
             f'=IF(A{row}="",0,'
             f'IF($E$5<>"TODAS",'
