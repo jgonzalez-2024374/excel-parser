@@ -20,7 +20,7 @@
 
     body {
       margin: 0;
-      background: radial-gradient(circle at 10% -10%, #27334a 0, transparent 35%), linear-gradient(180deg, #171A21, #12151B 80%);
+      background-color:#10151f;
       color: var(--text);
       font-family: Inter, 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
