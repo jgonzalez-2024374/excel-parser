@@ -37,7 +37,7 @@
                 <span class="currency-toggle-labels"><span id="gt-converted-label">$</span></span>
               </label>
             </div>
-            <div class="country-currency-control" data-currency-country="EL_SALVADOR">
+            <div class="country-currency-control" data-currency-country="EL_SALVADOR" hidden style="display:none;">
               <div class="country-currency-copy">
                 <strong>El Salvador · moneda</strong>
                 <span id="exchange-display-sv" class="exchange-info">Actualizando tipo de cambio...</span>
@@ -247,6 +247,44 @@
     window.DASHBOARD_RAW_TRANSACTIONS = {{ raw_transactions | tojson | safe }};
   </script>
   <script src="/static/assets/js/dashboard.js"></script>
+  <script>
+    // Muestra únicamente el control de moneda correspondiente al país activo.
+    (function () {
+      function mostrarControlMonedaPais(country) {
+        document.querySelectorAll('.country-currency-control').forEach(function (control) {
+          var visible = control.dataset.currencyCountry === country;
+          control.hidden = !visible;
+          control.style.display = visible ? '' : 'none';
+        });
+      }
+
+      document.querySelectorAll('.country-btn[data-country]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          mostrarControlMonedaPais(button.dataset.country);
+        });
+      });
+
+      function sincronizarInicial() {
+        var activo = document.querySelector('.country-btn.active[data-country]');
+        if (activo) {
+          mostrarControlMonedaPais(activo.dataset.country);
+          return;
+        }
+        mostrarControlMonedaPais('GUATEMALA');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sincronizarInicial);
+      } else {
+        sincronizarInicial();
+      }
+
+      setTimeout(function () {
+        var activo = document.querySelector('.country-btn.active[data-country]');
+        if (activo) mostrarControlMonedaPais(activo.dataset.country);
+      }, 0);
+    })();
+  </script>
 </body>
 
 </html>
