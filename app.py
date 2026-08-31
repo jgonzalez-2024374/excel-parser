@@ -4674,6 +4674,130 @@ def actualizar_tablero(
 # ============================================================
 
 
+
+def aplicar_formato_juego_moneda(
+    workbook,
+    transactions,
+    moneda,
+    nombres
+):
+    """
+    Aplica una sola moneda a TODO el juego de hojas ya separado:
+    saldos, estados, reporte diario y tablero.
+    No convierte importes; solo corrige el formato visual.
+    """
+    formato = formato_moneda_excel(moneda)
+
+    # ESTADOS CONSOLIDADOS
+    ws_estados = workbook[nombres[SHEET_ESTADOS]]
+    for row_number in range(2, 2 + len(transactions)):
+        for column in (6, 7, 8):
+            cell = obtener_celda_segura(ws_estados, row_number, column)
+            if cell:
+                cell.number_format = formato
+
+    # SALDOS POR CUENTA
+    ws_saldos = workbook[nombres[SHEET_SALDOS]]
+    cuentas = []
+    for t in transactions:
+        clave = (str(t.get("banco", "")).strip(), str(t.get("cuenta", "")).strip())
+        if clave not in cuentas:
+            cuentas.append(clave)
+
+    for row_number in range(5, 5 + len(cuentas)):
+        for column in (3, 4):
+            cell = obtener_celda_segura(ws_saldos, row_number, column)
+            if cell:
+                cell.number_format = formato
+
+    # REPORTE CRÉDITOS DIARIOS
+    ws_reporte = workbook[nombres[SHEET_REPORTE]]
+    fechas = {
+        (
+            t["fecha"].date()
+            if isinstance(t.get("fecha"), datetime)
+            else t.get("fecha")
+        )
+        for t in transactions
+        if isinstance(t.get("fecha"), (datetime, date))
+    }
+    last_data_row = 4 + len(fechas) if fechas else 4
+
+    # Detectar TOTAL y CUENTAS CON ABONO.
+    total_col = None
+    count_col = None
+    for col in range(2, ws_reporte.max_column + 1):
+        header = clean_text(ws_reporte.cell(row=4, column=col).value)
+        if total_col is None and "total" in header and ("credito" in header or "credit" in header):
+            total_col = col
+        if count_col is None and "cuentas" in header and "abono" in header:
+            count_col = col
+
+    # Todas las columnas de cuentas y el total son de la misma moneda.
+    last_money_col = total_col if total_col is not None else max(2, ws_reporte.max_column - 1)
+    for row in range(5, last_data_row + 1):
+        for col in range(2, last_money_col + 1):
+            cell = obtener_celda_segura(ws_reporte, row, col)
+            if cell:
+                cell.number_format = formato
+
+        if count_col is not None:
+            cell = obtener_celda_segura(ws_reporte, row, count_col)
+            if cell:
+                cell.number_format = "0"
+
+    # TABLERO CRÉDITOS
+    ws_tablero = workbook[nombres[SHEET_TABLERO]]
+
+    # KPIs superiores: Créditos en rango, Promedio diario y Mayor día.
+    titulos_monetarios = (
+        "creditos en rango",
+        "promedio diario",
+        "mayor dia",
+    )
+    titulo_cantidad = "cuentas con abono"
+
+    for row in range(1, min(ws_tablero.max_row, 14) + 1):
+        for column in range(1, ws_tablero.max_column + 1):
+            cell = ws_tablero.cell(row=row, column=column)
+            if es_celda_combinada(cell):
+                continue
+
+            texto = clean_text(cell.value)
+            if not texto:
+                continue
+
+            if any(titulo in texto for titulo in titulos_monetarios):
+                value_cell = obtener_celda_segura(ws_tablero, row + 1, column)
+                if value_cell:
+                    value_cell.number_format = formato
+            elif titulo_cantidad in texto:
+                value_cell = obtener_celda_segura(ws_tablero, row + 1, column)
+                if value_cell:
+                    value_cell.number_format = "0"
+
+    # Evolución diaria: crédito seleccionado y variación diaria.
+    for row in range(15, ws_tablero.max_row + 1):
+        for column in (2, 3):
+            cell = obtener_celda_segura(ws_tablero, row, column)
+            if cell:
+                cell.number_format = formato
+
+    # Créditos por cuenta: columna H.
+    for row in range(15, 15 + len(cuentas)):
+        cell = obtener_celda_segura(ws_tablero, row, 8)
+        if cell:
+            cell.number_format = formato
+
+    # Eje monetario de las gráficas.
+    for chart in getattr(ws_tablero, "_charts", []):
+        try:
+            if hasattr(chart, "y_axis"):
+                chart.y_axis.numFmt = formato
+        except Exception:
+            pass
+
+
 def crear_versiones_por_moneda(workbook, transactions):
     """
     Separa físicamente los reportes por moneda.
@@ -4765,34 +4889,13 @@ def crear_versiones_por_moneda(workbook, transactions):
             reporte_sheet_name=nombres[SHEET_REPORTE]
         )
 
-        # Aplicar el símbolo correcto al detalle de estados de esta moneda.
-        formato = formato_moneda_excel(moneda)
-        ws_estados = workbook[nombres[SHEET_ESTADOS]]
-        for row_number in range(2, 2 + len(trans_moneda)):
-            for column in (6, 7, 8):
-                cell = obtener_celda_segura(
-                    ws_estados,
-                    row_number,
-                    column
-                )
-                if cell:
-                    cell.number_format = formato
-
-        # Saldos por cuenta: columnas de saldo inicial/final.
-        ws_saldos = workbook[nombres[SHEET_SALDOS]]
-        cuentas_moneda = {
-            (t.get("banco"), t.get("cuenta"))
-            for t in trans_moneda
-        }
-        for row_number in range(5, 5 + len(cuentas_moneda)):
-            for column in (3, 4):
-                cell = obtener_celda_segura(
-                    ws_saldos,
-                    row_number,
-                    column
-                )
-                if cell:
-                    cell.number_format = formato
+        # Aplicar la moneda correcta a TODO este juego de hojas.
+        aplicar_formato_juego_moneda(
+            workbook,
+            trans_moneda,
+            moneda,
+            nombres
+        )
 
 
 def generar_por_moneda_si_aplica(workbook, transactions):
@@ -4842,12 +4945,14 @@ def insertar_en_plantilla(
             actualizar_tablero(workbook, transactions)
 
         # 5
-        # Adaptar únicamente los símbolos/formato de moneda
-        # según lo detectado en los archivos bancarios.
-        aplicar_formato_moneda_excel(
-            workbook,
-            transactions
-        )
+        # Aplicar formato global únicamente cuando el libro tiene UNA moneda.
+        # Si hay varias monedas, crear_versiones_por_moneda ya aplicó el
+        # formato correcto de forma independiente a cada juego de hojas.
+        if len(monedas) <= 1:
+            aplicar_formato_moneda_excel(
+                workbook,
+                transactions
+            )
 
         # Recalcular fórmulas/gráficas al abrir el resultado.
         forzar_recalculo_excel(workbook)
