@@ -96,6 +96,15 @@
       margin: 0 auto;
       position: relative;
       z-index: 1;
+      margin-top: 0;
+    }
+
+    .top-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-start;
     }
 
     .country-switcher {
@@ -107,7 +116,7 @@
       border: none;
       background: transparent;
       box-shadow: none;
-      margin-top: 1rem;
+      margin-top: 0;
     }
 
     .country-buttons {
@@ -116,6 +125,7 @@
       flex-wrap: wrap;
       justify-content: flex-start;
       align-items: center;
+      margin-top: 0;
     }
 
     .hero-actions {
@@ -127,7 +137,7 @@
       justify-content: flex-end;
       align-items: center;
       margin: 0;
-      margin-top: 1rem;
+      margin-top: 0;
     }
 
      .save-icon{
@@ -1127,11 +1137,13 @@
       background: #2A313D;
       color: #CBD5E1;
       border-radius: 12px;
-      padding: 9px 12px;
+      padding: 8px 12px;
       cursor: pointer;
       font-weight: 800;
       transition: .18s ease;
-      min-height: 48px;
+      min-height: 42px;
+      line-height: 1.2;
+      transform: translateY(0);
     }
 
     .country-btn small {
@@ -1194,9 +1206,13 @@
     .currency-switcher {
       display: flex;
       gap: 10px;
-      align-items: stretch;
+      align-items: center;
       flex-wrap: wrap;
-      margin: 12px 0;
+      margin: 0;
+    }
+
+    .top-toolbar .currency-switcher {
+      margin: 0;
     }
 
     .country-currency-control[hidden] {
@@ -1207,8 +1223,8 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      min-width: 260px;
-      padding: 10px 12px;
+      min-width: 0;
+      padding: 8px 10px;
       border: 1px solid #394252;
       border-radius: 14px;
       background: #1E2430;
