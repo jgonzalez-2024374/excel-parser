@@ -63,7 +63,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.8-api-key-security-20260831"
+APP_BUILD = "dashboard-v4.9-saldo-disponible-multimoneda-20260831"
 
 
 # ============================================================
@@ -2209,6 +2209,7 @@ def aplicar_formato_moneda_excel(
             "creditos en rango",
             "promedio diario",
             "mayor dia",
+            "saldo disponible",
         )
 
         titulo_cantidad = "cuentas con abono"
@@ -2331,6 +2332,16 @@ def aplicar_formato_moneda_excel(
                 cell.number_format = formato_moneda_excel(
                     moneda
                 )
+
+        # Saldo Disponible y Total usan la moneda única del libro.
+        saldo_disponible_cell = obtener_celda_segura(ws, 8, 9)
+        if saldo_disponible_cell:
+            saldo_disponible_cell.number_format = formato_general
+
+        total_row = 15 + len(cuentas)
+        total_cell = obtener_celda_segura(ws, total_row, 8)
+        if total_cell:
+            total_cell.number_format = formato_general
 
         # Los ejes monetarios de las gráficas también se adaptan
         # cuando el libro utiliza una única moneda.
@@ -4515,16 +4526,42 @@ def actualizar_tablero(
     workbook,
     transactions,
     sheet_name=None,
-    reporte_sheet_name=None
+    reporte_sheet_name=None,
+    saldos_sheet_name=None
 ):
+    """
+    Actualiza TABLERO CREDITOS usando exclusivamente las hojas del mismo
+    juego/moneda.
+
+    Incluye:
+    - Créditos en rango.
+    - Promedio diario.
+    - Mayor día.
+    - Cuentas con abono.
+    - Saldo disponible (saldo final real de SALDOS POR CUENTA).
+    - Total de créditos por cuenta.
+
+    Reglas de SALDO DISPONIBLE:
+    - CUENTA seleccionada: saldo final de esa cuenta.
+    - BANCO seleccionado: suma de saldos finales de sus cuentas.
+    - TODAS / TODOS: suma consolidada de saldos finales del juego de moneda.
+    """
     target_sheet = sheet_name or SHEET_TABLERO
     target_reporte = reporte_sheet_name or SHEET_REPORTE
+    target_saldos = saldos_sheet_name or SHEET_SALDOS
 
-    if target_sheet not in workbook.sheetnames or target_reporte not in workbook.sheetnames:
+    required_sheets = {
+        target_sheet,
+        target_reporte,
+        target_saldos
+    }
+
+    if not required_sheets.issubset(set(workbook.sheetnames)):
         return
 
     ws = workbook[target_sheet]
     reporte = workbook[target_reporte]
+    saldos = workbook[target_saldos]
 
     fechas = [
         t["fecha"] for t in transactions
@@ -4534,8 +4571,10 @@ def actualizar_tablero(
     if fechas:
         fechas = sorted(fechas)
         fecha_min, fecha_max = fechas[0], fechas[-1]
+
         if isinstance(fecha_min, date) and not isinstance(fecha_min, datetime):
             fecha_min = datetime(fecha_min.year, fecha_min.month, fecha_min.day)
+
         if isinstance(fecha_max, date) and not isinstance(fecha_max, datetime):
             fecha_max = datetime(fecha_max.year, fecha_max.month, fecha_max.day)
 
@@ -4543,6 +4582,7 @@ def actualizar_tablero(
         if cell:
             cell.value = fecha_min
             cell.number_format = "dd/mm/yyyy"
+
         cell = obtener_celda_segura(ws, 5, 3)
         if cell:
             cell.value = fecha_max
@@ -4551,19 +4591,21 @@ def actualizar_tablero(
     escribir_celda_segura(ws, 5, 5, "TODAS")
     escribir_celda_segura(ws, 5, 7, "TODOS")
 
-    # Detectar dinámicamente dónde quedaron TOTAL CRÉDITOS y CUENTAS CON ABONO.
     total_col = None
     count_col = None
+
     for col in range(2, reporte.max_column + 1):
         header = clean_text(reporte.cell(row=4, column=col).value)
+
         if "total" in header and ("credito" in header or "credit" in header):
             total_col = col
+
         if "cuentas" in header and "abono" in header:
             count_col = col
 
     if total_col is None:
-        # escribir_reporte_creditos siempre crea el total justo después de cuentas.
         total_col = max(2, reporte.max_column - 1)
+
     if count_col is None:
         count_col = total_col + 1
 
@@ -4574,13 +4616,8 @@ def actualizar_tablero(
     count_letter = get_column_letter(count_col)
 
     report_start = 5
-    # No usar max_row porque la plantilla conserva filas con estilo aunque estén vacías.
-    # Tomamos únicamente hasta la última fecha realmente escrita.
-    report_end = ultima_fila_con_valor(
-        reporte,
-        1,
-        report_start
-    )
+    report_end = ultima_fila_con_valor(reporte, 1, report_start)
+
     if report_end < report_start:
         return
 
@@ -4602,55 +4639,69 @@ def actualizar_tablero(
         row = tablero_start + i
         report_row = report_start + i
 
-        if report_row <= report_end:
-            formula_fecha = (
-                f'=IF(AND(\'{target_reporte}\'!A{report_row}>=$A$5,'
-                f'\'{target_reporte}\'!A{report_row}<=$C$5),'
-                f'\'{target_reporte}\'!A{report_row},"")'
-            )
-            escribir_celda_segura(ws, row, 1, formula_fecha)
+        if report_row > report_end:
+            continue
 
-            formula_credito = (
-                f'=IF(A{row}="",0,'
-                f'IF($E$5<>"TODAS",'
-                f'IFERROR(INDEX(\'{target_reporte}\'!${first_account_letter}$5:${last_account_letter}${report_end},'
-                f'MATCH(A{row},\'{target_reporte}\'!$A$5:$A${report_end},0),'
-                f'MATCH($E$5,\'{target_reporte}\'!${first_account_letter}$4:${last_account_letter}$4,0)),0),'
-                f'IF($G$5="TODOS",'
-                f'IFERROR(SUMIF(\'{target_reporte}\'!$A$5:$A${report_end},A{row},'
-                f'\'{target_reporte}\'!${total_letter}$5:${total_letter}${report_end}),0),0)))'
-            )
-            escribir_celda_segura(ws, row, 2, formula_credito)
+        formula_fecha = (
+            f'=IF(AND(\'{target_reporte}\'!A{report_row}>=$A$5,'
+            f'\'{target_reporte}\'!A{report_row}<=$C$5),'
+            f'\'{target_reporte}\'!A{report_row},"")'
+        )
+        escribir_celda_segura(ws, row, 1, formula_fecha)
 
-            if i == 0:
-                escribir_celda_segura(ws, row, 3, 0)
-            else:
-                escribir_celda_segura(ws, row, 3, f'=B{row}-B{row - 1}')
+        formula_credito = (
+            f'=IF(A{row}="",0,'
+            f'IF($E$5<>"TODAS",'
+            f'IFERROR(INDEX(\'{target_reporte}\'!${first_account_letter}$5:${last_account_letter}${report_end},'
+            f'MATCH(A{row},\'{target_reporte}\'!$A$5:$A${report_end},0),'
+            f'MATCH($E$5,\'{target_reporte}\'!${first_account_letter}$4:${last_account_letter}$4,0)),0),'
+            f'IF($G$5="TODOS",'
+            f'IFERROR(SUMIF(\'{target_reporte}\'!$A$5:$A${report_end},A{row},'
+            f'\'{target_reporte}\'!${total_letter}$5:${total_letter}${report_end}),0),0)))'
+        )
+        escribir_celda_segura(ws, row, 2, formula_credito)
 
-            formula_cuentas = (
-                f'=IF(A{row}="",0,'
-                f'IF($G$5="TODOS",IFERROR(INDEX(\'{target_reporte}\'!${count_letter}$5:${count_letter}${report_end},'
-                f'MATCH(A{row},\'{target_reporte}\'!$A$5:$A${report_end},0)),0),IF(B{row}>0,1,0)))'
-            )
-            escribir_celda_segura(ws, row, 4, formula_cuentas)
+        if i == 0:
+            escribir_celda_segura(ws, row, 3, 0)
+        else:
+            escribir_celda_segura(ws, row, 3, f'=B{row}-B{row - 1}')
 
-    # Créditos por cuenta
+        formula_cuentas = (
+            f'=IF(A{row}="",0,'
+            f'IF($G$5="TODOS",IFERROR(INDEX('
+            f'\'{target_reporte}\'!${count_letter}$5:${count_letter}${report_end},'
+            f'MATCH(A{row},\'{target_reporte}\'!$A$5:$A${report_end},0)),0),'
+            f'IF(B{row}>0,1,0)))'
+        )
+        escribir_celda_segura(ws, row, 4, formula_cuentas)
+
+    evolution_rows = max(1, report_end - report_start + 1)
+    evolution_end = tablero_start + evolution_rows - 1
+
     cuentas = []
     for transaction in transactions:
-        clave = (banco_corto(transaction["banco"]), str(transaction["cuenta"]))
+        clave = (
+            banco_corto(transaction["banco"]),
+            str(transaction["cuenta"])
+        )
         if clave not in cuentas:
             cuentas.append(clave)
+
     cuentas = sorted(cuentas, key=lambda x: (x[0], x[1]))
 
     cuenta_start = 15
+
     for row in range(cuenta_start, max(ws.max_row, cuenta_start + 100) + 1):
         for col in range(6, 9):
             limpiar_celda_segura(ws, row, col)
 
     cuenta_end = cuenta_start + len(cuentas) - 1
-    if cuenta_end > ws.max_row:
+    total_row = cuenta_end + 1 if cuentas else cuenta_start
+    required_account_end = max(cuenta_end, total_row)
+
+    if required_account_end > ws.max_row:
         old_max = ws.max_row
-        for row in range(old_max + 1, cuenta_end + 1):
+        for row in range(old_max + 1, required_account_end + 1):
             copiar_estilo_fila(ws, 15, row)
 
     report_columns = {}
@@ -4660,8 +4711,6 @@ def actualizar_tablero(
         banco_cell = reporte.cell(row=3, column=col)
         cuenta_cell = reporte.cell(row=4, column=col)
 
-        # Si un banco tiene varias cuentas, la fila 3 puede estar combinada.
-        # Solo la primera celda conserva el nombre; lo propagamos a las demás.
         if not es_celda_combinada(banco_cell):
             banco_valor = banco_cell.value
             if banco_valor not in (None, ""):
@@ -4671,7 +4720,6 @@ def actualizar_tablero(
             continue
 
         cuenta = cuenta_cell.value
-
         if banco_actual and cuenta not in (None, ""):
             report_columns[
                 (clean_text(banco_actual), str(cuenta).strip())
@@ -4682,6 +4730,7 @@ def actualizar_tablero(
         escribir_celda_segura(ws, index, 7, valor_o_nd(cuenta))
 
         report_col = report_columns.get((clean_text(banco), cuenta))
+
         if report_col:
             col_letter = get_column_letter(report_col)
             formula = (
@@ -4692,18 +4741,132 @@ def actualizar_tablero(
                 f'\'{target_reporte}\'!$A$5:$A${report_end},"<="&$C$5),0)'
             )
             escribir_celda_segura(ws, index, 8, formula)
+        else:
+            escribir_celda_segura(ws, index, 8, 0)
 
-    # --------------------------------------------------------
-    # ACTUALIZAR RANGOS DE LAS GRÁFICAS
-    # --------------------------------------------------------
-    # Evolución usa solo las fechas realmente existentes.
-    evolution_rows = max(1, report_end - report_start + 1)
-    evolution_end = tablero_start + evolution_rows - 1
+    # Total visible debajo de CRÉDITOS POR CUENTA EN EL RANGO.
+    escribir_celda_segura(ws, total_row, 6, "Total")
+    escribir_celda_segura(ws, total_row, 7, None)
+
+    if cuentas:
+        escribir_celda_segura(
+            ws,
+            total_row,
+            8,
+            f'=SUM(H{cuenta_start}:H{cuenta_end})'
+        )
+    else:
+        escribir_celda_segura(ws, total_row, 8, 0)
+
+    # Estilo del Total basado en la tabla existente.
+    try:
+        from openpyxl.styles import PatternFill, Font
+
+        for col in range(6, 9):
+            source = ws.cell(row=cuenta_start, column=col)
+            target = ws.cell(row=total_row, column=col)
+
+            if not es_celda_combinada(source) and not es_celda_combinada(target):
+                if source.has_style:
+                    target._style = copy(source._style)
+                target.fill = PatternFill(
+                    fill_type="solid",
+                    fgColor="E2F0D9"
+                )
+                target.font = Font(
+                    name=source.font.name,
+                    size=source.font.sz,
+                    bold=True,
+                    italic=source.font.italic,
+                    color=source.font.color
+                )
+    except Exception:
+        pass
+
+    # KPIs superiores: se reescriben para evitar referencias heredadas
+    # de otra hoja/moneda al copiar TABLERO CREDITOS.
+    if cuentas:
+        escribir_celda_segura(
+            ws, 8, 1,
+            f'=SUM(H{cuenta_start}:H{cuenta_end})'
+        )
+        escribir_celda_segura(
+            ws, 8, 7,
+            f'=COUNTIF(H{cuenta_start}:H{cuenta_end},">0")'
+        )
+    else:
+        escribir_celda_segura(ws, 8, 1, 0)
+        escribir_celda_segura(ws, 8, 7, 0)
+
+    escribir_celda_segura(
+        ws, 8, 3,
+        f'=IFERROR(AVERAGEIF(B{tablero_start}:B{evolution_end},">0"),0)'
+    )
+    escribir_celda_segura(
+        ws, 8, 5,
+        f'=IFERROR(MAX(B{tablero_start}:B{evolution_end}),0)'
+    )
+
+    # SALDO DISPONIBLE en I:J.
+    try:
+        current_merges = {str(r) for r in ws.merged_cells.ranges}
+
+        if "I7:J7" not in current_merges:
+            ws.merge_cells("I7:J7")
+
+        current_merges = {str(r) for r in ws.merged_cells.ranges}
+        if "I8:J8" not in current_merges:
+            ws.merge_cells("I8:J8")
+
+        for source_coord, target_coord in (
+            ("G7", "I7"),
+            ("G8", "I8")
+        ):
+            source = ws[source_coord]
+            target = ws[target_coord]
+
+            if source.has_style:
+                target._style = copy(source._style)
+            if source.alignment:
+                target.alignment = copy(source.alignment)
+            if source.fill:
+                target.fill = copy(source.fill)
+            if source.font:
+                target.font = copy(source.font)
+            if source.border:
+                target.border = copy(source.border)
+
+        ws["I7"] = "SALDO DISPONIBLE"
+
+    except Exception:
+        escribir_celda_segura(ws, 7, 9, "SALDO DISPONIBLE")
+
+    saldos_start = 5
+    saldos_end = ultima_fila_con_valor(
+        saldos,
+        2,
+        saldos_start
+    )
+
+    if saldos_end < saldos_start:
+        saldo_formula = "=0"
+    else:
+        saldo_formula = (
+            f'=IF($E$5<>"TODAS",'
+            f'IFERROR(SUMIF(\'{target_saldos}\'!$B${saldos_start}:$B${saldos_end},'
+            f'$E$5,\'{target_saldos}\'!$D${saldos_start}:$D${saldos_end}),0),'
+            f'IF($G$5<>"TODOS",'
+            f'IFERROR(SUMIF(\'{target_saldos}\'!$A${saldos_start}:$A${saldos_end},'
+            f'$G$5,\'{target_saldos}\'!$D${saldos_start}:$D${saldos_end}),0),'
+            f'IFERROR(SUM(\'{target_saldos}\'!$D${saldos_start}:$D${saldos_end}),0)))'
+        )
+
+    escribir_celda_segura(ws, 8, 9, saldo_formula)
 
     actualizar_graficas_dinamicas(
         ws,
         evolution_end,
-        cuenta_end,
+        cuenta_end if cuentas else cuenta_start,
         len(cuentas)
     )
 
@@ -4793,6 +4956,7 @@ def aplicar_formato_juego_moneda(
         "creditos en rango",
         "promedio diario",
         "mayor dia",
+        "saldo disponible",
     )
     titulo_cantidad = "cuentas con abono"
 
@@ -4827,6 +4991,17 @@ def aplicar_formato_juego_moneda(
         cell = obtener_celda_segura(ws_tablero, row, 8)
         if cell:
             cell.number_format = formato
+
+    # Total de créditos por cuenta y Saldo Disponible.
+    total_row = 15 + len(cuentas)
+
+    total_cell = obtener_celda_segura(ws_tablero, total_row, 8)
+    if total_cell:
+        total_cell.number_format = formato
+
+    saldo_disponible_cell = obtener_celda_segura(ws_tablero, 8, 9)
+    if saldo_disponible_cell:
+        saldo_disponible_cell.number_format = formato
 
     # Eje monetario de las gráficas.
     for chart in getattr(ws_tablero, "_charts", []):
@@ -4925,7 +5100,8 @@ def crear_versiones_por_moneda(workbook, transactions):
             workbook,
             trans_moneda,
             sheet_name=nombres[SHEET_TABLERO],
-            reporte_sheet_name=nombres[SHEET_REPORTE]
+            reporte_sheet_name=nombres[SHEET_REPORTE],
+            saldos_sheet_name=nombres[SHEET_SALDOS]
         )
 
         # Aplicar la moneda correcta a TODO este juego de hojas.
