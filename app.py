@@ -17,13 +17,15 @@ import json
 import pickle
 import shutil
 import time
+import base64
+import mimetypes
 import urllib.request
 import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.6-safe-bank-logo-ocr-20260830"
+APP_BUILD = "dashboard-v4.7-dashboard-autonomo-assets-20260830"
 
 
 # ============================================================
@@ -940,7 +942,7 @@ def dashboard_file():
                     "batch_id": batch_id
                 }), 404
 
-        html = renderizar_dashboard_nueva_plantilla(
+        html = renderizar_dashboard_autonomo(
             datos
         )
 
@@ -6379,6 +6381,109 @@ def renderizar_dashboard_nueva_plantilla(datos_override=None):
         base_data=datos,
         raw_transactions=datos.get("transactions", [])
     )
+
+    return html
+
+
+
+def _dashboard_asset_path(url):
+    """
+    Convierte una URL /static/... del HTML en la ruta física correspondiente
+    dentro del proyecto Flask. Solo permite archivos dentro de BASE_DIR/static.
+    """
+    url = str(url or "").split("?", 1)[0].split("#", 1)[0]
+
+    if not url.startswith("/static/"):
+        return None
+
+    relative = url[len("/static/"):].lstrip("/\\")
+    static_root = os.path.abspath(os.path.join(BASE_DIR, "static"))
+    path = os.path.abspath(os.path.join(static_root, relative))
+
+    # Evita que una ruta maliciosa salga de /static.
+    if path != static_root and not path.startswith(static_root + os.sep):
+        return None
+
+    return path
+
+
+def renderizar_dashboard_autonomo(datos_override=None):
+    """
+    Genera el mismo dashboard de /dashboard, pero convierte sus assets locales
+    en recursos embebidos para que el archivo descargado pueda abrirse mediante
+    file:/// sin depender de dashboard.css, dashboard.js ni imágenes externas.
+
+    /dashboard sigue usando los assets separados de /static.
+    /dashboard-file usa exclusivamente esta versión autónoma.
+    """
+    html = renderizar_dashboard_nueva_plantilla(datos_override)
+
+    # 1) CSS: <link rel="stylesheet" href="/static/...css"> -> <style>...</style>
+    patron_css = re.compile(
+        r'<link\b(?=[^>]*\brel=["\']stylesheet["\'])(?=[^>]*\bhref=["\']([^"\']+)["\'])[^>]*>',
+        re.IGNORECASE
+    )
+
+    def reemplazar_css(match):
+        url = match.group(1)
+        path = _dashboard_asset_path(url)
+
+        if not path or not os.path.isfile(path):
+            return match.group(0)
+
+        try:
+            css = open(path, "r", encoding="utf-8").read()
+            return "<style>\n" + css + "\n</style>"
+        except Exception:
+            return match.group(0)
+
+    html = patron_css.sub(reemplazar_css, html)
+
+    # 2) JS externo: <script src="/static/...js"></script> -> <script>...</script>
+    patron_js = re.compile(
+        r'<script\b(?=[^>]*\bsrc=["\']([^"\']+)["\'])[^>]*>\s*</script>',
+        re.IGNORECASE
+    )
+
+    def reemplazar_js(match):
+        url = match.group(1)
+        path = _dashboard_asset_path(url)
+
+        if not path or not os.path.isfile(path):
+            return match.group(0)
+
+        try:
+            js = open(path, "r", encoding="utf-8").read()
+            # Evita cerrar el script si algún texto JS contiene esa secuencia.
+            js = re.sub(r"</script", r"<\/script", js, flags=re.IGNORECASE)
+            return "<script>\n" + js + "\n</script>"
+        except Exception:
+            return match.group(0)
+
+    html = patron_js.sub(reemplazar_js, html)
+
+    # 3) Imágenes de /static: src="/static/...png" -> data:image/...;base64,...
+    patron_img = re.compile(
+        r'(<img\b[^>]*?\bsrc=["\'])(/static/[^"\']+)(["\'][^>]*>)',
+        re.IGNORECASE
+    )
+
+    def reemplazar_img(match):
+        prefix, url, suffix = match.groups()
+        path = _dashboard_asset_path(url)
+
+        if not path or not os.path.isfile(path):
+            return match.group(0)
+
+        try:
+            mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
+            with open(path, "rb") as fh:
+                encoded = base64.b64encode(fh.read()).decode("ascii")
+            return prefix + "data:" + mime + ";base64," + encoded + suffix
+        except Exception:
+            return match.group(0)
+
+    html = patron_img.sub(reemplazar_img, html)
 
     return html
 
