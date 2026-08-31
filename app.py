@@ -4049,29 +4049,14 @@ def escribir_reporte_creditos(
     display_accounts = list(cuentas_ordenadas)
 
     # Si trae menos cuentas que el diseño base, NO encogemos la hoja.
-    # Conservamos las últimas cuentas de la plantilla como columnas de relleno.
-    # Esto mantiene las columnas de resumen en su sitio original (J/K en la
-    # plantilla actual) y evita que CUENTAS CON ABONO se vea como moneda.
+    # Conservamos el ancho visual, pero las columnas de relleno quedan vacías.
+    # Nunca reutilizamos bancos/cuentas antiguos de la plantilla.
     if len(display_accounts) < template_account_slots:
         needed = template_account_slots - len(display_accounts)
-        incoming_keys = {
-            (clean_text(b), str(c).strip())
-            for b, c in display_accounts
-        }
-
-        candidates = [
-            pair for pair in template_accounts
-            if (clean_text(pair[0]), str(pair[1]).strip()) not in incoming_keys
-        ]
-
-        padding = candidates[-needed:] if needed > 0 else []
-
-        # Si una plantilla extraña no tuviera suficientes encabezados,
-        # completamos con N/D para conservar el ancho, sin inventar cuentas.
-        while len(padding) < needed:
-            padding.insert(0, ("", "N/D"))
-
-        display_accounts.extend(padding)
+        display_accounts.extend([
+            ("", "")
+            for _ in range(needed)
+        ])
 
     # Si vienen más cuentas que la plantilla, simplemente expandimos.
     total_column = 2 + len(display_accounts)
@@ -4174,7 +4159,7 @@ def escribir_reporte_creditos(
 
     for offset, (banco, cuenta) in enumerate(display_accounts):
         col = 2 + offset
-        cuenta_texto = valor_o_nd(cuenta)
+        cuenta_texto = str(cuenta).strip() if str(cuenta or "").strip() else ""
 
         escribir_celda_segura(ws, header_account_row, col, cuenta_texto)
 
@@ -4205,7 +4190,7 @@ def escribir_reporte_creditos(
                 ws,
                 header_bank_row,
                 start_col,
-                valor_o_nd(banco) if banco else "N/D"
+                valor_o_nd(banco) if banco else ""
             )
 
             if end_col > start_col:
@@ -4628,15 +4613,28 @@ def actualizar_tablero(
             copiar_estilo_fila(ws, 15, row)
 
     report_columns = {}
+    banco_actual = ""
+
     for col in range(2, total_col):
         banco_cell = reporte.cell(row=3, column=col)
         cuenta_cell = reporte.cell(row=4, column=col)
-        if es_celda_combinada(banco_cell) or es_celda_combinada(cuenta_cell):
+
+        # Si un banco tiene varias cuentas, la fila 3 puede estar combinada.
+        # Solo la primera celda conserva el nombre; lo propagamos a las demás.
+        if not es_celda_combinada(banco_cell):
+            banco_valor = banco_cell.value
+            if banco_valor not in (None, ""):
+                banco_actual = str(banco_valor).strip()
+
+        if es_celda_combinada(cuenta_cell):
             continue
-        banco = banco_cell.value
+
         cuenta = cuenta_cell.value
-        if banco and cuenta:
-            report_columns[(clean_text(banco), str(cuenta).strip())] = col
+
+        if banco_actual and cuenta not in (None, ""):
+            report_columns[
+                (clean_text(banco_actual), str(cuenta).strip())
+            ] = col
 
     for index, (banco, cuenta) in enumerate(cuentas, start=cuenta_start):
         escribir_celda_segura(ws, index, 6, valor_o_nd(banco))
