@@ -7,6 +7,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.cell.cell import MergedCell
 from copy import copy
 from datetime import datetime, date
+from functools import wraps
 from difflib import SequenceMatcher
 import os
 import io
@@ -17,6 +18,7 @@ import json
 import pickle
 import shutil
 import time
+import hmac
 import base64
 import mimetypes
 import urllib.request
@@ -24,8 +26,44 @@ import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
+
+# ============================================================
+# SEGURIDAD API / RUTAS CONFIDENCIALES
+# ============================================================
+
+API_KEY_ENV_NAME = "INTELFON_API_KEY"
+
+def _api_key_valida():
+    """Valida X-API-Key contra la variable segura configurada en Render."""
+    expected = str(os.environ.get(API_KEY_ENV_NAME, "") or "").strip()
+    provided = str(request.headers.get("X-API-Key", "") or "").strip()
+
+    # Falla cerrado: si Render no tiene la variable, no expone datos bancarios.
+    if not expected or not provided:
+        return False
+
+    return hmac.compare_digest(provided, expected)
+
+
+def require_api_key(func):
+    """Protege endpoints confidenciales sin alterar su lógica interna."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not _api_key_valida():
+            response = jsonify({
+                "success": False,
+                "error": "No autorizado"
+            })
+            response.status_code = 401
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
+        return func(*args, **kwargs)
+
+    return wrapper
+
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v4.7-dashboard-autonomo-assets-20260830"
+APP_BUILD = "dashboard-v4.8-api-key-security-20260831"
 
 
 # ============================================================
@@ -816,6 +854,7 @@ def tipo_cambio_actual():
     methods=["GET"],
     strict_slashes=False
 )
+@require_api_key
 def dashboard():
     """Muestra la plantilla ejecutiva con los datos del último Excel procesado."""
 
@@ -873,6 +912,7 @@ def dashboard():
     "/dashboard/data.json",
     methods=["GET"]
 )
+@require_api_key
 def dashboard_data_endpoint():
 
     batch_id = _sanitizar_batch_id(
@@ -913,6 +953,7 @@ def dashboard_data_endpoint():
     methods=["GET"],
     strict_slashes=False
 )
+@require_api_key
 def dashboard_file():
     """
     Descarga una copia autónoma del dashboard ejecutivo.
@@ -6819,6 +6860,7 @@ def construir_dashboard_html_autonomo():
     "/process-excel",
     methods=["POST"]
 )
+@require_api_key
 def process_excel():
 
     if "file" not in request.files:
@@ -7314,6 +7356,7 @@ def process_excel():
     "/finalize-batch",
     methods=["POST"]
 )
+@require_api_key
 def finalize_batch():
 
     payload = request.get_json(
@@ -7510,6 +7553,7 @@ def finalize_batch():
     "/result-excel",
     methods=["GET"]
 )
+@require_api_key
 def result_excel_batch():
 
     batch_id = _sanitizar_batch_id(
@@ -7572,6 +7616,7 @@ def result_excel_batch():
     "/batch-status",
     methods=["GET"]
 )
+@require_api_key
 def batch_status():
 
     batch_id = _sanitizar_batch_id(
