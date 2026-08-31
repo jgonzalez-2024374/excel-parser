@@ -10,13 +10,31 @@
 
 <body>
 
-   <div class="hero-actions">
-    <button onclick="window.print()">
-      <img class="save-icon" src="/static/assets/img/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
-    </button>
-    <button onclick="toggleFullscreen()">
-      <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
-    </button>
+  <div class="top-toolbar">
+    <div class="country-switcher" id="countrySwitcher">
+      <div class="country-buttons">
+        <button type="button" class="country-btn active" data-country="GUATEMALA">
+          <span>Guatemala</span>
+          <img src="/static/assets/img/guatemala.png" alt="Guatemala">
+        
+          <span class="country-count" data-country-count="GUATEMALA">0</span>
+        </button>
+        <button type="button" class="country-btn" data-country="EL_SALVADOR">
+          <span>🇸🇻 El Salvador</span>
+          <img src="/static/assets/img/elsalvador.png" alt="El Salvador">
+          <span class="country-count" data-country-count="EL_SALVADOR">0</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="hero-actions">
+      <button type="button" onclick="window.print()">
+        <img class="save-icon" src="/static/assets/img/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
+      </button>
+      <button type="button" onclick="toggleFullscreen()">
+        <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
+      </button>
+    </div>
   </div>
   <title>Saldos Bancarios Consolidados</title>
   <div class="app">
@@ -92,24 +110,7 @@
 
     </header>
 
-    <div class="country-switcher" id="countrySwitcher">
-      <div class="country-switch-title">
-        <b>Vista por país</b>
-        <span>La plantilla, cifras y moneda cambian según el país seleccionado.</span>
-      </div>
-      <div class="country-buttons">
-        <button type="button" class="country-btn" data-country="GUATEMALA">
-          <span>🇬🇹 Guatemala</span>
-          <small>GTQ · Q</small>
-          <span class="country-count" data-country-count="GUATEMALA">0</span>
-        </button>
-        <button type="button" class="country-btn" data-country="EL_SALVADOR">
-          <span>🇸🇻 El Salvador</span>
-          <small>USD · $</small>
-          <span class="country-count" data-country-count="EL_SALVADOR">0</span>
-        </button>
-      </div>
-    </div>
+
 
     <nav class="tabs">
       <button class="tab active" data-target="resumen">Resumen ejecutivo</button>
