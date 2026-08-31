@@ -925,9 +925,23 @@ async function loadExchangeRate(){
 
 function formatExchangeUpdatedAt(value){
   if(!value) return '';
-  const d=new Date(value);
+
+  // Render normalmente trabaja en UTC. El backend devuelve fetched_at sin
+  // zona horaria (ej. 2026-08-31T01:20:00), por lo que lo interpretamos
+  // explícitamente como UTC y luego lo mostramos en hora de Guatemala.
+  let raw=String(value).trim();
+  const hasTimezone=/([zZ]|[+\-]\d{2}:?\d{2})$/.test(raw);
+  if(!hasTimezone) raw += 'Z';
+
+  const d=new Date(raw);
   if(Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit'});
+
+  return d.toLocaleTimeString('es-GT',{
+    timeZone:'America/Guatemala',
+    hour:'2-digit',
+    minute:'2-digit',
+    hour12:true
+  });
 }
 
 const currencyCode = () => {
