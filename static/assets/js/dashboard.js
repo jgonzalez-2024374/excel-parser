@@ -338,30 +338,246 @@ const currencyCode = () => {
 
 console.info('[Dashboard v3.2] moneda resuelta:', currencyCode(), 'meta:', (BASE_DATA.meta||{}).currency);
 
-const currencySymbol = () => CURRENCY_SYMBOLS[currencyCode()] || '';
+
+// ============================================================
+// MONEDA POR PAÍS + TIPO DE CAMBIO ACTUALIZADO AUTOMÁTICAMENTE
+// Guatemala: GTQ (Q) <-> USD ($)
+// El Salvador: USD ($) <-> GTQ (Q)
+// ============================================================
+
+const COUNTRY_CURRENCY_VIEW = {
+  GUATEMALA: 'GTQ',
+  EL_SALVADOR: 'USD'
+};
+
+let DASH_EXCHANGE_RATE = null;   // GTQ por 1 USD
+let DASH_EXCHANGE_UPDATED_AT = null;
+let DASH_EXCHANGE_TIMER = null;
+
+function baseCurrencyForActiveCountry(){
+  const country = normalizeCountry(ACTIVE_COUNTRY);
+  if(country === 'GUATEMALA') return 'GTQ';
+  if(country === 'EL_SALVADOR') return 'USD';
+  return currencyCode();
+}
+
+function displayCurrencyCode(){
+  const country = normalizeCountry(ACTIVE_COUNTRY);
+  return COUNTRY_CURRENCY_VIEW[country] || baseCurrencyForActiveCountry();
+}
+
+const currencySymbol = () => CURRENCY_SYMBOLS[displayCurrencyCode()] || '';
 
 const currencyLabel = () => {
-  const code = currencyCode();
-  const symbol = currencySymbol();
+  const code = displayCurrencyCode();
+  const symbol = CURRENCY_SYMBOLS[code] || '';
   if(code === 'MULTI') return 'Múltiples monedas';
   if(code === 'N/D') return 'N/D';
   return symbol ? `${code} (${symbol})` : code;
 };
+
+function convertCurrencyForView(value){
+  const n = Number(value) || 0;
+  const original = baseCurrencyForActiveCountry();
+  const target = displayCurrencyCode();
+  const rate = Number(DASH_EXCHANGE_RATE);
+
+  if(original === target) return n;
+  if(!Number.isFinite(rate) || rate <= 0) return n;
+
+  // Guatemala: Q -> $
+  if(original === 'GTQ' && target === 'USD'){
+    return n / rate;
+  }
+
+  // El Salvador: $ -> Q
+  if(original === 'USD' && target === 'GTQ'){
+    return n * rate;
+  }
+
+  return n;
+}
+
 const moneyAllViews = v => {
-  const n = Number(v) || 0;
+  const n = convertCurrencyForView(v);
+  const code = displayCurrencyCode();
+  const symbol = CURRENCY_SYMBOLS[code] || '';
   const formatted = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(Math.abs(n));
-
-  const code = currencyCode();
-  const symbol = CURRENCY_SYMBOLS[code] || '';
   const sign = n < 0 ? '-' : '';
 
-  if (symbol) return `${sign}${symbol} ${formatted}`;
-  if (code && code !== 'N/D' && code !== 'MULTI') return `${sign}${code} ${formatted}`;
+  if(symbol) return `${sign}${symbol} ${formatted}`;
+  if(code && code !== 'N/D' && code !== 'MULTI') return `${sign}${code} ${formatted}`;
   return `${sign}${formatted}`;
 };
+
+function exchangeTimestampLabel(){
+  if(!DASH_EXCHANGE_UPDATED_AT) return '';
+  try{
+    return new Intl.DateTimeFormat('es-GT', {
+      timeZone: 'America/Guatemala',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).format(DASH_EXCHANGE_UPDATED_AT);
+  }catch(_){
+    return DASH_EXCHANGE_UPDATED_AT.toLocaleTimeString('es-GT');
+  }
+}
+
+function updateExchangeDisplays(){
+  const gt = document.getElementById('exchange-display-gt');
+  const sv = document.getElementById('exchange-display-sv');
+  const rate = Number(DASH_EXCHANGE_RATE);
+
+  let textValue = 'Actualizando tipo de cambio...';
+  if(Number.isFinite(rate) && rate > 0){
+    const stamp = exchangeTimestampLabel();
+    textValue = `1 USD = Q ${rate.toFixed(4)}${stamp ? ` · ${stamp}` : ''}`;
+  }
+
+  if(gt) gt.textContent = textValue;
+  if(sv) sv.textContent = textValue;
+}
+
+function syncCurrencyControls(){
+  const country = normalizeCountry(ACTIVE_COUNTRY);
+  const current = displayCurrencyCode();
+
+  // Mostrar únicamente el control del país activo.
+  document.querySelectorAll('.country-currency-control').forEach(control => {
+    const visible = normalizeCountry(control.dataset.currencyCountry) === country;
+    control.hidden = !visible;
+    control.style.display = visible ? '' : 'none';
+  });
+
+  const gtToggle = document.getElementById('currency-toggle-gt');
+  const svToggle = document.getElementById('currency-toggle-sv');
+
+  if(gtToggle) gtToggle.checked = COUNTRY_CURRENCY_VIEW.GUATEMALA === 'USD';
+  if(svToggle) svToggle.checked = COUNTRY_CURRENCY_VIEW.EL_SALVADOR === 'GTQ';
+
+  const gtLocal = document.getElementById('gt-local-label');
+  const gtConverted = document.getElementById('gt-converted-label');
+  const svLocal = document.getElementById('sv-local-label');
+  const svConverted = document.getElementById('sv-converted-label');
+
+  if(gtLocal) gtLocal.classList.toggle('selected', country === 'GUATEMALA' && current === 'GTQ');
+  if(gtConverted) gtConverted.classList.toggle('selected', country === 'GUATEMALA' && current === 'USD');
+  if(svLocal) svLocal.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'USD');
+  if(svConverted) svConverted.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'GTQ');
+
+  updateExchangeDisplays();
+}
+
+function initCurrencyControls(){
+  const gtToggle = document.getElementById('currency-toggle-gt');
+  const svToggle = document.getElementById('currency-toggle-sv');
+
+  if(gtToggle && !gtToggle.dataset.currencyBound){
+    gtToggle.dataset.currencyBound = '1';
+    gtToggle.addEventListener('change', () => {
+      COUNTRY_CURRENCY_VIEW.GUATEMALA = gtToggle.checked ? 'USD' : 'GTQ';
+      if(normalizeCountry(ACTIVE_COUNTRY) === 'GUATEMALA'){
+        renderAll();
+      }else{
+        syncCurrencyControls();
+      }
+    });
+  }
+
+  if(svToggle && !svToggle.dataset.currencyBound){
+    svToggle.dataset.currencyBound = '1';
+    svToggle.addEventListener('change', () => {
+      COUNTRY_CURRENCY_VIEW.EL_SALVADOR = svToggle.checked ? 'GTQ' : 'USD';
+      if(normalizeCountry(ACTIVE_COUNTRY) === 'EL_SALVADOR'){
+        renderAll();
+      }else{
+        syncCurrencyControls();
+      }
+    });
+  }
+
+  syncCurrencyControls();
+}
+
+function exchangeRateUrl(){
+  // En Render usa la ruta normal. Si el HTML fue descargado y se abre como file://,
+  // intenta consultar directamente el backend publicado.
+  if(window.location && window.location.protocol === 'file:'){
+    return 'https://excel-parser-m9q8.onrender.com/api/tipo-cambio';
+  }
+  return '/api/tipo-cambio';
+}
+
+async function loadExchangeRate(forceRender = true){
+  try{
+    const separator = exchangeRateUrl().includes('?') ? '&' : '?';
+    const response = await fetch(
+      `${exchangeRateUrl()}${separator}_=${Date.now()}`,
+      { cache: 'no-store' }
+    );
+
+    if(!response.ok){
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const rate = Number(payload && payload.rate_gtq_per_usd);
+
+    if(!Number.isFinite(rate) || rate <= 0){
+      throw new Error('Tipo de cambio inválido');
+    }
+
+    const changed = DASH_EXCHANGE_RATE !== rate;
+    DASH_EXCHANGE_RATE = rate;
+
+    // Si el backend devuelve fecha, se usa; de lo contrario se toma la hora de consulta.
+    const backendDate = payload.fetched_at || payload.updated_at || payload.timestamp || null;
+    const parsed = backendDate ? new Date(backendDate) : new Date();
+    DASH_EXCHANGE_UPDATED_AT = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+
+    updateExchangeDisplays();
+
+    // Redibujar todos los valores cuando cambia la tasa o durante la primera carga.
+    if(forceRender && DATA && (changed || !document.querySelector('.currencyLabel')?.textContent)){
+      renderAll();
+    }else if(forceRender && DATA){
+      renderAll();
+    }
+
+    return rate;
+  }catch(error){
+    console.warn('[Dashboard] No se pudo actualizar el tipo de cambio:', error);
+    updateExchangeDisplays();
+    return DASH_EXCHANGE_RATE;
+  }
+}
+
+function startExchangeRateAutoRefresh(){
+  loadExchangeRate(true);
+
+  if(DASH_EXCHANGE_TIMER){
+    clearInterval(DASH_EXCHANGE_TIMER);
+  }
+
+  // Consulta automática cada 60 segundos.
+  DASH_EXCHANGE_TIMER = setInterval(() => {
+    loadExchangeRate(true);
+  }, 60 * 1000);
+
+  // También actualiza cuando el usuario vuelve a la pestaña/ventana.
+  window.addEventListener('focus', () => loadExchangeRate(true));
+
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible'){
+      loadExchangeRate(true);
+    }
+  });
+}
+
 
 const money = v => moneyAllViews(v);
 const pct = v => `${v>=0?'+':''}${Number(v||0).toFixed(2)}%`;
@@ -589,6 +805,7 @@ function renderDailyTable(){
 
 function renderAll(){
   renderCountrySwitcher();
+  syncCurrencyControls();
   renderHeader();
   renderCoverLogos();
   renderKpis();
@@ -700,9 +917,11 @@ document.getElementById('resetDateFilter').addEventListener('click',()=>{
   applyCurrentDateFilter(false);
 });
 
-// Primera carga: también se construye desde los 221 registros reales, no desde el resumen estático.
+// Primera carga: también se construye desde los registros reales, no desde el resumen estático.
+initCurrencyControls();
 DATA=buildFiltered(MIN_DATE,MAX_DATE);
 renderAll();
+startExchangeRateAutoRefresh();
 
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.target).classList.add('active');setTimeout(drawAll,80);
@@ -725,51 +944,3 @@ function drawDaily(){
 function drawAll(){if(document.getElementById('balancesChart').offsetParent)drawGroupedBars('balancesChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.initial),DATA.banks.map(b=>b.final),'#60A5FA','#34D399');if(document.getElementById('flowBankChart').offsetParent)drawGroupedBars('flowBankChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.credits),DATA.banks.map(b=>b.debits),'#34D399','#FB7185');if(document.getElementById('netBankChart').offsetParent)drawNetBars();if(document.getElementById('dailyChart').offsetParent)drawDaily()}
 window.addEventListener('resize',()=>setTimeout(drawAll,80));
 function toggleFullscreen(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.()}
-
-
-
-
-// Conversión visual USD <-> GTQ (sin modificar Excel)
-let DASH_EXCHANGE_RATE = 1;
-let DASH_CURRENCY_VIEW = "ORIGINAL";
-
-async function loadExchangeRate(){
-  try{
-    const r = await fetch("/api/tipo-cambio");
-    const j = await r.json();
-    if(j && j.rate_gtq_per_usd){
-      DASH_EXCHANGE_RATE = Number(j.rate_gtq_per_usd);
-    }
-  }catch(e){
-    console.log("No se pudo actualizar tipo de cambio", e);
-  }
-}
-
-function convertCurrency(value, original){
-  value = Number(value || 0);
-  if(DASH_CURRENCY_VIEW==="ORIGINAL") return value;
-  if(DASH_CURRENCY_VIEW==="GTQ" && original==="USD")
-      return value * DASH_EXCHANGE_RATE;
-  if(DASH_CURRENCY_VIEW==="USD" && original==="GTQ")
-      return value / DASH_EXCHANGE_RATE;
-  return value;
-}
-
-function currencyLabelView(){
-  if(DASH_CURRENCY_VIEW==="GTQ") return "GTQ Q";
-  if(DASH_CURRENCY_VIEW==="USD") return "USD $";
-  return "Original";
-}
-
-// Corrección visual de países no identificados
-function normalizeCountry(bank){
-  if(bank==="NO_IDENTIFICADO" &&
-    ["BANCO AGRÍCOLA","BANCO CUSCATLÁN","BANCO CUSCATLAN"].includes(arguments[1]))
-      return "EL_SALVADOR";
-  return bank;
-}
-
-document.addEventListener("DOMContentLoaded",()=>{
-  loadExchangeRate();
-});
-
