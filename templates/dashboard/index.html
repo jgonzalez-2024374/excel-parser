@@ -11,38 +11,23 @@
 <body>
 
   <div class="top-toolbar">
-    <div class="country-switcher" id="countrySwitcher">
-      <div class="country-buttons">
-        <button type="button" class="country-btn active" data-country="GUATEMALA">
-          <span>Guatemala</span>
-          <img src="/static/assets/img/guatemala.png" alt="Guatemala">
-        
-          <span class="country-count" data-country-count="GUATEMALA">0</span>
-        </button>
-        <button type="button" class="country-btn" data-country="EL_SALVADOR">
-          <span>🇸🇻 El Salvador</span>
-          <img src="/static/assets/img/elsalvador.png" alt="El Salvador">
-          <span class="country-count" data-country-count="EL_SALVADOR">0</span>
-        </button>
+    <div class="top-toolbar-left">
+      <div class="country-switcher" id="countrySwitcher">
+        <div class="country-buttons">
+          <button type="button" class="country-btn active" data-country="GUATEMALA">
+            <span>Guatemala</span>
+            <img src="/static/assets/img/guatemala.png" alt="Guatemala">
+            <span class="country-count" data-country-count="GUATEMALA">0</span>
+          </button>
+          <button type="button" class="country-btn" data-country="EL_SALVADOR">
+            <span>🇸🇻 El Salvador</span>
+            <img src="/static/assets/img/elsalvador.png" alt="El Salvador">
+            <span class="country-count" data-country-count="EL_SALVADOR">0</span>
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div class="hero-actions">
-      <button type="button" onclick="window.print()">
-        <img class="save-icon" src="/static/assets/img/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
-      </button>
-      <button type="button" onclick="toggleFullscreen()">
-        <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
-      </button>
-    </div>
-  </div>
-  <title>Saldos Bancarios Consolidados</title>
-  <div class="app">
-    <section class="executive-cover" aria-label="Portada ejecutiva">
-      <div class="cover-grid">
-        <div>
-          <div class="cover-kicker">Presentación ejecutiva · Junta Directiva</div>
-          <div id="currency-controls" class="currency-switcher" aria-label="Conversión de moneda por país">
+      <div id="currency-controls" class="currency-switcher" aria-label="Conversión de moneda por país">
             <div class="country-currency-control" data-currency-country="GUATEMALA">
               <div class="country-currency-copy">
                 <strong>Guatemala · moneda</strong>
@@ -69,6 +54,24 @@
               </label>
             </div>
           </div>
+    </div>
+
+    <div class="hero-actions">
+      <button type="button" onclick="window.print()">
+        <img class="save-icon" src="/static/assets/img/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
+      </button>
+      <button type="button" onclick="toggleFullscreen()">
+        <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
+      </button>
+    </div>
+  </div>
+  <title>Saldos Bancarios Consolidados</title>
+  <div class="app">
+    <section class="executive-cover" aria-label="Portada ejecutiva">
+      <div class="cover-grid">
+        <div>
+          <div class="cover-kicker">Presentación ejecutiva · Junta Directiva</div>
+          
 
           <div class="cover-title">Saldos Bancarios Consolidados</div>
           <div class="cover-copy">Resumen visual del comportamiento bancario consolidado, incluyendo saldos, créditos,
