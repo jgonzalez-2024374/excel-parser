@@ -63,7 +63,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v5.2-fix-normalizar-moneda-20260831"
+APP_BUILD = "dashboard-v5.3-disponible-real-sin-fallback-20260831"
 
 
 # ============================================================
@@ -4027,20 +4027,18 @@ def escribir_saldos_por_cuenta(
                 dinero_disponible = mov.get("saldo_disponible")
                 break
 
+        # IMPORTANTE:
+        # "Dinero disponible" NO debe copiarse del saldo final.
+        # Solo se muestra cuando el banco reporta explícitamente un saldo disponible.
+        # Si el estado no trae ese dato separado, se muestra N/D para no inventarlo.
         if dinero_disponible is None:
-            # Si el banco no publica una columna separada de disponible,
-            # el último saldo final/contable es el respaldo operativo.
-            dinero_disponible = saldo_final
-
-        # Evitar celdas vacías en DINERO DISPONIBLE cuando hay saldo final.
-        if dinero_disponible in (None, "", "N/D") and isinstance(saldo_final, (int, float)):
-            dinero_disponible = saldo_final
+            dinero_disponible = "N/D"
 
         escribir_celda_segura(ws, row_number, 1, valor_o_nd(banco_corto(banco)))
         escribir_celda_segura(ws, row_number, 2, valor_o_nd(cuenta))
         escribir_celda_segura(ws, row_number, 3, saldo_inicial)
         escribir_celda_segura(ws, row_number, 4, saldo_final)
-        escribir_celda_segura(ws, row_number, 5, valor_o_nd(dinero_disponible))
+        escribir_celda_segura(ws, row_number, 5, dinero_disponible)
 
         # Mantener formato monetario también en la nueva columna.
         # Usa la función de normalización que ya existe en este proyecto.
@@ -4600,7 +4598,7 @@ def actualizar_tablero(
     - Mayor día.
     - Cuentas con abono.
     - Saldo final total (último saldo contable/final por cuenta).
-    - Dinero disponible (saldo disponible reportado por el banco; respaldo: saldo final).
+    - Dinero disponible (solo saldo disponible explícitamente reportado por el banco; nunca se copia del saldo final).
     - Total de créditos por cuenta.
 
     Reglas de SALDO FINAL TOTAL / DINERO DISPONIBLE:
@@ -4936,12 +4934,17 @@ def actualizar_tablero(
 
         disponible_formula = (
             f'=IF($E$5<>"TODAS",'
+            f'IF(COUNTIFS(\'{target_saldos}\'!$B${saldos_start}:$B${saldos_end},$E$5,'
+            f'\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end},"N/D")>0,"N/D",'
             f'IFERROR(SUMIF(\'{target_saldos}\'!$B${saldos_start}:$B${saldos_end},'
-            f'$E$5,\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),0),'
+            f'$E$5,\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),"N/D")),'
             f'IF($G$5<>"TODOS",'
+            f'IF(COUNTIFS(\'{target_saldos}\'!$A${saldos_start}:$A${saldos_end},$G$5,'
+            f'\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end},"N/D")>0,"N/D",'
             f'IFERROR(SUMIF(\'{target_saldos}\'!$A${saldos_start}:$A${saldos_end},'
-            f'$G$5,\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),0),'
-            f'IFERROR(SUM(\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),0)))'
+            f'$G$5,\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),"N/D")),'
+            f'IF(COUNTIF(\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end},"N/D")>0,"N/D",'
+            f'IFERROR(SUM(\'{target_saldos}\'!$E${saldos_start}:$E${saldos_end}),"N/D"))))'
         )
 
     escribir_celda_segura(ws, 8, 9, saldo_final_formula)
