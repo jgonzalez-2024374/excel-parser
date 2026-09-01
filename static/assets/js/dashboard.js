@@ -775,8 +775,12 @@ function renderKpis() {
     ['Créditos acumulados', moneyAllViews(DATA.totals.credits), 'Abonos / entradas del período', 'positive'],
     ['Débitos acumulados', moneyAllViews(DATA.totals.debits), 'Cargos / salidas del período', 'negative'],
     ['Variación entradas vs salidas', moneyAllViews(DATA.totals.change), pct(DATA.totals.changePct) + ' respecto a salidas', cls(DATA.totals.change)],
-    ['Movimientos totales', DATA.meta.movementCount.toLocaleString('en-US'), 'Registros de ESTADO UNIFORME en el período', 'neutral']
-  ];
+    [
+      'Movimientos totales',
+      (DATA.meta.movementCount || DATA.transactions?.length || 0).toLocaleString('en-US'),
+      'Registros de ESTADO UNIFORME en el período',
+      'neutral'
+    ]];
   document.getElementById('kpis').innerHTML = kpis.map(k => `<div class="kpi"><div class="label">${k[0]}</div><div class="value ${k[3]}">${k[1]}</div><div class="hint">${k[2]}</div></div>`).join('');
 }
 
