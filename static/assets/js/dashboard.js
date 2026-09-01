@@ -998,10 +998,10 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
 
       console.log(
         "CARGANDO CONSOLIDADO",
-        regional.CONSOLIDADO
+        window.DASHBOARD_BASE_DATA.regional.CONSOLIDADO
       );
 
-      return regional.CONSOLIDADO || {};
+      return window.DASHBOARD_BASE_DATA.regional.CONSOLIDADO;
     }
 
 
