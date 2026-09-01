@@ -1005,16 +1005,18 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
 
     const data = getActiveDashboardData(country);
 
-    window.DASHBOARD_CURRENT_DATA = data;
-    if (typeof window.renderAll === "function") {
+   window.DASHBOARD_CURRENT_DATA = data;
+window.DATA = data;
 
-      window.renderAll(data);
+if (typeof window.renderAll === "function") {
 
-    } else if (typeof window.refreshDashboard === "function") {
+    window.renderAll();
 
-      window.refreshDashboard(data);
+} else if (typeof window.refreshDashboard === "function") {
 
-    }
+    window.refreshDashboard();
+
+}
 
     document.querySelectorAll("[data-country]").forEach(btn => {
       btn.classList.toggle(
