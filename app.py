@@ -8232,6 +8232,56 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv, tipo_cambio=None)
     sv_banks = sv.get("banks", [])
 
 
+    # Convertir detalle de bancos de El Salvador a GTQ únicamente
+    # para la vista CONSOLIDADO. Guatemala permanece sin cambios.
+    sv_banks_gtq = []
+    for banco in sv_banks:
+        item = dict(banco or {})
+
+        for campo in [
+            "initial",
+            "final",
+            "credits",
+            "debits",
+            "change",
+            "netFlow",
+            "saldo",
+            "balance"
+        ]:
+            if campo in item:
+                item[campo] = convertir_valores_usd_a_gtq(
+                    item.get(campo),
+                    tipo_cambio
+                )
+
+        item["currency"] = "GTQ"
+        sv_banks_gtq.append(item)
+
+
+    sv_accounts_gtq = []
+    for cuenta in sv_accounts:
+        item = dict(cuenta or {})
+
+        for campo in [
+            "initial",
+            "final",
+            "credits",
+            "debits",
+            "change",
+            "netFlow",
+            "saldo",
+            "balance"
+        ]:
+            if campo in item:
+                item[campo] = convertir_valores_usd_a_gtq(
+                    item.get(campo),
+                    tipo_cambio
+                )
+
+        item["currency"] = "GTQ"
+        sv_accounts_gtq.append(item)
+
+
     return {
 
         "GUATEMALA": gt,
@@ -8242,10 +8292,10 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv, tipo_cambio=None)
         "CONSOLIDADO": {
 
             "banks":
-                gt_banks + sv_banks,
+                gt_banks + sv_banks_gtq,
 
             "accounts":
-                gt_accounts + sv_accounts,
+                gt_accounts + sv_accounts_gtq,
 
             "daily":
                 gt.get("daily", []) +
