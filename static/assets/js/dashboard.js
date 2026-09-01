@@ -944,3 +944,110 @@ function drawDaily(){
 function drawAll(){if(document.getElementById('balancesChart').offsetParent)drawGroupedBars('balancesChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.initial),DATA.banks.map(b=>b.final),'#60A5FA','#34D399');if(document.getElementById('flowBankChart').offsetParent)drawGroupedBars('flowBankChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.credits),DATA.banks.map(b=>b.debits),'#34D399','#FB7185');if(document.getElementById('netBankChart').offsetParent)drawNetBars();if(document.getElementById('dailyChart').offsetParent)drawDaily()}
 window.addEventListener('resize',()=>setTimeout(drawAll,80));
 function toggleFullscreen(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.()}
+
+
+// dashboard_consolidado_regional_final_v2.js
+
+(function () {
+    "use strict";
+
+    window.DASHBOARD_ACTIVE_COUNTRY = window.DASHBOARD_ACTIVE_COUNTRY || "GUATEMALA";
+
+    function getRegionalData() {
+        return window.DASHBOARD_REGIONAL_DATA || {};
+    }
+
+    function getActiveDashboardData(country) {
+        const regional = getRegionalData();
+
+        if (country === "CONSOLIDADO" && regional.CONSOLIDADO) {
+            return regional.CONSOLIDADO;
+        }
+
+        if (regional[country]) {
+            return regional[country];
+        }
+
+        return window.DASHBOARD_BASE_DATA || {};
+    }
+
+    window.changeDashboardCountry = function (country) {
+        window.DASHBOARD_ACTIVE_COUNTRY = country;
+
+        const data = getActiveDashboardData(country);
+
+        window.DASHBOARD_CURRENT_DATA = data;
+
+        if (typeof window.renderDashboard === "function") {
+            window.renderDashboard(data);
+        } else if (typeof window.refreshDashboard === "function") {
+            window.refreshDashboard(data);
+        }
+
+        document.querySelectorAll("[data-country]").forEach(btn => {
+            btn.classList.toggle(
+                "active",
+                btn.dataset.country === country
+            );
+        });
+
+        if (typeof window.actualizarControlMoneda === "function") {
+            window.actualizarControlMoneda(country);
+        }
+    };
+
+    function unirConsolidado(gt, sv) {
+        gt = gt || {};
+        sv = sv || {};
+
+        return {
+            meta: {
+                country: "CONSOLIDADO"
+            },
+            totals: {
+                ...(gt.totals || {}),
+                consolidated: true
+            },
+            banks: [
+                ...(gt.banks || []),
+                ...(sv.banks || [])
+            ],
+            accounts: [
+                ...(gt.accounts || []),
+                ...(sv.accounts || [])
+            ],
+            daily: [
+                ...(gt.daily || []),
+                ...(sv.daily || [])
+            ],
+            highlights: {
+                ...(gt.highlights || {}),
+                ...(sv.highlights || {})
+            }
+        };
+    }
+
+    window.buildConsolidadoRegional = function () {
+        const regional = getRegionalData();
+
+        if (regional.CONSOLIDADO) {
+            return regional.CONSOLIDADO;
+        }
+
+        return unirConsolidado(
+            regional.GUATEMALA,
+            regional.EL_SALVADOR
+        );
+    };
+
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll("[data-country]").forEach(button => {
+            button.addEventListener("click", function () {
+                window.changeDashboardCountry(
+                    this.dataset.country
+                );
+            });
+        });
+    });
+
+})();
