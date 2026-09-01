@@ -3164,10 +3164,59 @@ def detectar_pais_bancario(
     if "banco industrial" in banco_texto:
         return "GUATEMALA"
 
-    # Último respaldo: nombre general del archivo.
+    # ==========================================================
+    # DETECCION POR NOMBRE DE ARCHIVO
+    # Algunos bancos no escriben el nombre dentro del Excel.
+    # La identificación viene del archivo recibido.
+    # ==========================================================
     archivo = clean_text(
         nombre_archivo
     )
+
+    # Bancos identificados por nombre de archivo - El Salvador
+    senales_archivo_sv = (
+        "cusca",
+        "cuscatlan",
+        "dav",
+        "davivienda",
+        "agricola",
+        "atlantida",
+        "hipotecario",
+        "azul",
+    )
+
+    if any(
+        señal in archivo
+        for señal in senales_archivo_sv
+    ):
+        return "EL_SALVADOR"
+
+    # Bancos regionales: BAC y Promerica dependen de moneda
+    if "bac" in archivo or "promerica" in archivo:
+        moneda_codigo = normalizar_codigo_moneda(
+            moneda
+        )
+
+        if moneda_codigo == "USD":
+            return "EL_SALVADOR"
+
+        if moneda_codigo == "GTQ":
+            return "GUATEMALA"
+
+    # Bancos identificados por archivo - Guatemala
+    senales_archivo_gt = (
+        "industrial",
+        "banrural",
+        "g&t",
+        "gyt",
+        "bam",
+    )
+
+    if any(
+        señal in archivo
+        for señal in senales_archivo_gt
+    ):
+        return "GUATEMALA"
 
     if "el salvador" in archivo:
         return "EL_SALVADOR"
