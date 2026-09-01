@@ -1026,34 +1026,29 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
   }
 
   window.changeDashboardCountry = function (country) {
+
     window.DASHBOARD_ACTIVE_COUNTRY = country;
 
     const data = getActiveDashboardData(country);
 
     window.DASHBOARD_CURRENT_DATA = data;
+
+    DATA = data;
+
     window.DATA = data;
+
 
     if (typeof window.renderAll === "function") {
 
-      window.renderAll();
+        window.renderAll();
 
     } else if (typeof window.refreshDashboard === "function") {
 
-      window.refreshDashboard();
+        window.refreshDashboard(data);
 
     }
 
-    document.querySelectorAll("[data-country]").forEach(btn => {
-      btn.classList.toggle(
-        "active",
-        btn.dataset.country === country
-      );
-    });
-
-    if (typeof window.actualizarControlMoneda === "function") {
-      window.actualizarControlMoneda(country);
-    }
-  };
+};
 
   function unirConsolidado(gt, sv) {
     gt = gt || {};
