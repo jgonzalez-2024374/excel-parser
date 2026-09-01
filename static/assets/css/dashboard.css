@@ -275,6 +275,12 @@ button:hover {
   cursor: pointer
 }
 
+
+.country-btn[data-country="CONSOLIDADO"] {
+    font-weight: 700;
+}
+
+
 .date-apply:hover,
 .date-reset:hover {
   background: #41516A
