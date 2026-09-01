@@ -21,13 +21,13 @@ const BANK_LOGOS = {
 };
 
 
-function normalizeBankName(value){
+function normalizeBankName(value) {
   return String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
-    .replace(/[^A-Z0-9&]+/g,' ')
-    .replace(/\s+/g,' ')
+    .replace(/[^A-Z0-9&]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -121,7 +121,7 @@ const BANK_ALIASES = {
   'CITIBANK N A SUCURSAL EL SALVADOR': 'CITIBANK'
 };
 
-function resolveBankKey(bank){
+function resolveBankKey(bank) {
   const values = [
     bank && bank.key,
     bank && bank.name,
@@ -129,28 +129,28 @@ function resolveBankKey(bank){
     bank && bank.nombre
   ];
 
-  for(const value of values){
+  for (const value of values) {
     const normalized = normalizeBankName(value);
-    if(!normalized) continue;
+    if (!normalized) continue;
 
     const alias = BANK_ALIASES[normalized];
-    if(alias) return alias;
+    if (alias) return alias;
 
-    if(normalized.includes('BANCO INDUSTRIAL') || normalized === 'INDUSTRIAL') return 'BANCO INDUSTRIAL';
-    if(normalized.includes('BANRURAL') || normalized.includes('DESARROLLO RURAL')) return 'BANRURAL';
+    if (normalized.includes('BANCO INDUSTRIAL') || normalized === 'INDUSTRIAL') return 'BANCO INDUSTRIAL';
+    if (normalized.includes('BANRURAL') || normalized.includes('DESARROLLO RURAL')) return 'BANRURAL';
 
-    if(
+    if (
       normalized.includes('G&T CONTINENTAL') ||
       normalized.includes('GYT CONTINENTAL') ||
       normalized.includes('G Y T CONTINENTAL')
     ) return 'G&T CONTINENTAL';
 
-    if(normalized.includes('CUSCATLAN')) return 'BANCO CUSCATLÁN';
-    if(normalized.includes('AGRICOLA')) return 'BANCO AGRÍCOLA';
-    if(normalized.includes('DAVIVIENDA')) return 'DAVIVIENDA';
-    if(normalized.includes('PROMERICA')) return 'PROMERICA';
+    if (normalized.includes('CUSCATLAN')) return 'BANCO CUSCATLÁN';
+    if (normalized.includes('AGRICOLA')) return 'BANCO AGRÍCOLA';
+    if (normalized.includes('DAVIVIENDA')) return 'DAVIVIENDA';
+    if (normalized.includes('PROMERICA')) return 'PROMERICA';
 
-    if(
+    if (
       normalized === 'BAC' ||
       normalized.includes('BAC CREDOMATIC') ||
       normalized.includes('BANCO DE AMERICA CENTRAL')
@@ -160,39 +160,39 @@ function resolveBankKey(bank){
   return '';
 }
 
-function resolveBankLogo(bank){
+function resolveBankLogo(bank) {
   const canonical = resolveBankKey(bank);
   return canonical && BANK_LOGOS[canonical]
     ? BANK_LOGOS[canonical]
     : '';
 }
 
-function bankInitials(bank){
+function bankInitials(bank) {
   const name = String(
     (bank && (bank.name || bank.bank || bank.key || bank.nombre)) || 'Banco'
   ).trim();
 
   const cleaned = name
-    .replace(/\bBANCO\b/gi,'')
-    .replace(/\bDE\b/gi,'')
-    .replace(/\bDEL\b/gi,'')
-    .replace(/\bS\.?A\.?\b/gi,'')
+    .replace(/\bBANCO\b/gi, '')
+    .replace(/\bDE\b/gi, '')
+    .replace(/\bDEL\b/gi, '')
+    .replace(/\bS\.?A\.?\b/gi, '')
     .trim();
 
   const parts = cleaned.split(/\s+/).filter(Boolean);
-  if(!parts.length) return 'B';
-  if(parts.length === 1) return parts[0].slice(0,3).toUpperCase();
+  if (!parts.length) return 'B';
+  if (parts.length === 1) return parts[0].slice(0, 3).toUpperCase();
 
-  return parts.slice(0,2).map(x=>x.charAt(0)).join('').toUpperCase();
+  return parts.slice(0, 2).map(x => x.charAt(0)).join('').toUpperCase();
 }
 
-function bankLogoHtml(bank, mode='card'){
+function bankLogoHtml(bank, mode = 'card') {
   const src = resolveBankLogo(bank);
   const name = esc(
     (bank && (bank.name || bank.bank || bank.key || bank.nombre)) || 'Banco'
   );
 
-  if(src){
+  if (src) {
     return `<img
       src="${src}"
       alt="Logo ${name}"
@@ -207,49 +207,49 @@ function bankLogoHtml(bank, mode='card'){
 
 const COUNTRY_INFO = {
   GUATEMALA: {
-    label:'Guatemala',
-    currency:'GTQ'
+    label: 'Guatemala',
+    currency: 'GTQ'
   },
   EL_SALVADOR: {
-    label:'El Salvador',
-    currency:'USD'
+    label: 'El Salvador',
+    currency: 'USD'
   },
   NO_IDENTIFICADO: {
-    label:'Sin clasificar',
-    currency:'N/D'
+    label: 'Sin clasificar',
+    currency: 'N/D'
   }
 };
-function normalizeCountry(value){
+function normalizeCountry(value) {
 
   const v = String(value || '')
     .trim()
     .toUpperCase()
-    .replace(/\s+/g,'_');
+    .replace(/\s+/g, '_');
 
 
-  if(
+  if (
     v === 'GUATEMALA' ||
     v === 'GT' ||
     v === 'GUA'
-  ){
+  ) {
     return 'GUATEMALA';
   }
 
 
-  if(
+  if (
     v === 'EL_SALVADOR' ||
     v === 'ELSALVADOR' ||
     v === 'SV' ||
     v === 'SLV'
-  ){
+  ) {
     return 'EL_SALVADOR';
   }
 
 
-  if(
+  if (
     v === 'CONSOLIDADO' ||
     v === 'CONSOLIDADO_REGIONAL'
-  ){
+  ) {
     return 'CONSOLIDADO';
   }
 
@@ -258,15 +258,15 @@ function normalizeCountry(value){
 
 }
 
-function recordCountry(item){
-  const direct=normalizeCountry(item && (item.country || item.pais));
-  if(direct!=='NO_IDENTIFICADO') return direct;
+function recordCountry(item) {
+  const direct = normalizeCountry(item && (item.country || item.pais));
+  if (direct !== 'NO_IDENTIFICADO') return direct;
 
-  const text=normalizeBankName(
-    `${item && (item.bankCanonical||item.bankKey||'')} ${item && (item.bank||item.name||'')}`
+  const text = normalizeBankName(
+    `${item && (item.bankCanonical || item.bankKey || '')} ${item && (item.bank || item.name || '')}`
   );
 
-  if(
+  if (
     text.includes('BANRURAL') ||
     text.includes('G&T') ||
     text.includes('GYT') ||
@@ -274,7 +274,7 @@ function recordCountry(item){
     text.includes('BAM')
   ) return 'GUATEMALA';
 
-  if(
+  if (
     text.includes('BANCO AGRICOLA') ||
     text.includes('CUSCATLAN') ||
     text.includes('DAVIVIENDA') ||
@@ -283,87 +283,87 @@ function recordCountry(item){
     text.includes('ATLANTIDA')
   ) return 'EL_SALVADOR';
 
-  const cur=String(item && (item.currency||item.moneda)||'').toUpperCase();
-  if(cur==='GTQ') return 'GUATEMALA';
-  if(cur==='USD'||cur==='SVC') return 'EL_SALVADOR';
+  const cur = String(item && (item.currency || item.moneda) || '').toUpperCase();
+  if (cur === 'GTQ') return 'GUATEMALA';
+  if (cur === 'USD' || cur === 'SVC') return 'EL_SALVADOR';
 
   return 'NO_IDENTIFICADO';
 }
-function countryCounts(){
+function countryCounts() {
 
-    const regional = window.DASHBOARD_BASE_DATA?.regional || {};
+  const regional = window.DASHBOARD_BASE_DATA?.regional || {};
 
-    return {
+  return {
 
-        GUATEMALA:
-            (regional.GUATEMALA?.banks || []).length,
+    GUATEMALA:
+      (regional.GUATEMALA?.banks || []).length,
 
-        EL_SALVADOR:
-            (regional.EL_SALVADOR?.banks || []).length,
+    EL_SALVADOR:
+      (regional.EL_SALVADOR?.banks || []).length,
 
-        CONSOLIDADO:
-            (regional.CONSOLIDADO?.banks || []).length,
+    CONSOLIDADO:
+      (regional.CONSOLIDADO?.banks || []).length,
 
-        NO_IDENTIFICADO:0
-    };
+    NO_IDENTIFICADO: 0
+  };
 }
-const INITIAL_COUNTRY_COUNTS=countryCounts();
+const INITIAL_COUNTRY_COUNTS = countryCounts();
 
-let ACTIVE_COUNTRY=
-  INITIAL_COUNTRY_COUNTS.GUATEMALA>0
+let ACTIVE_COUNTRY =
+  INITIAL_COUNTRY_COUNTS.GUATEMALA > 0
     ? 'GUATEMALA'
     : (
-        INITIAL_COUNTRY_COUNTS.EL_SALVADOR>0
-          ? 'EL_SALVADOR'
-          : 'NO_IDENTIFICADO'
-      );
+      INITIAL_COUNTRY_COUNTS.EL_SALVADOR > 0
+        ? 'EL_SALVADOR'
+        : 'NO_IDENTIFICADO'
+    );
 
-function countryLabel(country=ACTIVE_COUNTRY){
-  return (COUNTRY_INFO[normalizeCountry(country)]||COUNTRY_INFO.NO_IDENTIFICADO).label;
+function countryLabel(country = ACTIVE_COUNTRY) {
+  return (COUNTRY_INFO[normalizeCountry(country)] || COUNTRY_INFO.NO_IDENTIFICADO).label;
 }
 
-function currencyForCountry(country=ACTIVE_COUNTRY, transactions=null){
-  const normalized=normalizeCountry(country);
-  const rows=Array.isArray(transactions)
+function currencyForCountry(country = ACTIVE_COUNTRY, transactions = null) {
+  const normalized = normalizeCountry(country);
+  const rows = Array.isArray(transactions)
     ? transactions
-    : RAW_TRANSACTIONS.filter(t=>recordCountry(t)===normalized);
+    : RAW_TRANSACTIONS.filter(t => recordCountry(t) === normalized);
 
-  const currencies=[...new Set(
+  const currencies = [...new Set(
     rows
-      .map(t=>String(t.currency||t.moneda||'').trim().toUpperCase())
-      .filter(c=>CURRENCY_SYMBOLS[c])
+      .map(t => String(t.currency || t.moneda || '').trim().toUpperCase())
+      .filter(c => CURRENCY_SYMBOLS[c])
   )];
 
-  if(currencies.length===1) return currencies[0];
+  if (currencies.length === 1) return currencies[0];
 
-  return (COUNTRY_INFO[normalized]||COUNTRY_INFO.NO_IDENTIFICADO).currency;
+  return (COUNTRY_INFO[normalized] || COUNTRY_INFO.NO_IDENTIFICADO).currency;
 }
 
 const CURRENCY_SYMBOLS = {
-  GTQ:'Q', USD:'$', EUR:'€', SVC:'₡', HNL:'L', CRC:'₡', NIO:'C$', MXN:'MX$', GBP:'£'
+  GTQ: 'Q', USD: '$', EUR: '€', SVC: '₡', HNL: 'L', CRC: '₡', NIO: 'C$', MXN: 'MX$', GBP: '£'
 };
 const currencyCode = () => {
-  const active=(typeof DATA!=='undefined'&&DATA)?DATA:BASE_DATA;
-  const meta=(active&&active.meta)?active.meta:{};
-  const explicit=String(meta.currency||'N/D').trim().toUpperCase();
+  const active = (typeof DATA !== 'undefined' && DATA) ? DATA : BASE_DATA;
+  const meta = (active && active.meta) ? active.meta : {};
+  const explicit = String(meta.currency || 'N/D').trim().toUpperCase();
 
-  if(CURRENCY_SYMBOLS[explicit]) return explicit;
+  if (CURRENCY_SYMBOLS[explicit]) return explicit;
 
-  const country=normalizeCountry(
+  const country = normalizeCountry(
     meta.country || ACTIVE_COUNTRY
   );
 
-  const byCountry=currencyForCountry(
+  const byCountry = currencyForCountry(
     country
   );
 
-  if(CURRENCY_SYMBOLS[byCountry]) return byCountry;
+  if (CURRENCY_SYMBOLS[byCountry]) return byCountry;
 
-  if(explicit==='MULTI') return 'MULTI';
+  if (explicit === 'MULTI') return 'MULTI';
   return 'N/D';
 };
 
-console.info('[Dashboard v3.2] moneda resuelta:', currencyCode(), 'meta:', (BASE_DATA.meta||{}).currency);
+console.info('[Dashboard v3.2] moneda resuelta:', currencyCode(), 'meta:', (BASE_DATA.meta || {}).currency);
 
 
 // ============================================================
@@ -381,14 +381,14 @@ let DASH_EXCHANGE_RATE = null;   // GTQ por 1 USD
 let DASH_EXCHANGE_UPDATED_AT = null;
 let DASH_EXCHANGE_TIMER = null;
 
-function baseCurrencyForActiveCountry(){
+function baseCurrencyForActiveCountry() {
   const country = normalizeCountry(ACTIVE_COUNTRY);
-  if(country === 'GUATEMALA') return 'GTQ';
-  if(country === 'EL_SALVADOR') return 'USD';
+  if (country === 'GUATEMALA') return 'GTQ';
+  if (country === 'EL_SALVADOR') return 'USD';
   return currencyCode();
 }
 
-function displayCurrencyCode(){
+function displayCurrencyCode() {
   const country = normalizeCountry(ACTIVE_COUNTRY);
   return COUNTRY_CURRENCY_VIEW[country] || baseCurrencyForActiveCountry();
 }
@@ -398,27 +398,27 @@ const currencySymbol = () => CURRENCY_SYMBOLS[displayCurrencyCode()] || '';
 const currencyLabel = () => {
   const code = displayCurrencyCode();
   const symbol = CURRENCY_SYMBOLS[code] || '';
-  if(code === 'MULTI') return 'Múltiples monedas';
-  if(code === 'N/D') return 'N/D';
+  if (code === 'MULTI') return 'Múltiples monedas';
+  if (code === 'N/D') return 'N/D';
   return symbol ? `${code} (${symbol})` : code;
 };
 
-function convertCurrencyForView(value){
+function convertCurrencyForView(value) {
   const n = Number(value) || 0;
   const original = baseCurrencyForActiveCountry();
   const target = displayCurrencyCode();
   const rate = Number(DASH_EXCHANGE_RATE);
 
-  if(original === target) return n;
-  if(!Number.isFinite(rate) || rate <= 0) return n;
+  if (original === target) return n;
+  if (!Number.isFinite(rate) || rate <= 0) return n;
 
   // Guatemala: Q -> $
-  if(original === 'GTQ' && target === 'USD'){
+  if (original === 'GTQ' && target === 'USD') {
     return n / rate;
   }
 
   // El Salvador: $ -> Q
-  if(original === 'USD' && target === 'GTQ'){
+  if (original === 'USD' && target === 'GTQ') {
     return n * rate;
   }
 
@@ -435,41 +435,41 @@ const moneyAllViews = v => {
   }).format(Math.abs(n));
   const sign = n < 0 ? '-' : '';
 
-  if(symbol) return `${sign}${symbol} ${formatted}`;
-  if(code && code !== 'N/D' && code !== 'MULTI') return `${sign}${code} ${formatted}`;
+  if (symbol) return `${sign}${symbol} ${formatted}`;
+  if (code && code !== 'N/D' && code !== 'MULTI') return `${sign}${code} ${formatted}`;
   return `${sign}${formatted}`;
 };
 
-function exchangeTimestampLabel(){
-  if(!DASH_EXCHANGE_UPDATED_AT) return '';
-  try{
+function exchangeTimestampLabel() {
+  if (!DASH_EXCHANGE_UPDATED_AT) return '';
+  try {
     return new Intl.DateTimeFormat('es-GT', {
       timeZone: 'America/Guatemala',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
     }).format(DASH_EXCHANGE_UPDATED_AT);
-  }catch(_){
+  } catch (_) {
     return DASH_EXCHANGE_UPDATED_AT.toLocaleTimeString('es-GT');
   }
 }
 
-function updateExchangeDisplays(){
+function updateExchangeDisplays() {
   const gt = document.getElementById('exchange-display-gt');
   const sv = document.getElementById('exchange-display-sv');
   const rate = Number(DASH_EXCHANGE_RATE);
 
   let textValue = 'Actualizando tipo de cambio...';
-  if(Number.isFinite(rate) && rate > 0){
+  if (Number.isFinite(rate) && rate > 0) {
     const stamp = exchangeTimestampLabel();
     textValue = `1 USD = Q ${rate.toFixed(4)}${stamp ? ` · ${stamp}` : ''}`;
   }
 
-  if(gt) gt.textContent = textValue;
-  if(sv) sv.textContent = textValue;
+  if (gt) gt.textContent = textValue;
+  if (sv) sv.textContent = textValue;
 }
 
-function syncCurrencyControls(){
+function syncCurrencyControls() {
   const country = normalizeCountry(ACTIVE_COUNTRY);
   const current = displayCurrencyCode();
 
@@ -483,45 +483,45 @@ function syncCurrencyControls(){
   const gtToggle = document.getElementById('currency-toggle-gt');
   const svToggle = document.getElementById('currency-toggle-sv');
 
-  if(gtToggle) gtToggle.checked = COUNTRY_CURRENCY_VIEW.GUATEMALA === 'USD';
-  if(svToggle) svToggle.checked = COUNTRY_CURRENCY_VIEW.EL_SALVADOR === 'GTQ';
+  if (gtToggle) gtToggle.checked = COUNTRY_CURRENCY_VIEW.GUATEMALA === 'USD';
+  if (svToggle) svToggle.checked = COUNTRY_CURRENCY_VIEW.EL_SALVADOR === 'GTQ';
 
   const gtLocal = document.getElementById('gt-local-label');
   const gtConverted = document.getElementById('gt-converted-label');
   const svLocal = document.getElementById('sv-local-label');
   const svConverted = document.getElementById('sv-converted-label');
 
-  if(gtLocal) gtLocal.classList.toggle('selected', country === 'GUATEMALA' && current === 'GTQ');
-  if(gtConverted) gtConverted.classList.toggle('selected', country === 'GUATEMALA' && current === 'USD');
-  if(svLocal) svLocal.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'USD');
-  if(svConverted) svConverted.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'GTQ');
+  if (gtLocal) gtLocal.classList.toggle('selected', country === 'GUATEMALA' && current === 'GTQ');
+  if (gtConverted) gtConverted.classList.toggle('selected', country === 'GUATEMALA' && current === 'USD');
+  if (svLocal) svLocal.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'USD');
+  if (svConverted) svConverted.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'GTQ');
 
   updateExchangeDisplays();
 }
 
-function initCurrencyControls(){
+function initCurrencyControls() {
   const gtToggle = document.getElementById('currency-toggle-gt');
   const svToggle = document.getElementById('currency-toggle-sv');
 
-  if(gtToggle && !gtToggle.dataset.currencyBound){
+  if (gtToggle && !gtToggle.dataset.currencyBound) {
     gtToggle.dataset.currencyBound = '1';
     gtToggle.addEventListener('change', () => {
       COUNTRY_CURRENCY_VIEW.GUATEMALA = gtToggle.checked ? 'USD' : 'GTQ';
-      if(normalizeCountry(ACTIVE_COUNTRY) === 'GUATEMALA'){
+      if (normalizeCountry(ACTIVE_COUNTRY) === 'GUATEMALA') {
         renderAll();
-      }else{
+      } else {
         syncCurrencyControls();
       }
     });
   }
 
-  if(svToggle && !svToggle.dataset.currencyBound){
+  if (svToggle && !svToggle.dataset.currencyBound) {
     svToggle.dataset.currencyBound = '1';
     svToggle.addEventListener('change', () => {
       COUNTRY_CURRENCY_VIEW.EL_SALVADOR = svToggle.checked ? 'GTQ' : 'USD';
-      if(normalizeCountry(ACTIVE_COUNTRY) === 'EL_SALVADOR'){
+      if (normalizeCountry(ACTIVE_COUNTRY) === 'EL_SALVADOR') {
         renderAll();
-      }else{
+      } else {
         syncCurrencyControls();
       }
     });
@@ -530,31 +530,31 @@ function initCurrencyControls(){
   syncCurrencyControls();
 }
 
-function exchangeRateUrl(){
+function exchangeRateUrl() {
   // En Render usa la ruta normal. Si el HTML fue descargado y se abre como file://,
   // intenta consultar directamente el backend publicado.
-  if(window.location && window.location.protocol === 'file:'){
+  if (window.location && window.location.protocol === 'file:') {
     return 'https://excel-parser-m9q8.onrender.com/api/tipo-cambio';
   }
   return '/api/tipo-cambio';
 }
 
-async function loadExchangeRate(forceRender = true){
-  try{
+async function loadExchangeRate(forceRender = true) {
+  try {
     const separator = exchangeRateUrl().includes('?') ? '&' : '?';
     const response = await fetch(
       `${exchangeRateUrl()}${separator}_=${Date.now()}`,
       { cache: 'no-store' }
     );
 
-    if(!response.ok){
+    if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
 
     const payload = await response.json();
     const rate = Number(payload && payload.rate_gtq_per_usd);
 
-    if(!Number.isFinite(rate) || rate <= 0){
+    if (!Number.isFinite(rate) || rate <= 0) {
       throw new Error('Tipo de cambio inválido');
     }
 
@@ -569,24 +569,24 @@ async function loadExchangeRate(forceRender = true){
     updateExchangeDisplays();
 
     // Redibujar todos los valores cuando cambia la tasa o durante la primera carga.
-    if(forceRender && DATA && (changed || !document.querySelector('.currencyLabel')?.textContent)){
+    if (forceRender && DATA && (changed || !document.querySelector('.currencyLabel')?.textContent)) {
       renderAll();
-    }else if(forceRender && DATA){
+    } else if (forceRender && DATA) {
       renderAll();
     }
 
     return rate;
-  }catch(error){
+  } catch (error) {
     console.warn('[Dashboard] No se pudo actualizar el tipo de cambio:', error);
     updateExchangeDisplays();
     return DASH_EXCHANGE_RATE;
   }
 }
 
-function startExchangeRateAutoRefresh(){
+function startExchangeRateAutoRefresh() {
   loadExchangeRate(true);
 
-  if(DASH_EXCHANGE_TIMER){
+  if (DASH_EXCHANGE_TIMER) {
     clearInterval(DASH_EXCHANGE_TIMER);
   }
 
@@ -599,7 +599,7 @@ function startExchangeRateAutoRefresh(){
   window.addEventListener('focus', () => loadExchangeRate(true));
 
   document.addEventListener('visibilitychange', () => {
-    if(document.visibilityState === 'visible'){
+    if (document.visibilityState === 'visible') {
       loadExchangeRate(true);
     }
   });
@@ -607,230 +607,230 @@ function startExchangeRateAutoRefresh(){
 
 
 const money = v => moneyAllViews(v);
-const pct = v => `${v>=0?'+':''}${Number(v||0).toFixed(2)}%`;
-const cls = v => v>0?'positive':v<0?'negative':'neutral';
-const esc = s => String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const pct = v => `${v >= 0 ? '+' : ''}${Number(v || 0).toFixed(2)}%`;
+const cls = v => v > 0 ? 'positive' : v < 0 ? 'negative' : 'neutral';
+const esc = s => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const logoClass = bank => {
   const k = typeof bank === 'string'
     ? (BANK_ALIASES[normalizeBankName(bank)] || bank)
     : resolveBankKey(bank);
 
   return ({
-    'BANCO AGRÍCOLA':'bank-icon-agricola',
-    'BANCO CUSCATLÁN':'bank-icon-cuscatlan',
-    'BAC':'bank-icon-bac',
-    'PROMERICA':'bank-icon-promerica',
-    'DAVIVIENDA':'bank-icon-davivienda',
-    'BANCO INDUSTRIAL':'bank-icon-industrial',
-    'G&T CONTINENTAL':'bank-icon-gyt',
-    'BANRURAL':'bank-icon-banrural'
+    'BANCO AGRÍCOLA': 'bank-icon-agricola',
+    'BANCO CUSCATLÁN': 'bank-icon-cuscatlan',
+    'BAC': 'bank-icon-bac',
+    'PROMERICA': 'bank-icon-promerica',
+    'DAVIVIENDA': 'bank-icon-davivienda',
+    'BANCO INDUSTRIAL': 'bank-icon-industrial',
+    'G&T CONTINENTAL': 'bank-icon-gyt',
+    'BANRURAL': 'bank-icon-banrural'
   }[k] || '');
 };
-const fmtDate = iso => { if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
-const periodLabel = (a,b) => a===b ? fmtDate(b) : `${fmtDate(a)} – ${fmtDate(b)}`;
-const round2 = v => Math.round((Number(v)+Number.EPSILON)*100)/100;
-const txKey = (bankKey,account) => `${bankKey}|${account}`;
+const fmtDate = iso => { if (!iso) return '—'; const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
+const periodLabel = (a, b) => a === b ? fmtDate(b) : `${fmtDate(a)} – ${fmtDate(b)}`;
+const round2 = v => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
+const txKey = (bankKey, account) => `${bankKey}|${account}`;
 
 const TX_BY_ACCOUNT = {};
-RAW_TRANSACTIONS.forEach(t=>{(TX_BY_ACCOUNT[txKey(t.bankKey,t.account)] ||= []).push(t)});
-Object.values(TX_BY_ACCOUNT).forEach(arr=>arr.sort((a,b)=>a.row-b.row));
-const MIN_DATE = RAW_TRANSACTIONS.reduce((m,t)=>!m||t.date<m?t.date:m,'');
-const MAX_DATE = RAW_TRANSACTIONS.reduce((m,t)=>!m||t.date>m?t.date:m,'');
+RAW_TRANSACTIONS.forEach(t => { (TX_BY_ACCOUNT[txKey(t.bankKey, t.account)] ||= []).push(t) });
+Object.values(TX_BY_ACCOUNT).forEach(arr => arr.sort((a, b) => a.row - b.row));
+const MIN_DATE = RAW_TRANSACTIONS.reduce((m, t) => !m || t.date < m ? t.date : m, '');
+const MAX_DATE = RAW_TRANSACTIONS.reduce((m, t) => !m || t.date > m ? t.date : m, '');
 
-function lastBalanceAtOrBefore(baseAccount, iso, strictBefore=false){
-  const txs=TX_BY_ACCOUNT[txKey(baseAccount.bankKey,baseAccount.account)]||[];
-  let bal=baseAccount.initial;
-  for(const t of txs){
+function lastBalanceAtOrBefore(baseAccount, iso, strictBefore = false) {
+  const txs = TX_BY_ACCOUNT[txKey(baseAccount.bankKey, baseAccount.account)] || [];
+  let bal = baseAccount.initial;
+  for (const t of txs) {
     const ok = strictBefore ? t.date < iso : t.date <= iso;
-    if(ok && t.balance!==null && t.balance!==undefined) bal=Number(t.balance);
+    if (ok && t.balance !== null && t.balance !== undefined) bal = Number(t.balance);
   }
   return round2(bal);
 }
 
-function buildFiltered(startDate,endDate){
+function buildFiltered(startDate, endDate) {
   // Primero separar por país; después aplicar el período.
-  const countryTransactions=RAW_TRANSACTIONS.filter(
-    t=>recordCountry(t)===ACTIVE_COUNTRY
+  const countryTransactions = RAW_TRANSACTIONS.filter(
+    t => recordCountry(t) === ACTIVE_COUNTRY
   );
 
-  const inRange=countryTransactions.filter(
-    t=>t.date>=startDate&&t.date<=endDate
+  const inRange = countryTransactions.filter(
+    t => t.date >= startDate && t.date <= endDate
   );
 
-  const baseAccounts=BASE_DATA.accounts.filter(
-    a=>recordCountry(a)===ACTIVE_COUNTRY
+  const baseAccounts = BASE_DATA.accounts.filter(
+    a => recordCountry(a) === ACTIVE_COUNTRY
   );
 
-  const baseBanks=BASE_DATA.banks.filter(
-    b=>recordCountry(b)===ACTIVE_COUNTRY
+  const baseBanks = BASE_DATA.banks.filter(
+    b => recordCountry(b) === ACTIVE_COUNTRY
   );
 
   // Recalcular cada cuenta usando saldos reportados en ESTADO UNIFORME.
   // Saldo inicial = último saldo reportado antes del período (o saldo inicial del archivo si aún no había movimientos).
   // Saldo final   = último saldo reportado hasta la fecha final seleccionada.
-  const accounts=baseAccounts.map(a=>{
-    const txs=TX_BY_ACCOUNT[txKey(a.bankKey,a.account)]||[];
-    const initial=lastBalanceAtOrBefore(a,startDate,true);
-    const final=lastBalanceAtOrBefore(a,endDate,false);
-    const periodTx=txs.filter(t=>t.date>=startDate&&t.date<=endDate);
-    const credits=round2(periodTx.reduce((s,t)=>s+Number(t.credit||0),0));
-    const debits=round2(periodTx.reduce((s,t)=>s+Number(t.debit||0),0));
-    const change=round2(final-initial);
-    const changePct=initial!==0?round2(change/initial*100):null;
-    return {...a,initial,final,change,changePct,credits,debits,movements:periodTx.length};
+  const accounts = baseAccounts.map(a => {
+    const txs = TX_BY_ACCOUNT[txKey(a.bankKey, a.account)] || [];
+    const initial = lastBalanceAtOrBefore(a, startDate, true);
+    const final = lastBalanceAtOrBefore(a, endDate, false);
+    const periodTx = txs.filter(t => t.date >= startDate && t.date <= endDate);
+    const credits = round2(periodTx.reduce((s, t) => s + Number(t.credit || 0), 0));
+    const debits = round2(periodTx.reduce((s, t) => s + Number(t.debit || 0), 0));
+    const change = round2(final - initial);
+    const changePct = initial !== 0 ? round2(change / initial * 100) : null;
+    return { ...a, initial, final, change, changePct, credits, debits, movements: periodTx.length };
   });
 
-  const totalFinal=round2(accounts.reduce((s,a)=>s+a.final,0));
-  const colorByKey=Object.fromEntries(baseBanks.map(b=>[b.key,b.color]));
-  const nameByKey=Object.fromEntries(baseBanks.map(b=>[b.key,b.name]));
+  const totalFinal = round2(accounts.reduce((s, a) => s + a.final, 0));
+  const colorByKey = Object.fromEntries(baseBanks.map(b => [b.key, b.color]));
+  const nameByKey = Object.fromEntries(baseBanks.map(b => [b.key, b.name]));
 
-  const banks=baseBanks.map(base=>{
-    const aa=accounts.filter(a=>a.bankKey===base.key);
-    const bankTx=inRange.filter(t=>t.bankKey===base.key);
-    const initial=round2(aa.reduce((s,a)=>s+a.initial,0));
-    const final=round2(aa.reduce((s,a)=>s+a.final,0));
-    const credits=round2(bankTx.reduce((s,t)=>s+Number(t.credit||0),0));
-    const debits=round2(bankTx.reduce((s,t)=>s+Number(t.debit||0),0));
-    const change=round2(final-initial);
-    const changePct=initial!==0?round2(change/initial*100):null;
-    const netFlow=round2(credits-debits);
+  const banks = baseBanks.map(base => {
+    const aa = accounts.filter(a => a.bankKey === base.key);
+    const bankTx = inRange.filter(t => t.bankKey === base.key);
+    const initial = round2(aa.reduce((s, a) => s + a.initial, 0));
+    const final = round2(aa.reduce((s, a) => s + a.final, 0));
+    const credits = round2(bankTx.reduce((s, t) => s + Number(t.credit || 0), 0));
+    const debits = round2(bankTx.reduce((s, t) => s + Number(t.debit || 0), 0));
+    const change = round2(final - initial);
+    const changePct = initial !== 0 ? round2(change / initial * 100) : null;
+    const netFlow = round2(credits - debits);
     return {
-      key:base.key,name:nameByKey[base.key],color:colorByKey[base.key],
-      initial,final,change,changePct,credits,debits,netFlow,
-      share:totalFinal?round2(final/totalFinal*100):0,
-      accounts:aa.length,movements:bankTx.length
+      key: base.key, name: nameByKey[base.key], color: colorByKey[base.key],
+      initial, final, change, changePct, credits, debits, netFlow,
+      share: totalFinal ? round2(final / totalFinal * 100) : 0,
+      accounts: aa.length, movements: bankTx.length
     };
   });
 
-  const credits=round2(inRange.reduce((s,t)=>s+Number(t.credit||0),0));
-  const debits=round2(inRange.reduce((s,t)=>s+Number(t.debit||0),0));
-  const net=round2(credits-debits);
-  const initial=round2(accounts.reduce((s,a)=>s+a.initial,0));
-  const final=round2(accounts.reduce((s,a)=>s+a.final,0));
+  const credits = round2(inRange.reduce((s, t) => s + Number(t.credit || 0), 0));
+  const debits = round2(inRange.reduce((s, t) => s + Number(t.debit || 0), 0));
+  const net = round2(credits - debits);
+  const initial = round2(accounts.reduce((s, a) => s + a.initial, 0));
+  const final = round2(accounts.reduce((s, a) => s + a.final, 0));
 
   // Resumen diario generado directamente desde ESTADO UNIFORME.
-  const byDate={};
-  inRange.forEach(t=>{
-    const d=byDate[t.date]||(byDate[t.date]={date:t.date,moves:0,debits:0,credits:0});
-    d.moves+=1;
-    d.debits+=Number(t.debit||0);
-    d.credits+=Number(t.credit||0);
+  const byDate = {};
+  inRange.forEach(t => {
+    const d = byDate[t.date] || (byDate[t.date] = { date: t.date, moves: 0, debits: 0, credits: 0 });
+    d.moves += 1;
+    d.debits += Number(t.debit || 0);
+    d.credits += Number(t.credit || 0);
   });
-  const daily=Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date)).map(d=>({
-    date:d.date,
-    label:fmtDate(d.date).slice(0,5),
-    moves:d.moves,
-    debits:round2(d.debits),
-    credits:round2(d.credits),
-    net:round2(d.credits-d.debits)
+  const daily = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date)).map(d => ({
+    date: d.date,
+    label: fmtDate(d.date).slice(0, 5),
+    moves: d.moves,
+    debits: round2(d.debits),
+    credits: round2(d.credits),
+    net: round2(d.credits - d.debits)
   }));
 
-  const maxCredit=daily.length?daily.reduce((a,b)=>b.credits>a.credits?b:a):null;
-  const maxDebit=daily.length?daily.reduce((a,b)=>b.debits>a.debits?b:a):null;
-  const maxNet=daily.length?daily.reduce((a,b)=>b.net>a.net?b:a):null;
-  const minNet=daily.length?daily.reduce((a,b)=>b.net<a.net?b:a):null;
-  const latestMovement=inRange.length?inRange.reduce((m,t)=>t.date>m?t.date:m,inRange[0].date):null;
+  const maxCredit = daily.length ? daily.reduce((a, b) => b.credits > a.credits ? b : a) : null;
+  const maxDebit = daily.length ? daily.reduce((a, b) => b.debits > a.debits ? b : a) : null;
+  const maxNet = daily.length ? daily.reduce((a, b) => b.net > a.net ? b : a) : null;
+  const minNet = daily.length ? daily.reduce((a, b) => b.net < a.net ? b : a) : null;
+  const latestMovement = inRange.length ? inRange.reduce((m, t) => t.date > m ? t.date : m, inRange[0].date) : null;
 
   return {
-    meta:{
+    meta: {
       ...BASE_DATA.meta,
-      country:ACTIVE_COUNTRY,
-      countryLabel:countryLabel(ACTIVE_COUNTRY),
-      currency:currencyForCountry(ACTIVE_COUNTRY,countryTransactions),
-      banks:banks.length,
-      accounts:accounts.length,
-      fileCut:periodLabel(startDate,endDate),
-      latestMovement:latestMovement?fmtDate(latestMovement):'Sin movimientos en el período',
-      movementCount:inRange.length,
-      filterFrom:startDate,
-      filterTo:endDate
+      country: ACTIVE_COUNTRY,
+      countryLabel: countryLabel(ACTIVE_COUNTRY),
+      currency: currencyForCountry(ACTIVE_COUNTRY, countryTransactions),
+      banks: banks.length,
+      accounts: accounts.length,
+      fileCut: periodLabel(startDate, endDate),
+      latestMovement: latestMovement ? fmtDate(latestMovement) : 'Sin movimientos en el período',
+      movementCount: inRange.length,
+      filterFrom: startDate,
+      filterTo: endDate
     },
-    totals:{
-      initial,final,
-      change:net,
-      changePct:debits?round2(net/debits*100):0,
-      credits,debits,netFlow:net
+    totals: {
+      initial, final,
+      change: net,
+      changePct: debits ? round2(net / debits * 100) : 0,
+      credits, debits, netFlow: net
     },
-    highlights:{maxCredit,maxDebit,maxNet,minNet},
-    banks,accounts,daily
+    highlights: { maxCredit, maxDebit, maxNet, minNet },
+    banks, accounts, daily
   };
 }
 
-function renderHeader(){
-  document.querySelectorAll('.currencyLabel').forEach(el=>el.textContent=currencyLabel());
-  document.querySelectorAll('.countryLabel').forEach(el=>el.textContent=countryLabel(DATA.meta.country||ACTIVE_COUNTRY));
-  document.getElementById('latestMovement').textContent=DATA.meta.latestMovement;
-  document.getElementById('bankCount').textContent=DATA.meta.banks;
-  document.getElementById('accountCount').textContent=DATA.meta.accounts;
-  document.getElementById('sourceFile').textContent=DATA.meta.file;
-  document.getElementById('coverCut').textContent=DATA.meta.fileCut;
-  document.getElementById('coverBanks').textContent=DATA.meta.banks;
-  document.getElementById('coverAccounts').textContent=DATA.meta.accounts;
+function renderHeader() {
+  document.querySelectorAll('.currencyLabel').forEach(el => el.textContent = currencyLabel());
+  document.querySelectorAll('.countryLabel').forEach(el => el.textContent = countryLabel(DATA.meta.country || ACTIVE_COUNTRY));
+  document.getElementById('latestMovement').textContent = DATA.meta.latestMovement;
+  document.getElementById('bankCount').textContent = DATA.meta.banks;
+  document.getElementById('accountCount').textContent = DATA.meta.accounts;
+  document.getElementById('sourceFile').textContent = DATA.meta.file;
+  document.getElementById('coverCut').textContent = DATA.meta.fileCut;
+  document.getElementById('coverBanks').textContent = DATA.meta.banks;
+  document.getElementById('coverAccounts').textContent = DATA.meta.accounts;
 }
 
-function renderKpis(){
-  const kpis=[
-    ['Saldo inicial total',moneyAllViews(DATA.totals.initial),'Saldo al inicio del período seleccionado','neutral'],
-    ['Saldo final total',moneyAllViews(DATA.totals.final),'Saldo al cierre del período seleccionado','neutral'],
-    ['Créditos acumulados',moneyAllViews(DATA.totals.credits),'Abonos / entradas del período','positive'],
-    ['Débitos acumulados',moneyAllViews(DATA.totals.debits),'Cargos / salidas del período','negative'],
-    ['Variación entradas vs salidas',moneyAllViews(DATA.totals.change),pct(DATA.totals.changePct)+' respecto a salidas',cls(DATA.totals.change)],
-    ['Movimientos totales',DATA.meta.movementCount.toLocaleString('en-US'),'Registros de ESTADO UNIFORME en el período','neutral']
+function renderKpis() {
+  const kpis = [
+    ['Saldo inicial total', moneyAllViews(DATA.totals.initial), 'Saldo al inicio del período seleccionado', 'neutral'],
+    ['Saldo final total', moneyAllViews(DATA.totals.final), 'Saldo al cierre del período seleccionado', 'neutral'],
+    ['Créditos acumulados', moneyAllViews(DATA.totals.credits), 'Abonos / entradas del período', 'positive'],
+    ['Débitos acumulados', moneyAllViews(DATA.totals.debits), 'Cargos / salidas del período', 'negative'],
+    ['Variación entradas vs salidas', moneyAllViews(DATA.totals.change), pct(DATA.totals.changePct) + ' respecto a salidas', cls(DATA.totals.change)],
+    ['Movimientos totales', DATA.meta.movementCount.toLocaleString('en-US'), 'Registros de ESTADO UNIFORME en el período', 'neutral']
   ];
-  document.getElementById('kpis').innerHTML=kpis.map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value ${k[3]}">${k[1]}</div><div class="hint">${k[2]}</div></div>`).join('');
+  document.getElementById('kpis').innerHTML = kpis.map(k => `<div class="kpi"><div class="label">${k[0]}</div><div class="value ${k[3]}">${k[1]}</div><div class="hint">${k[2]}</div></div>`).join('');
 }
 
-function renderBankList(){
-  document.getElementById('bankList').innerHTML=DATA.banks.slice().sort((a,b)=>b.final-a.final).map(b=>`
-    <div class="bank-row"><span class="dot" style="background:${b.color}"></span><div><strong>${esc(b.name)}</strong><small>${b.accounts} cuenta${b.accounts>1?'s':''} · ${b.share.toFixed(2)}% del saldo final</small><div class="progress"><i style="width:${Math.max(0,b.share)}%;background:${b.color}"></i></div></div><div class="amount">${moneyAllViews(b.final)}</div></div>`).join('');
+function renderBankList() {
+  document.getElementById('bankList').innerHTML = DATA.banks.slice().sort((a, b) => b.final - a.final).map(b => `
+    <div class="bank-row"><span class="dot" style="background:${b.color}"></span><div><strong>${esc(b.name)}</strong><small>${b.accounts} cuenta${b.accounts > 1 ? 's' : ''} · ${b.share.toFixed(2)}% del saldo final</small><div class="progress"><i style="width:${Math.max(0, b.share)}%;background:${b.color}"></i></div></div><div class="amount">${moneyAllViews(b.final)}</div></div>`).join('');
 }
 
-function renderInsights(){
-  const largestBank=DATA.banks.slice().sort((a,b)=>b.final-a.final)[0];
-  const biggestDrop=DATA.banks.slice().sort((a,b)=>a.change-b.change)[0];
-  const mc=DATA.highlights.maxCredit, md=DATA.highlights.maxDebit;
-  document.getElementById('insights').innerHTML=`
-    <div class="insight"><div class="tag">Mayor saldo final</div><b>${largestBank?largestBank.name:'—'}</b><p>${largestBank?`${moneyAllViews(largestBank.final)} · ${largestBank.share.toFixed(2)}% del total.`:'Sin datos.'}</p></div>
-    <div class="insight"><div class="tag">Mayor reducción de saldo</div><b>${biggestDrop?biggestDrop.name:'—'}</b><p class="${biggestDrop?cls(biggestDrop.change):''}">${biggestDrop?`${moneyAllViews(biggestDrop.change)} (${biggestDrop.changePct===null?'—':pct(biggestDrop.changePct)}).`:'Sin datos.'}</p></div>
-    <div class="insight"><div class="tag">Mayor día de créditos</div><b>${mc?mc.label:'—'}</b><p>${mc?moneyAllViews(mc.credits)+' en créditos.':'Sin movimientos en el período.'}</p></div>
-    <div class="insight"><div class="tag">Mayor día de débitos</div><b>${md?md.label:'—'}</b><p>${md?moneyAllViews(md.debits)+' en débitos.':'Sin movimientos en el período.'}</p></div>`;
+function renderInsights() {
+  const largestBank = DATA.banks.slice().sort((a, b) => b.final - a.final)[0];
+  const biggestDrop = DATA.banks.slice().sort((a, b) => a.change - b.change)[0];
+  const mc = DATA.highlights.maxCredit, md = DATA.highlights.maxDebit;
+  document.getElementById('insights').innerHTML = `
+    <div class="insight"><div class="tag">Mayor saldo final</div><b>${largestBank ? largestBank.name : '—'}</b><p>${largestBank ? `${moneyAllViews(largestBank.final)} · ${largestBank.share.toFixed(2)}% del total.` : 'Sin datos.'}</p></div>
+    <div class="insight"><div class="tag">Mayor reducción de saldo</div><b>${biggestDrop ? biggestDrop.name : '—'}</b><p class="${biggestDrop ? cls(biggestDrop.change) : ''}">${biggestDrop ? `${moneyAllViews(biggestDrop.change)} (${biggestDrop.changePct === null ? '—' : pct(biggestDrop.changePct)}).` : 'Sin datos.'}</p></div>
+    <div class="insight"><div class="tag">Mayor día de créditos</div><b>${mc ? mc.label : '—'}</b><p>${mc ? moneyAllViews(mc.credits) + ' en créditos.' : 'Sin movimientos en el período.'}</p></div>
+    <div class="insight"><div class="tag">Mayor día de débitos</div><b>${md ? md.label : '—'}</b><p>${md ? moneyAllViews(md.debits) + ' en débitos.' : 'Sin movimientos en el período.'}</p></div>`;
 }
 
-function renderBankCards(){
-  document.getElementById('bankCards').innerHTML=DATA.banks.map(b=>`
-    <div class="bank-card" style="--bank:${b.color}"><div class="bank-title"><span>${esc(b.name)}</span><span class="bank-icon ${logoClass(b)}">${bankLogoHtml(b,'card')}</span></div><div class="big">${moneyAllViews(b.final)}</div><div class="small">Saldo final · ${b.share.toFixed(2)}% del total</div><div class="bank-metrics"><div class="mini"><b>${moneyAllViews(b.initial)}</b><span>Saldo inicial</span></div><div class="mini"><b class="${cls(b.change)}">${moneyAllViews(b.change)}</b><span>Variación</span></div><div class="mini"><b class="positive">${moneyAllViews(b.credits)}</b><span>Créditos</span></div><div class="mini"><b class="negative">${moneyAllViews(b.debits)}</b><span>Débitos</span></div></div></div>`).join('');
+function renderBankCards() {
+  document.getElementById('bankCards').innerHTML = DATA.banks.map(b => `
+    <div class="bank-card" style="--bank:${b.color}"><div class="bank-title"><span>${esc(b.name)}</span><span class="bank-icon ${logoClass(b)}">${bankLogoHtml(b, 'card')}</span></div><div class="big">${moneyAllViews(b.final)}</div><div class="small">Saldo final · ${b.share.toFixed(2)}% del total</div><div class="bank-metrics"><div class="mini"><b>${moneyAllViews(b.initial)}</b><span>Saldo inicial</span></div><div class="mini"><b class="${cls(b.change)}">${moneyAllViews(b.change)}</b><span>Variación</span></div><div class="mini"><b class="positive">${moneyAllViews(b.credits)}</b><span>Créditos</span></div><div class="mini"><b class="negative">${moneyAllViews(b.debits)}</b><span>Débitos</span></div></div></div>`).join('');
 }
 
-const bankFilter=document.getElementById('bankFilter');
+const bankFilter = document.getElementById('bankFilter');
 
-function rebuildBankFilter(){
-  const previous=bankFilter.value||'ALL';
+function rebuildBankFilter() {
+  const previous = bankFilter.value || 'ALL';
 
-  bankFilter.innerHTML='<option value="ALL">Todos los bancos</option>';
+  bankFilter.innerHTML = '<option value="ALL">Todos los bancos</option>';
 
-  DATA.banks.forEach(b=>{
-    const o=document.createElement('option');
-    o.value=b.key;
-    o.textContent=b.name;
+  DATA.banks.forEach(b => {
+    const o = document.createElement('option');
+    o.value = b.key;
+    o.textContent = b.name;
     bankFilter.appendChild(o);
   });
 
-  const valid=[...bankFilter.options].some(o=>o.value===previous);
-  bankFilter.value=valid?previous:'ALL';
+  const valid = [...bankFilter.options].some(o => o.value === previous);
+  bankFilter.value = valid ? previous : 'ALL';
 }
 
-function renderAccounts(){
-  const f=bankFilter.value;
-  const rows=DATA.accounts.filter(a=>f==='ALL'||a.bankKey===f);
-  document.getElementById('accountsTable').innerHTML=rows.map(a=>`<tr><td><span class="badge">${esc(a.bank)}</span></td><td><b>${esc(a.account)}</b></td><td class="num">${moneyAllViews(a.initial)}</td><td class="num"><b>${moneyAllViews(a.final)}</b></td><td class="num ${cls(a.change)}">${moneyAllViews(a.change)}</td><td class="num ${cls(a.change)}">${a.changePct===null?'—':pct(a.changePct)}</td><td class="num positive">${moneyAllViews(a.credits)}</td><td class="num negative">${moneyAllViews(a.debits)}</td></tr>`).join('');
+function renderAccounts() {
+  const f = bankFilter.value;
+  const rows = DATA.accounts.filter(a => f === 'ALL' || a.bankKey === f);
+  document.getElementById('accountsTable').innerHTML = rows.map(a => `<tr><td><span class="badge">${esc(a.bank)}</span></td><td><b>${esc(a.account)}</b></td><td class="num">${moneyAllViews(a.initial)}</td><td class="num"><b>${moneyAllViews(a.final)}</b></td><td class="num ${cls(a.change)}">${moneyAllViews(a.change)}</td><td class="num ${cls(a.change)}">${a.changePct === null ? '—' : pct(a.changePct)}</td><td class="num positive">${moneyAllViews(a.credits)}</td><td class="num negative">${moneyAllViews(a.debits)}</td></tr>`).join('');
 }
-bankFilter.addEventListener('change',renderAccounts);
+bankFilter.addEventListener('change', renderAccounts);
 
-function renderDailyTable(){
-  document.getElementById('dailyTable').innerHTML=DATA.daily.length?DATA.daily.map(d=>`<tr><td><b>${d.label}/2026</b></td><td class="num">${d.moves}</td><td class="num negative">${moneyAllViews(d.debits)}</td><td class="num positive">${moneyAllViews(d.credits)}</td><td class="num ${cls(d.net)}"><b>${moneyAllViews(d.net)}</b></td></tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:#94A0B2;padding:24px">No hay movimientos en el período seleccionado.</td></tr>';
+function renderDailyTable() {
+  document.getElementById('dailyTable').innerHTML = DATA.daily.length ? DATA.daily.map(d => `<tr><td><b>${d.label}/2026</b></td><td class="num">${d.moves}</td><td class="num negative">${moneyAllViews(d.debits)}</td><td class="num positive">${moneyAllViews(d.credits)}</td><td class="num ${cls(d.net)}"><b>${moneyAllViews(d.net)}</b></td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:#94A0B2;padding:24px">No hay movimientos en el período seleccionado.</td></tr>';
 }
 
-function renderAll(){
+function renderAll() {
   renderCountrySwitcher();
   syncCurrencyControls();
   renderHeader();
@@ -842,241 +842,244 @@ function renderAll(){
   rebuildBankFilter();
   renderAccounts();
   renderDailyTable();
-  setTimeout(drawAll,60);
+  setTimeout(drawAll, 60);
 }
 
 
-function renderCoverLogos(){
-  const coverBanks=Array.isArray(DATA&&DATA.banks)?DATA.banks:[];
-  const totalBanks=coverBanks.length;
+function renderCoverLogos() {
+  const coverBanks = Array.isArray(DATA && DATA.banks) ? DATA.banks : [];
+  const totalBanks = coverBanks.length;
 
-  document.getElementById('coverBankLogos').innerHTML=coverBanks.map((b,index)=>{
-    let extraClass='';
+  document.getElementById('coverBankLogos').innerHTML = coverBanks.map((b, index) => {
+    let extraClass = '';
 
-    if(totalBanks===1){
-      extraClass='is-single';
-    }else if(totalBanks%2===1&&index===totalBanks-1){
-      extraClass='is-last-odd';
+    if (totalBanks === 1) {
+      extraClass = 'is-single';
+    } else if (totalBanks % 2 === 1 && index === totalBanks - 1) {
+      extraClass = 'is-last-odd';
     }
 
     return `<div class="cover-logo ${extraClass}">
-      ${bankLogoHtml(b,'cover')}
+      ${bankLogoHtml(b, 'cover')}
     </div>`;
   }).join('');
 }
 
-const dateFrom=document.getElementById('dateFrom'), dateTo=document.getElementById('dateTo');
-dateFrom.min=MIN_DATE;dateFrom.max=MAX_DATE;dateTo.min=MIN_DATE;dateTo.max=MAX_DATE;dateFrom.value=MIN_DATE;dateTo.value=MAX_DATE;
+const dateFrom = document.getElementById('dateFrom'), dateTo = document.getElementById('dateTo');
+dateFrom.min = MIN_DATE; dateFrom.max = MAX_DATE; dateTo.min = MIN_DATE; dateTo.max = MAX_DATE; dateFrom.value = MIN_DATE; dateTo.value = MAX_DATE;
 
 
-function renderCountrySwitcher(){
-  const counts=countryCounts();
+function renderCountrySwitcher() {
+  const counts = countryCounts();
 
-  document.querySelectorAll('[data-country-count]').forEach(el=>{
-    const country=normalizeCountry(el.dataset.countryCount);
-    el.textContent=counts[country]||0;
+  document.querySelectorAll('[data-country-count]').forEach(el => {
+    const country = normalizeCountry(el.dataset.countryCount);
+    el.textContent = counts[country] || 0;
   });
 
-  document.querySelectorAll('.country-btn').forEach(btn=>{
-    const country=normalizeCountry(btn.dataset.country);
-    const available=(counts[country]||0)>0;
+  document.querySelectorAll('.country-btn').forEach(btn => {
+    const country = normalizeCountry(btn.dataset.country);
+    const available = (counts[country] || 0) > 0;
 
-    btn.disabled=!available;
+    btn.disabled = !available;
     btn.classList.toggle(
       'active',
-      country===ACTIVE_COUNTRY
+      country === ACTIVE_COUNTRY
     );
   });
 }
 
-document.querySelectorAll('.country-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    const nextCountry=normalizeCountry(
+document.querySelectorAll('.country-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const nextCountry = normalizeCountry(
       btn.dataset.country
     );
 
-    const counts=countryCounts();
+    const counts = countryCounts();
 
-    if(
-      nextCountry===ACTIVE_COUNTRY
-      || (counts[nextCountry]||0)===0
-    ){
+    if (
+      nextCountry === ACTIVE_COUNTRY
+      || (counts[nextCountry] || 0) === 0
+    ) {
       return;
     }
 
-    ACTIVE_COUNTRY=nextCountry;
-    bankFilter.value='ALL';
+    ACTIVE_COUNTRY = nextCountry;
+    bankFilter.value = 'ALL';
 
-    DATA=buildFiltered(
-      dateFrom.value||MIN_DATE,
-      dateTo.value||MAX_DATE
+    DATA = buildFiltered(
+      dateFrom.value || MIN_DATE,
+      dateTo.value || MAX_DATE
     );
 
     renderAll();
   });
 });
 
-function syncDateLimits(){
-  dateFrom.max=dateTo.value||MAX_DATE;
-  dateTo.min=dateFrom.value||MIN_DATE;
+function syncDateLimits() {
+  dateFrom.max = dateTo.value || MAX_DATE;
+  dateTo.min = dateFrom.value || MIN_DATE;
 }
 
-function applyCurrentDateFilter(showAlert=true){
-  const from=dateFrom.value||MIN_DATE;
-  const to=dateTo.value||MAX_DATE;
-  if(from>to){
-    if(showAlert) alert('La fecha inicial no puede ser posterior a la fecha final.');
+function applyCurrentDateFilter(showAlert = true) {
+  const from = dateFrom.value || MIN_DATE;
+  const to = dateTo.value || MAX_DATE;
+  if (from > to) {
+    if (showAlert) alert('La fecha inicial no puede ser posterior a la fecha final.');
     return false;
   }
-  DATA=buildFiltered(from,to);
+  DATA = buildFiltered(from, to);
   renderAll();
   return true;
 }
 
 // El tablero responde al cambio de cualquiera de las dos fechas.
-dateFrom.addEventListener('change',()=>{syncDateLimits();applyCurrentDateFilter(false)});
-dateTo.addEventListener('change',()=>{syncDateLimits();applyCurrentDateFilter(false)});
-document.getElementById('applyDateFilter').addEventListener('click',()=>applyCurrentDateFilter(true));
-document.getElementById('resetDateFilter').addEventListener('click',()=>{
-  dateFrom.value=MIN_DATE;
-  dateTo.value=MAX_DATE;
+dateFrom.addEventListener('change', () => { syncDateLimits(); applyCurrentDateFilter(false) });
+dateTo.addEventListener('change', () => { syncDateLimits(); applyCurrentDateFilter(false) });
+document.getElementById('applyDateFilter').addEventListener('click', () => applyCurrentDateFilter(true));
+document.getElementById('resetDateFilter').addEventListener('click', () => {
+  dateFrom.value = MIN_DATE;
+  dateTo.value = MAX_DATE;
   syncDateLimits();
   applyCurrentDateFilter(false);
 });
 
 // Primera carga: también se construye desde los registros reales, no desde el resumen estático.
 initCurrencyControls();
-DATA=buildFiltered(MIN_DATE,MAX_DATE);
+DATA = buildFiltered(MIN_DATE, MAX_DATE);
 renderAll();
 startExchangeRateAutoRefresh();
 
-document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.target).classList.add('active');setTimeout(drawAll,80);
+document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active')); document.querySelectorAll('.section').forEach(x => x.classList.remove('active')); btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.add('active'); setTimeout(drawAll, 80);
 }));
 
-function fitCanvas(canvas){
-  const dpr=window.devicePixelRatio||1,rect=canvas.getBoundingClientRect();canvas.width=Math.max(300,rect.width*dpr);canvas.height=Math.max(220,rect.height*dpr);const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return {ctx,w:rect.width,h:rect.height};
+function fitCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1, rect = canvas.getBoundingClientRect(); canvas.width = Math.max(300, rect.width * dpr); canvas.height = Math.max(220, rect.height * dpr); const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w: rect.width, h: rect.height };
 }
-function roundedRect(ctx,x,y,w,h,r,fill){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill()}
-function text(ctx,t,x,y,opt={}){ctx.fillStyle=opt.color||'#D9E1EC';ctx.font=`${opt.weight||600} ${opt.size||12}px Inter,Segoe UI,Arial`;ctx.textAlign=opt.align||'left';ctx.textBaseline='middle';ctx.fillText(t,x,y)}
-function drawGroupedBars(id,labels,s1,s2,c1,c2){
-  const {ctx,w,h}=fitCanvas(document.getElementById(id));ctx.clearRect(0,0,w,h);const L=85,R=18,T=25,B=45,pw=w-L-R,ph=h-T-B;const max=Math.max(...s1,...s2,1)*1.12;ctx.strokeStyle='#3B4350';ctx.lineWidth=1;for(let i=0;i<=4;i++){const y=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();text(ctx,moneyAllViews(max*(1-i/4)),L-8,y,{size:10,color:'#8F9AAB',align:'right',weight:500})}const group=pw/labels.length,bw=Math.min(32,group*.28);labels.forEach((lab,i)=>{const cx=L+group*(i+.5),h1=ph*s1[i]/max,h2=ph*s2[i]/max;roundedRect(ctx,cx-bw-3,T+ph-h1,bw,h1,6,c1);roundedRect(ctx,cx+3,T+ph-h2,bw,h2,6,c2);text(ctx,lab,cx,h-B/2+15,{size:10,color:'#B8C2D1',align:'center',weight:700})});
+function roundedRect(ctx, x, y, w, h, r, fill) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill() }
+function text(ctx, t, x, y, opt = {}) { ctx.fillStyle = opt.color || '#D9E1EC'; ctx.font = `${opt.weight || 600} ${opt.size || 12}px Inter,Segoe UI,Arial`; ctx.textAlign = opt.align || 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y) }
+function drawGroupedBars(id, labels, s1, s2, c1, c2) {
+  const { ctx, w, h } = fitCanvas(document.getElementById(id)); ctx.clearRect(0, 0, w, h); const L = 85, R = 18, T = 25, B = 45, pw = w - L - R, ph = h - T - B; const max = Math.max(...s1, ...s2, 1) * 1.12; ctx.strokeStyle = '#3B4350'; ctx.lineWidth = 1; for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); text(ctx, moneyAllViews(max * (1 - i / 4)), L - 8, y, { size: 10, color: '#8F9AAB', align: 'right', weight: 500 }) } const group = pw / labels.length, bw = Math.min(32, group * .28); labels.forEach((lab, i) => { const cx = L + group * (i + .5), h1 = ph * s1[i] / max, h2 = ph * s2[i] / max; roundedRect(ctx, cx - bw - 3, T + ph - h1, bw, h1, 6, c1); roundedRect(ctx, cx + 3, T + ph - h2, bw, h2, 6, c2); text(ctx, lab, cx, h - B / 2 + 15, { size: 10, color: '#B8C2D1', align: 'center', weight: 700 }) });
 }
-function drawNetBars(){
-  const {ctx,w,h}=fitCanvas(document.getElementById('netBankChart'));ctx.clearRect(0,0,w,h);const vals=DATA.banks.map(b=>b.netFlow),labels=DATA.banks.map(b=>b.name.replace('Banco ',''));const L=85,R=20,T=25,B=45,pw=w-L-R,ph=h-T-B,max=Math.max(...vals.map(Math.abs),1)*1.15,mid=T+ph/2;ctx.strokeStyle='#667085';ctx.beginPath();ctx.moveTo(L,mid);ctx.lineTo(w-R,mid);ctx.stroke();const group=pw/vals.length,bw=Math.min(48,group*.48);vals.forEach((v,i)=>{const barh=(ph/2)*Math.abs(v)/max,cx=L+group*(i+.5),y=v>=0?mid-barh:mid;roundedRect(ctx,cx-bw/2,y,bw,barh,7,v>=0?'#34D399':'#FB7185');text(ctx,labels[i],cx,h-18,{size:10,color:'#B8C2D1',align:'center',weight:700});text(ctx,moneyAllViews(v),cx,v>=0?Math.max(T+10,y-10):Math.min(h-B-5,y+barh+12),{size:10,color:v>=0?'#6EE7B7':'#FDA4AF',align:'center',weight:700})});
+function drawNetBars() {
+  const { ctx, w, h } = fitCanvas(document.getElementById('netBankChart')); ctx.clearRect(0, 0, w, h); const vals = DATA.banks.map(b => b.netFlow), labels = DATA.banks.map(b => b.name.replace('Banco ', '')); const L = 85, R = 20, T = 25, B = 45, pw = w - L - R, ph = h - T - B, max = Math.max(...vals.map(Math.abs), 1) * 1.15, mid = T + ph / 2; ctx.strokeStyle = '#667085'; ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(w - R, mid); ctx.stroke(); const group = pw / vals.length, bw = Math.min(48, group * .48); vals.forEach((v, i) => { const barh = (ph / 2) * Math.abs(v) / max, cx = L + group * (i + .5), y = v >= 0 ? mid - barh : mid; roundedRect(ctx, cx - bw / 2, y, bw, barh, 7, v >= 0 ? '#34D399' : '#FB7185'); text(ctx, labels[i], cx, h - 18, { size: 10, color: '#B8C2D1', align: 'center', weight: 700 }); text(ctx, moneyAllViews(v), cx, v >= 0 ? Math.max(T + 10, y - 10) : Math.min(h - B - 5, y + barh + 12), { size: 10, color: v >= 0 ? '#6EE7B7' : '#FDA4AF', align: 'center', weight: 700 }) });
 }
-function drawDaily(){
-  const canvas=document.getElementById('dailyChart'),{ctx,w,h}=fitCanvas(canvas);ctx.clearRect(0,0,w,h);if(!DATA.daily.length){text(ctx,'Sin movimientos en el período seleccionado',w/2,h/2,{size:13,color:'#94A0B2',align:'center',weight:650});return}const L=80,R=20,T=24,B=48,pw=w-L-R,ph=h-T-B,vals=[...DATA.daily.map(d=>d.credits),...DATA.daily.map(d=>d.debits)],max=Math.max(...vals,1)*1.1;ctx.strokeStyle='#3B4350';for(let i=0;i<=4;i++){const y=T+ph*i/4;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(w-R,y);ctx.stroke();text(ctx,moneyAllViews(max*(1-i/4)),L-8,y,{size:10,color:'#8F9AAB',align:'right',weight:500})}const x=i=>L+pw*(i/(DATA.daily.length-1||1)),y=v=>T+ph-(v/max*ph);function line(key,color){ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();DATA.daily.forEach((d,i)=>{const xx=x(i),yy=y(d[key]);i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy)});ctx.stroke();DATA.daily.forEach((d,i)=>{ctx.fillStyle=color;ctx.beginPath();ctx.arc(x(i),y(d[key]),3,0,Math.PI*2);ctx.fill()})}line('credits','#34D399');line('debits','#FB7185');DATA.daily.forEach((d,i)=>{if(i%2===0||DATA.daily.length<12)text(ctx,d.label,x(i),h-18,{size:9,color:'#9BA6B6',align:'center',weight:600})});
+function drawDaily() {
+  const canvas = document.getElementById('dailyChart'), { ctx, w, h } = fitCanvas(canvas); ctx.clearRect(0, 0, w, h); if (!DATA.daily.length) { text(ctx, 'Sin movimientos en el período seleccionado', w / 2, h / 2, { size: 13, color: '#94A0B2', align: 'center', weight: 650 }); return } const L = 80, R = 20, T = 24, B = 48, pw = w - L - R, ph = h - T - B, vals = [...DATA.daily.map(d => d.credits), ...DATA.daily.map(d => d.debits)], max = Math.max(...vals, 1) * 1.1; ctx.strokeStyle = '#3B4350'; for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); text(ctx, moneyAllViews(max * (1 - i / 4)), L - 8, y, { size: 10, color: '#8F9AAB', align: 'right', weight: 500 }) } const x = i => L + pw * (i / (DATA.daily.length - 1 || 1)), y = v => T + ph - (v / max * ph); function line(key, color) { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); DATA.daily.forEach((d, i) => { const xx = x(i), yy = y(d[key]); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy) }); ctx.stroke(); DATA.daily.forEach((d, i) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x(i), y(d[key]), 3, 0, Math.PI * 2); ctx.fill() }) } line('credits', '#34D399'); line('debits', '#FB7185'); DATA.daily.forEach((d, i) => { if (i % 2 === 0 || DATA.daily.length < 12) text(ctx, d.label, x(i), h - 18, { size: 9, color: '#9BA6B6', align: 'center', weight: 600 }) });
 }
-function drawAll(){if(document.getElementById('balancesChart').offsetParent)drawGroupedBars('balancesChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.initial),DATA.banks.map(b=>b.final),'#60A5FA','#34D399');if(document.getElementById('flowBankChart').offsetParent)drawGroupedBars('flowBankChart',DATA.banks.map(b=>b.name.replace('Banco ','')),DATA.banks.map(b=>b.credits),DATA.banks.map(b=>b.debits),'#34D399','#FB7185');if(document.getElementById('netBankChart').offsetParent)drawNetBars();if(document.getElementById('dailyChart').offsetParent)drawDaily()}
-window.addEventListener('resize',()=>setTimeout(drawAll,80));
-function toggleFullscreen(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.()}
+function drawAll() { if (document.getElementById('balancesChart').offsetParent) drawGroupedBars('balancesChart', DATA.banks.map(b => b.name.replace('Banco ', '')), DATA.banks.map(b => b.initial), DATA.banks.map(b => b.final), '#60A5FA', '#34D399'); if (document.getElementById('flowBankChart').offsetParent) drawGroupedBars('flowBankChart', DATA.banks.map(b => b.name.replace('Banco ', '')), DATA.banks.map(b => b.credits), DATA.banks.map(b => b.debits), '#34D399', '#FB7185'); if (document.getElementById('netBankChart').offsetParent) drawNetBars(); if (document.getElementById('dailyChart').offsetParent) drawDaily() }
+window.addEventListener('resize', () => setTimeout(drawAll, 80));
+function toggleFullscreen() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.() }
 
 
 // dashboard_consolidado_regional_final_v2.js
 
 (function () {
-    "use strict";
+  "use strict";
 
-    window.DASHBOARD_ACTIVE_COUNTRY = window.DASHBOARD_ACTIVE_COUNTRY || "GUATEMALA";
+  window.DASHBOARD_ACTIVE_COUNTRY = window.DASHBOARD_ACTIVE_COUNTRY || "GUATEMALA";
 
- function getRegionalData() {
+  function getRegionalData() {
 
     return window.DASHBOARD_BASE_DATA?.regional || {};
 
-}
+  }
 
-    function getActiveDashboardData(country) {
-        const regional = getRegionalData();
+  function getActiveDashboardData(country) {
+    const regional = getRegionalData();
 
-        if (country === "CONSOLIDADO" && regional.CONSOLIDADO) {
-            return regional.CONSOLIDADO;
-        }
-
-        if (regional[country]) {
-            return regional[country];
-        }
-
-        return window.DASHBOARD_BASE_DATA || {};
+    if (country === "CONSOLIDADO" && regional.CONSOLIDADO) {
+      return regional.CONSOLIDADO;
     }
 
-    window.changeDashboardCountry = function (country) {
-        window.DASHBOARD_ACTIVE_COUNTRY = country;
-
-        const data = getActiveDashboardData(country);
-
-        window.DASHBOARD_CURRENT_DATA = data;
-
-        if (typeof window.renderDashboard === "function") {
-            window.renderDashboard(data);
-        } else if (typeof window.refreshDashboard === "function") {
-            window.refreshDashboard(data);
-        }
-
-        document.querySelectorAll("[data-country]").forEach(btn => {
-            btn.classList.toggle(
-                "active",
-                btn.dataset.country === country
-            );
-        });
-
-        if (typeof window.actualizarControlMoneda === "function") {
-            window.actualizarControlMoneda(country);
-        }
-    };
-
-    function unirConsolidado(gt, sv) {
-        gt = gt || {};
-        sv = sv || {};
-
-        return {
-            meta: {
-                country: "CONSOLIDADO"
-            },
-            totals: {
-                ...(gt.totals || {}),
-                consolidated: true
-            },
-            banks: [
-                ...(gt.banks || []),
-                ...(sv.banks || [])
-            ],
-            accounts: [
-                ...(gt.accounts || []),
-                ...(sv.accounts || [])
-            ],
-            daily: [
-                ...(gt.daily || []),
-                ...(sv.daily || [])
-            ],
-            highlights: {
-                ...(gt.highlights || {}),
-                ...(sv.highlights || {})
-            }
-        };
+    if (regional[country]) {
+      return regional[country];
     }
 
-    window.buildConsolidadoRegional = function () {
-        const regional = getRegionalData();
+    return window.DASHBOARD_BASE_DATA || {};
+  }
 
-        if (regional.CONSOLIDADO) {
-            return regional.CONSOLIDADO;
-        }
+  window.changeDashboardCountry = function (country) {
+    window.DASHBOARD_ACTIVE_COUNTRY = country;
 
-        return unirConsolidado(
-            regional.GUATEMALA,
-            regional.EL_SALVADOR
-        );
-    };
+    const data = getActiveDashboardData(country);
 
-    document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll("[data-country]").forEach(button => {
-            button.addEventListener("click", function () {
-                window.changeDashboardCountry(
-                    this.dataset.country
-                );
-            });
-        });
+    window.DASHBOARD_CURRENT_DATA = data;
+    if (typeof window.renderAll === "function") {
+
+      window.renderAll(data);
+
+    } else if (typeof window.refreshDashboard === "function") {
+
+      window.refreshDashboard(data);
+
+    }
+
+    document.querySelectorAll("[data-country]").forEach(btn => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.country === country
+      );
     });
+
+    if (typeof window.actualizarControlMoneda === "function") {
+      window.actualizarControlMoneda(country);
+    }
+  };
+
+  function unirConsolidado(gt, sv) {
+    gt = gt || {};
+    sv = sv || {};
+
+    return {
+      meta: {
+        country: "CONSOLIDADO"
+      },
+      totals: {
+        ...(gt.totals || {}),
+        consolidated: true
+      },
+      banks: [
+        ...(gt.banks || []),
+        ...(sv.banks || [])
+      ],
+      accounts: [
+        ...(gt.accounts || []),
+        ...(sv.accounts || [])
+      ],
+      daily: [
+        ...(gt.daily || []),
+        ...(sv.daily || [])
+      ],
+      highlights: {
+        ...(gt.highlights || {}),
+        ...(sv.highlights || {})
+      }
+    };
+  }
+
+  window.buildConsolidadoRegional = function () {
+    const regional = getRegionalData();
+
+    if (regional.CONSOLIDADO) {
+      return regional.CONSOLIDADO;
+    }
+
+    return unirConsolidado(
+      regional.GUATEMALA,
+      regional.EL_SALVADOR
+    );
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-country]").forEach(button => {
+      button.addEventListener("click", function () {
+        window.changeDashboardCountry(
+          this.dataset.country
+        );
+      });
+    });
+  });
 
 })();
