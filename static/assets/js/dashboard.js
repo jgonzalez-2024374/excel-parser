@@ -953,9 +953,11 @@ function toggleFullscreen(){document.fullscreenElement?document.exitFullscreen()
 
     window.DASHBOARD_ACTIVE_COUNTRY = window.DASHBOARD_ACTIVE_COUNTRY || "GUATEMALA";
 
-    function getRegionalData() {
-        return window.DASHBOARD_REGIONAL_DATA || {};
-    }
+ function getRegionalData() {
+
+    return window.DASHBOARD_BASE_DATA?.regional || {};
+
+}
 
     function getActiveDashboardData(country) {
         const regional = getRegionalData();
