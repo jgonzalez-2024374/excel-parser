@@ -6759,9 +6759,16 @@ def construir_dashboard_data(
         ]
 
         tx_sv = [
-            tx for tx in transactions
-            if normalizar_pais_bancario(tx.get("pais")) == "EL_SALVADOR"
-        ]
+    tx for tx in transactions
+    if normalizar_pais_bancario(
+        tx.get("pais")
+    ) == "EL_SALVADOR"
+    or detectar_pais_bancario(
+        banco=tx.get("banco", ""),
+        moneda=tx.get("moneda", "N/D"),
+        nombre_archivo=nombre_archivo
+    ) == "EL_SALVADOR"
+]
 
         regional_data = {
             "GUATEMALA": construir_dashboard_data(
@@ -6771,11 +6778,11 @@ def construir_dashboard_data(
                 False
             ) if tx_gt else None,
             "EL_SALVADOR": construir_dashboard_data(
-                tx_sv,
-                nombre_archivo,
-                moneda_preferida,
-                False
-            ) if tx_sv else None,
+    tx_sv,
+    nombre_archivo,
+    moneda_preferida,
+    False
+) if tx_sv else {}
         }
 
         regional_data["CONSOLIDADO"] = {
