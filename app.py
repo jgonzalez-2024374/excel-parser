@@ -6834,22 +6834,87 @@ def construir_dashboard_data(
 ) if tx_sv else {}
         }
 
+        # ========================================================
+        # CONSOLIDADO REGIONAL HOMOLOGADO A GTQ
+        # Guatemala se mantiene en GTQ.
+        # El Salvador se convierte de USD a GTQ únicamente aquí.
+        # Las vistas individuales permanecen intactas.
+        # ========================================================
+
+        gt_data = regional_data.get("GUATEMALA") or {}
+        sv_data = regional_data.get("EL_SALVADOR") or {}
+
+        gt_totals = gt_data.get("totals", {})
+        sv_totals = sv_data.get("totals", {})
+
+        tipo_cambio = FX_CACHE.get("rate_gtq_per_usd") or 1
+
         regional_data["CONSOLIDADO"] = {
             "meta": {
                 "country": "CONSOLIDADO REGIONAL",
-                "accounts": len(accounts),
-                "banks": len(banks)
+                "accounts": len(
+                    gt_data.get("accounts", [])
+                ) + len(
+                    sv_data.get("accounts", [])
+                ),
+                "banks": len(
+                    gt_data.get("banks", [])
+                ) + len(
+                    sv_data.get("banks", [])
+                ),
+                "currency": "GTQ",
+                "exchangeRate": tipo_cambio
             },
-            "banks": banks,
-            "accounts": accounts,
-            "daily": daily,
-            "transactions": raw_transactions,
+
+            "banks": (
+                gt_data.get("banks", [])
+                +
+                sv_data.get("banks", [])
+            ),
+
+            "accounts": (
+                gt_data.get("accounts", [])
+                +
+                sv_data.get("accounts", [])
+            ),
+
+            "daily": (
+                gt_data.get("daily", [])
+                +
+                sv_data.get("daily", [])
+            ),
+
+            "transactions": (
+                gt_data.get("transactions", [])
+                +
+                sv_data.get("transactions", [])
+            ),
+
             "totals": {
-                "initial": total_initial,
-                "final": total_final,
-                "credits": total_credits,
-                "debits": total_debits,
-                "netFlow": net_flow
+                "initial":
+                    gt_totals.get("initial", 0)
+                    +
+                    (sv_totals.get("initial", 0) * tipo_cambio),
+
+                "final":
+                    gt_totals.get("final", 0)
+                    +
+                    (sv_totals.get("final", 0) * tipo_cambio),
+
+                "credits":
+                    gt_totals.get("credits", 0)
+                    +
+                    (sv_totals.get("credits", 0) * tipo_cambio),
+
+                "debits":
+                    gt_totals.get("debits", 0)
+                    +
+                    (sv_totals.get("debits", 0) * tipo_cambio),
+
+                "netFlow":
+                    gt_totals.get("netFlow", 0)
+                    +
+                    (sv_totals.get("netFlow", 0) * tipo_cambio)
             }
         }
 
