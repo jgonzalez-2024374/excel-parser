@@ -219,12 +219,43 @@ const COUNTRY_INFO = {
     currency:'N/D'
   }
 };
-
 function normalizeCountry(value){
-  const v=String(value||'').trim().toUpperCase().replace(/\s+/g,'_');
-  if(v==='GUATEMALA'||v==='GT'||v==='GUA') return 'GUATEMALA';
-  if(v==='EL_SALVADOR'||v==='ELSALVADOR'||v==='SV'||v==='SLV') return 'EL_SALVADOR';
+
+  const v = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g,'_');
+
+
+  if(
+    v === 'GUATEMALA' ||
+    v === 'GT' ||
+    v === 'GUA'
+  ){
+    return 'GUATEMALA';
+  }
+
+
+  if(
+    v === 'EL_SALVADOR' ||
+    v === 'ELSALVADOR' ||
+    v === 'SV' ||
+    v === 'SLV'
+  ){
+    return 'EL_SALVADOR';
+  }
+
+
+  if(
+    v === 'CONSOLIDADO' ||
+    v === 'CONSOLIDADO_REGIONAL'
+  ){
+    return 'CONSOLIDADO';
+  }
+
+
   return 'NO_IDENTIFICADO';
+
 }
 
 function recordCountry(item){
@@ -258,28 +289,24 @@ function recordCountry(item){
 
   return 'NO_IDENTIFICADO';
 }
-
 function countryCounts(){
-  const counts={
-    GUATEMALA:0,
-    EL_SALVADOR:0,
-    NO_IDENTIFICADO:0
-  };
 
-  const seen=new Set();
+    const regional = window.DASHBOARD_BASE_DATA?.regional || {};
 
-  (Array.isArray(BASE_DATA.banks)?BASE_DATA.banks:[]).forEach(b=>{
-    const country=recordCountry(b);
-    const key=`${country}|${b.key||b.name||''}`;
-    if(!seen.has(key)){
-      seen.add(key);
-      counts[country]=(counts[country]||0)+1;
-    }
-  });
+    return {
 
-  return counts;
+        GUATEMALA:
+            (regional.GUATEMALA?.banks || []).length,
+
+        EL_SALVADOR:
+            (regional.EL_SALVADOR?.banks || []).length,
+
+        CONSOLIDADO:
+            (regional.CONSOLIDADO?.banks || []).length,
+
+        NO_IDENTIFICADO:0
+    };
 }
-
 const INITIAL_COUNTRY_COUNTS=countryCounts();
 
 let ACTIVE_COUNTRY=
