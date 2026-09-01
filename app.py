@@ -8130,13 +8130,111 @@ if __name__ == "__main__":
 
 # ===== DATOS CONSOLIDADO REGIONAL =====
 def construir_consolidado_regional(dashboard_gt, dashboard_sv):
+
     """Une Guatemala y El Salvador para la vista regional del dashboard."""
+
+    gt = dashboard_gt or {}
+    sv = dashboard_sv or {}
+
+    gt_totals = gt.get("totals", {})
+    sv_totals = sv.get("totals", {})
+
+    gt_transactions = gt.get("transactions", [])
+    sv_transactions = sv.get("transactions", [])
+
+    gt_accounts = gt.get("accounts", [])
+    sv_accounts = sv.get("accounts", [])
+
+    gt_banks = gt.get("banks", [])
+    sv_banks = sv.get("banks", [])
+
+
     return {
-        "GUATEMALA": dashboard_gt or {},
-        "EL_SALVADOR": dashboard_sv or {},
+
+        "GUATEMALA": gt,
+
+        "EL_SALVADOR": sv,
+
+
         "CONSOLIDADO": {
-            "banks": (dashboard_gt or {}).get("banks", []) + (dashboard_sv or {}).get("banks", []),
-            "accounts": (dashboard_gt or {}).get("accounts", []) + (dashboard_sv or {}).get("accounts", []),
-            "daily": (dashboard_gt or {}).get("daily", []) + (dashboard_sv or {}).get("daily", []),
+
+            "banks":
+                gt_banks + sv_banks,
+
+
+            "accounts":
+                gt_accounts + sv_accounts,
+
+
+            "daily":
+                gt.get("daily", []) +
+                sv.get("daily", []),
+
+
+            "transactions":
+                gt_transactions +
+                sv_transactions,
+
+
+            "meta": {
+
+                "country":
+                    "CONSOLIDADO REGIONAL",
+
+                "accounts":
+                    len(gt_accounts) +
+                    len(sv_accounts),
+
+                "banks":
+                    len(gt_banks) +
+                    len(sv_banks),
+
+                "movementCount":
+                    len(gt_transactions) +
+                    len(sv_transactions),
+
+                "currency":
+                    "MULTI"
+
+            },
+
+
+            "totals": {
+
+                "initial":
+                    gt_totals.get("initial", 0) +
+                    sv_totals.get("initial", 0),
+
+
+                "final":
+                    gt_totals.get("final", 0) +
+                    sv_totals.get("final", 0),
+
+
+                "credits":
+                    gt_totals.get("credits", 0) +
+                    sv_totals.get("credits", 0),
+
+
+                "debits":
+                    gt_totals.get("debits", 0) +
+                    sv_totals.get("debits", 0),
+
+
+                "change":
+                    gt_totals.get("change", 0) +
+                    sv_totals.get("change", 0)
+
+            },
+
+
+            "highlights": {
+
+                **gt.get("highlights", {}),
+                **sv.get("highlights", {})
+
+            }
+
         }
+
     }
