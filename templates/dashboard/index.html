@@ -6,6 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Red intelfon | Estados Bancarios</title>
   <link rel="stylesheet" href="/static/assets/css/dashboard.css">
+
+<style>
+/* Vista exclusiva consolidado regional */
+.regional-view{display:none;padding:24px 0;}
+.regional-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+.regional-card{background:rgba(30,41,59,.65);border:1px solid rgba(148,163,184,.18);border-radius:20px;padding:22px;}
+.regional-title{font-size:22px;font-weight:700;margin-bottom:18px;}
+.regional-chart{height:300px;}
+@media(max-width:900px){.regional-grid{grid-template-columns:1fr;}}
+</style>
 </head>
 
 <body>
@@ -250,7 +260,18 @@
       <span>Fuente: <b id="sourceFile"></b></span>
       <span>Dashboard generado a partir de información contenida en el Excel suministrado.</span>
     </div>
+  
+<section id="regionalView" class="regional-view">
+  <div class="regional-title">Consolidado Regional Guatemala + El Salvador</div>
+  <div class="kpis" id="regionalKpis"></div>
+  <div class="regional-grid">
+    <div class="regional-card"><h2>Saldo por país</h2><canvas id="regionalCountryChart"></canvas></div>
+    <div class="regional-card"><h2>Saldo por banco regional</h2><canvas id="regionalBankChart"></canvas></div>
+    <div class="regional-card"><h2>Créditos vs Débitos</h2><canvas id="regionalFlowChart"></canvas></div>
   </div>
+</section>
+
+</div>
 
   <script>
     window.DASHBOARD_BASE_DATA = {{ base_data | tojson | safe }};
@@ -321,6 +342,17 @@
       });
     })();
   </script>
+
+<script>
+(function(){
+ function renderRegionalView(data){
+   document.getElementById('regionalView').style.display='block';
+   var k=document.getElementById('regionalKpis');
+   if(k){k.innerHTML=`<div class="kpi"><div class="label">Bancos</div><div class="value">${data.banks?.length||0}</div></div><div class="kpi"><div class="label">Cuentas</div><div class="value">${data.accounts?.length||0}</div></div><div class="kpi"><div class="label">Movimientos</div><div class="value">${data.transactions?.length||0}</div></div>`;}
+ }
+ window.renderRegionalView=renderRegionalView;
+})();
+</script>
 </body>
 
 </html>
