@@ -876,6 +876,8 @@ dateFrom.min = MIN_DATE; dateFrom.max = MAX_DATE; dateTo.min = MIN_DATE; dateTo.
 function renderCountrySwitcher() {
   const counts = countryCounts();
 
+  document.body.dataset.country = ACTIVE_COUNTRY || 'GUATEMALA';
+
   document.querySelectorAll('[data-country-count]').forEach(el => {
     const country = normalizeCountry(el.dataset.countryCount);
     el.textContent = counts[country] || 0;
