@@ -987,18 +987,39 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
   }
 
   function getActiveDashboardData(country) {
-    const regional = getRegionalData();
 
-    if (country === "CONSOLIDADO" && regional.CONSOLIDADO) {
-      return regional.CONSOLIDADO;
+    const regional = window.DASHBOARD_BASE_DATA?.regional || {};
+
+    console.log("CAMBIO PAIS:", country);
+    console.log("REGIONAL:", regional);
+
+
+    if(country === "CONSOLIDADO"){
+
+        console.log(
+            "CARGANDO CONSOLIDADO",
+            regional.CONSOLIDADO
+        );
+
+        return regional.CONSOLIDADO || {};
     }
 
-    if (regional[country]) {
-      return regional[country];
+
+    if(country === "GUATEMALA"){
+
+        return regional.GUATEMALA || {};
     }
+
+
+    if(country === "EL_SALVADOR"){
+
+        return regional.EL_SALVADOR || {};
+    }
+
 
     return window.DASHBOARD_BASE_DATA || {};
-  }
+
+}
 
   window.changeDashboardCountry = function (country) {
     window.DASHBOARD_ACTIVE_COUNTRY = country;
@@ -1006,7 +1027,7 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
     const data = getActiveDashboardData(country);
 
    window.DASHBOARD_CURRENT_DATA = data;
-window.DATA = data;
+wind  ow.DATA = data;
 
 if (typeof window.renderAll === "function") {
 
