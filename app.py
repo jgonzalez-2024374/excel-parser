@@ -5614,7 +5614,8 @@ def resolver_moneda_dashboard_final(
 def construir_dashboard_data(
     transactions,
     nombre_archivo="",
-    moneda_preferida="N/D"
+    moneda_preferida="N/D",
+    incluir_regional=True
 ):
     """
     Construye el dashboard con separación real por país.
@@ -6744,7 +6745,60 @@ def construir_dashboard_data(
         latest_display
     )
 
+    regional_data = {}
+
+    # ========================================================
+    # CONSOLIDADO REGIONAL GUATEMALA + EL SALVADOR
+    # ========================================================
+    # Se genera una vista adicional sin mezclar las monedas.
+    # Cada país mantiene sus propios bancos y cuentas.
+    if incluir_regional:
+        tx_gt = [
+            tx for tx in transactions
+            if normalizar_pais_bancario(tx.get("pais")) == "GUATEMALA"
+        ]
+
+        tx_sv = [
+            tx for tx in transactions
+            if normalizar_pais_bancario(tx.get("pais")) == "EL_SALVADOR"
+        ]
+
+        regional_data = {
+            "GUATEMALA": construir_dashboard_data(
+                tx_gt,
+                nombre_archivo,
+                moneda_preferida,
+                False
+            ) if tx_gt else None,
+            "EL_SALVADOR": construir_dashboard_data(
+                tx_sv,
+                nombre_archivo,
+                moneda_preferida,
+                False
+            ) if tx_sv else None,
+        }
+
+        regional_data["CONSOLIDADO"] = {
+            "meta": {
+                "country": "CONSOLIDADO REGIONAL",
+                "accounts": len(accounts),
+                "banks": len(banks)
+            },
+            "banks": banks,
+            "accounts": accounts,
+            "daily": daily,
+            "transactions": raw_transactions,
+            "totals": {
+                "initial": total_initial,
+                "final": total_final,
+                "credits": total_credits,
+                "debits": total_debits,
+                "netFlow": net_flow
+            }
+        }
+
     return {
+        "regional": regional_data,
         "meta": {
             "file": nombre_archivo or "Archivo bancario",
             "fileCut": file_cut,
