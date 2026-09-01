@@ -63,7 +63,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v5.4-disponible-general-sin-columna-por-cuenta-20260831"
+APP_BUILD = "dashboard-v5.6-consolidado-regional-20260901"
 
 
 # ============================================================
