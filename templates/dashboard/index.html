@@ -5,22 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Red intelfon | Estados Bancarios</title>
+  <link rel="icon" type="image/png" href="/static/assets/img/Logo.png">
   <link rel="stylesheet" href="/static/assets/css/dashboard.css">
-
-<style>
-/* Vista exclusiva consolidado regional */
-.regional-view{display:none;padding:24px 0;}
-.regional-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
-.regional-card{background:rgba(30,41,59,.65);border:1px solid rgba(148,163,184,.18);border-radius:20px;padding:22px;}
-.regional-title{font-size:22px;font-weight:700;margin-bottom:18px;}
-.regional-chart{height:300px;}
-@media(max-width:900px){.regional-grid{grid-template-columns:1fr;}}
-</style>
 </head>
 
 <body>
+
   <div class="top-toolbar">
-  
     <div class="top-toolbar-left">
       <div class="country-switcher" id="countrySwitcher">
         <div class="country-buttons">
@@ -35,10 +26,7 @@
             <span class="country-count" data-country-count="EL_SALVADOR">0</span>
           </button>
           <button type="button" class="country-btn" data-country="CONSOLIDADO">
-            <span>
-              <img src="/static/assets/img/conciliacion.png" alt="El Salvador">
-              Consolidado
-            </span>
+            <span>🌎 Consolidado Regional</span>
             <span class="country-count" data-country-count="CONSOLIDADO">0</span>
           </button>
         </div>
@@ -82,8 +70,6 @@
       </button>
     </div>
   </div>
-
-
   <title>Saldos Bancarios Consolidados</title>
   <div class="app">
     <section class="executive-cover" aria-label="Portada ejecutiva">
@@ -260,18 +246,7 @@
       <span>Fuente: <b id="sourceFile"></b></span>
       <span>Dashboard generado a partir de información contenida en el Excel suministrado.</span>
     </div>
-  
-<section id="regionalView" class="regional-view">
-  <div class="regional-title">Consolidado Regional Guatemala + El Salvador</div>
-  <div class="kpis" id="regionalKpis"></div>
-  <div class="regional-grid">
-    <div class="regional-card"><h2>Saldo por país</h2><canvas id="regionalCountryChart"></canvas></div>
-    <div class="regional-card"><h2>Saldo por banco regional</h2><canvas id="regionalBankChart"></canvas></div>
-    <div class="regional-card"><h2>Créditos vs Débitos</h2><canvas id="regionalFlowChart"></canvas></div>
   </div>
-</section>
-
-</div>
 
   <script>
     window.DASHBOARD_BASE_DATA = {{ base_data | tojson | safe }};
@@ -317,42 +292,62 @@
     })();
   </script>
 
-  <script>
-    // Oculta pestañas de detalle cuando se usa el consolidado regional
-    (function(){
-      function controlarTabsConsolidado(country){
-        var tabs = document.querySelector('.tabs');
-        if(!tabs) return;
-
-        var ocultar = country === 'CONSOLIDADO';
-        tabs.style.display = ocultar ? 'none' : '';
-
-        var resumen = document.querySelector('[data-target="resumen"]');
-        if(resumen){
-          resumen.classList.add('active');
-        }
-      }
-
-      window.controlarTabsConsolidado = controlarTabsConsolidado;
-
-      document.querySelectorAll('[data-country]').forEach(function(btn){
-        btn.addEventListener('click', function(){
-          controlarTabsConsolidado(btn.dataset.country);
-        });
-      });
-    })();
-  </script>
-
 <script>
 (function(){
- function renderRegionalView(data){
-   document.getElementById('regionalView').style.display='block';
-   var k=document.getElementById('regionalKpis');
-   if(k){k.innerHTML=`<div class="kpi"><div class="label">Bancos</div><div class="value">${data.banks?.length||0}</div></div><div class="kpi"><div class="label">Cuentas</div><div class="value">${data.accounts?.length||0}</div></div><div class="kpi"><div class="label">Movimientos</div><div class="value">${data.transactions?.length||0}</div></div>`;}
- }
- window.renderRegionalView=renderRegionalView;
+  /*
+    Consolidado Regional:
+    - La vista consolidada utiliza GTQ como moneda base.
+    - Los valores USD de El Salvador se convierten usando el tipo de cambio disponible.
+    - La conversión visual posterior puede usar el control existente.
+  */
+
+  window.REGIONAL_BASE_CURRENCY = "GTQ";
+
+  window.convertRegionalUSDToGTQ = function(value, exchangeRate){
+      return (Number(value) || 0) * (Number(exchangeRate) || 0);
+  };
+
+  window.normalizeRegionalConsolidado = function(data, exchangeRate){
+      if(!data) return data;
+
+      const sv = data.EL_SALVADOR || {};
+      const gt = data.GUATEMALA || {};
+
+      const svTotals = sv.totals || {};
+      const gtTotals = gt.totals || {};
+
+      const convert = (v) => window.convertRegionalUSDToGTQ(v, exchangeRate);
+
+      const convertedSV = {
+          initial: convert(svTotals.initial),
+          final: convert(svTotals.final),
+          credits: convert(svTotals.credits),
+          debits: convert(svTotals.debits),
+          change: convert(svTotals.change || 0)
+      };
+
+      const gtqTotals = {
+          initial: (gtTotals.initial || 0) + convertedSV.initial,
+          final: (gtTotals.final || 0) + convertedSV.final,
+          credits: (gtTotals.credits || 0) + convertedSV.credits,
+          debits: (gtTotals.debits || 0) + convertedSV.debits,
+          change: (gtTotals.change || 0) + convertedSV.change
+      };
+
+      if(data.CONSOLIDADO){
+          data.CONSOLIDADO.totals = gtqTotals;
+          data.CONSOLIDADO.meta = data.CONSOLIDADO.meta || {};
+          data.CONSOLIDADO.meta.currency = "GTQ";
+          data.CONSOLIDADO.meta.baseCurrency = "GTQ";
+          data.CONSOLIDADO.meta.note = "El Salvador convertido a GTQ para consolidado regional";
+      }
+
+      return data;
+  };
+
 })();
 </script>
+
 </body>
 
 </html>

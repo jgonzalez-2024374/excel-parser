@@ -8129,9 +8129,23 @@ if __name__ == "__main__":
     )   
 
 # ===== DATOS CONSOLIDADO REGIONAL =====
-def construir_consolidado_regional(dashboard_gt, dashboard_sv):
+def convertir_valores_usd_a_gtq(valor, tipo_cambio):
+    """
+    Convierte valores de El Salvador (USD) a GTQ para el consolidado regional.
+    """
+    try:
+        return float(valor or 0) * float(tipo_cambio or 0)
+    except Exception:
+        return 0.0
 
-    """Une Guatemala y El Salvador para la vista regional del dashboard."""
+
+def construir_consolidado_regional(dashboard_gt, dashboard_sv, tipo_cambio=None):
+
+    """
+    Une Guatemala y El Salvador para la vista regional.
+    La moneda base del consolidado es GTQ.
+    El Salvador se convierte de USD a GTQ antes de sumar.
+    """
 
     gt = dashboard_gt or {}
     sv = dashboard_sv or {}
@@ -8139,8 +8153,29 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv):
     gt_totals = gt.get("totals", {})
     sv_totals = sv.get("totals", {})
 
-    gt_transactions = gt.get("transactions", [])
-    sv_transactions = sv.get("transactions", [])
+    # Obtener tipo de cambio del cache si no viene recibido
+    if tipo_cambio is None:
+        tipo_cambio = FX_CACHE.get("rate_gtq_per_usd") or 1
+
+
+    sv_converted_totals = {
+        "initial": convertir_valores_usd_a_gtq(
+            sv_totals.get("initial"), tipo_cambio
+        ),
+        "final": convertir_valores_usd_a_gtq(
+            sv_totals.get("final"), tipo_cambio
+        ),
+        "credits": convertir_valores_usd_a_gtq(
+            sv_totals.get("credits"), tipo_cambio
+        ),
+        "debits": convertir_valores_usd_a_gtq(
+            sv_totals.get("debits"), tipo_cambio
+        ),
+        "change": convertir_valores_usd_a_gtq(
+            sv_totals.get("change"), tipo_cambio
+        )
+    }
+
 
     gt_accounts = gt.get("accounts", [])
     sv_accounts = sv.get("accounts", [])
@@ -8161,19 +8196,16 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv):
             "banks":
                 gt_banks + sv_banks,
 
-
             "accounts":
                 gt_accounts + sv_accounts,
-
 
             "daily":
                 gt.get("daily", []) +
                 sv.get("daily", []),
 
-
             "transactions":
-                gt_transactions +
-                sv_transactions,
+                gt.get("transactions", []) +
+                sv.get("transactions", []),
 
 
             "meta": {
@@ -8190,12 +8222,14 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv):
                     len(sv_banks),
 
                 "movementCount":
-                    len(gt_transactions) +
-                    len(sv_transactions),
+                    len(gt.get("transactions", [])) +
+                    len(sv.get("transactions", [])),
 
                 "currency":
-                    "MULTI"
+                    "GTQ",
 
+                "exchangeRate":
+                    tipo_cambio
             },
 
 
@@ -8203,28 +8237,23 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv):
 
                 "initial":
                     gt_totals.get("initial", 0) +
-                    sv_totals.get("initial", 0),
-
+                    sv_converted_totals["initial"],
 
                 "final":
                     gt_totals.get("final", 0) +
-                    sv_totals.get("final", 0),
-
+                    sv_converted_totals["final"],
 
                 "credits":
                     gt_totals.get("credits", 0) +
-                    sv_totals.get("credits", 0),
-
+                    sv_converted_totals["credits"],
 
                 "debits":
                     gt_totals.get("debits", 0) +
-                    sv_totals.get("debits", 0),
-
+                    sv_converted_totals["debits"],
 
                 "change":
                     gt_totals.get("change", 0) +
-                    sv_totals.get("change", 0)
-
+                    sv_converted_totals["change"]
             },
 
 
