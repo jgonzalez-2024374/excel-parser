@@ -290,6 +290,32 @@
       }, 0);
     })();
   </script>
+
+  <script>
+    // Oculta pestañas de detalle cuando se usa el consolidado regional
+    (function(){
+      function controlarTabsConsolidado(country){
+        var tabs = document.querySelector('.tabs');
+        if(!tabs) return;
+
+        var ocultar = country === 'CONSOLIDADO';
+        tabs.style.display = ocultar ? 'none' : '';
+
+        var resumen = document.querySelector('[data-target="resumen"]');
+        if(resumen){
+          resumen.classList.add('active');
+        }
+      }
+
+      window.controlarTabsConsolidado = controlarTabsConsolidado;
+
+      document.querySelectorAll('[data-country]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          controlarTabsConsolidado(btn.dataset.country);
+        });
+      });
+    })();
+  </script>
 </body>
 
 </html>

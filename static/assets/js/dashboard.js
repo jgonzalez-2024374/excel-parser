@@ -1036,6 +1036,7 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
     DATA = data;
 
     window.DATA = data;
+  controlarVistaConsolidado(country);
 
 
     if (typeof window.renderAll === "function") {
