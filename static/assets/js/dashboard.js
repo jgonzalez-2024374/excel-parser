@@ -994,50 +994,50 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
     console.log("REGIONAL:", regional);
 
 
-    if(country === "CONSOLIDADO"){
+    if (country === "CONSOLIDADO") {
 
-        console.log(
-            "CARGANDO CONSOLIDADO",
-            regional.CONSOLIDADO
-        );
+      console.log(
+        "CARGANDO CONSOLIDADO",
+        regional.CONSOLIDADO
+      );
 
-        return regional.CONSOLIDADO || {};
+      return regional.CONSOLIDADO || {};
     }
 
 
-    if(country === "GUATEMALA"){
+    if (country === "GUATEMALA") {
 
-        return regional.GUATEMALA || {};
+      return regional.GUATEMALA || {};
     }
 
 
-    if(country === "EL_SALVADOR"){
+    if (country === "EL_SALVADOR") {
 
-        return regional.EL_SALVADOR || {};
+      return regional.EL_SALVADOR || {};
     }
 
 
     return window.DASHBOARD_BASE_DATA || {};
 
-}
+  }
 
   window.changeDashboardCountry = function (country) {
     window.DASHBOARD_ACTIVE_COUNTRY = country;
 
     const data = getActiveDashboardData(country);
 
-   window.DASHBOARD_CURRENT_DATA = data;
-wind  ow.DATA = data;
+    window.DASHBOARD_CURRENT_DATA = data;
+    window.DATA = data;
 
-if (typeof window.renderAll === "function") {
+    if (typeof window.renderAll === "function") {
 
-    window.renderAll();
+      window.renderAll();
 
-} else if (typeof window.refreshDashboard === "function") {
+    } else if (typeof window.refreshDashboard === "function") {
 
-    window.refreshDashboard();
+      window.refreshDashboard();
 
-}
+    }
 
     document.querySelectorAll("[data-country]").forEach(btn => {
       btn.classList.toggle(
