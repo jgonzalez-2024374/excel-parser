@@ -8111,23 +8111,6 @@ def batch_status():
     })
 
 
-# ============================================================
-# SERVIDOR
-# ============================================================
-
-if __name__ == "__main__":
-
-    app.run(
-        host="0.0.0.0",
-        port=int(
-            os.environ.get(
-                "PORT",
-                5000
-            )
-        ),
-        debug=False
-    )   
-
 # ===== DATOS CONSOLIDADO REGIONAL =====
 def convertir_valores_usd_a_gtq(valor, tipo_cambio):
     """
@@ -8267,3 +8250,22 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv, tipo_cambio=None)
         }
 
     }
+
+
+# ============================================================
+# SERVIDOR
+# ============================================================
+
+if __name__ == "__main__":
+
+    app.run(
+        host="0.0.0.0",
+        port=int(
+            os.environ.get(
+                "PORT",
+                5000
+            )
+        ),
+        debug=False
+    )   
+
