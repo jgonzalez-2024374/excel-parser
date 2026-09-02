@@ -806,6 +806,32 @@ function renderBankList() {
 }
 
 function renderInsights() {
+
+  // En la vista Consolidado Regional no se muestran insights individuales.
+  // Evita errores porque el consolidado no siempre trae highlights.
+  if (window.DASHBOARD_ACTIVE_COUNTRY === "CONSOLIDADO") {
+    const insights = document.getElementById('insights');
+    if (insights) {
+      insights.innerHTML = '';
+      insights.style.display = 'none';
+    }
+    return;
+  }
+
+  const insights = document.getElementById('insights');
+  if (insights) {
+    insights.style.display = '';
+  }
+
+  DATA = DATA || {};
+  DATA.banks = Array.isArray(DATA.banks) ? DATA.banks : [];
+  DATA.highlights = DATA.highlights || {
+    maxCredit: null,
+    maxDebit: null,
+    maxNet: null,
+    minNet: null
+  };
+
   const largestBank = DATA.banks.slice().sort((a, b) => b.final - a.final)[0];
   const biggestDrop = DATA.banks.slice().sort((a, b) => a.change - b.change)[0];
   const mc = DATA.highlights.maxCredit, md = DATA.highlights.maxDebit;
