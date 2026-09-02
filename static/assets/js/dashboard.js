@@ -508,41 +508,65 @@ function initCurrencyControls() {
   const svToggle = document.getElementById('currency-toggle-sv');
   const regionalToggle = document.getElementById('currency-toggle-regional');
 
+  const applyCurrency = (country, currency) => {
+    const c = normalizeCountry(country);
+
+    if (c === 'GUATEMALA') {
+      COUNTRY_CURRENCY_VIEW.GUATEMALA = currency;
+    }
+
+    if (c === 'EL_SALVADOR') {
+      COUNTRY_CURRENCY_VIEW.EL_SALVADOR = currency;
+    }
+
+    if (c === 'CONSOLIDADO') {
+      COUNTRY_CURRENCY_VIEW.CONSOLIDADO = currency;
+    }
+
+    syncCurrencyControls();
+
+    if (normalizeCountry(ACTIVE_COUNTRY) === c) {
+      renderAll();
+    }
+  };
+
   if (gtToggle && !gtToggle.dataset.currencyBound) {
     gtToggle.dataset.currencyBound = '1';
+
     gtToggle.addEventListener('change', () => {
-      COUNTRY_CURRENCY_VIEW.GUATEMALA = gtToggle.checked ? 'USD' : 'GTQ';
-      if (normalizeCountry(ACTIVE_COUNTRY) === 'GUATEMALA') {
-        renderAll();
-      } else {
-        syncCurrencyControls();
-      }
+      applyCurrency(
+        'GUATEMALA',
+        gtToggle.checked ? 'USD' : 'GTQ'
+      );
     });
   }
 
   if (svToggle && !svToggle.dataset.currencyBound) {
     svToggle.dataset.currencyBound = '1';
+
     svToggle.addEventListener('change', () => {
-      COUNTRY_CURRENCY_VIEW.EL_SALVADOR = svToggle.checked ? 'GTQ' : 'USD';
-      if (normalizeCountry(ACTIVE_COUNTRY) === 'EL_SALVADOR') {
-        renderAll();
-      } else {
-        syncCurrencyControls();
-      }
+      applyCurrency(
+        'EL_SALVADOR',
+        svToggle.checked ? 'GTQ' : 'USD'
+      );
     });
   }
 
   if (regionalToggle && !regionalToggle.dataset.currencyBound) {
     regionalToggle.dataset.currencyBound = '1';
+
     regionalToggle.addEventListener('change', () => {
-      COUNTRY_CURRENCY_VIEW.CONSOLIDADO = regionalToggle.checked ? 'USD' : 'GTQ';
-      if (normalizeCountry(ACTIVE_COUNTRY) === 'CONSOLIDADO') {
-        renderAll();
-      } else {
-        syncCurrencyControls();
-      }
+      applyCurrency(
+        'CONSOLIDADO',
+        regionalToggle.checked ? 'USD' : 'GTQ'
+      );
     });
   }
+
+  // Permite también activar la conversión desde botones externos si existen.
+  window.changeDashboardCurrency = function(country, currency) {
+    applyCurrency(country, currency);
+  };
 
   syncCurrencyControls();
 }
