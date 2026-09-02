@@ -494,11 +494,15 @@ function syncCurrencyControls() {
   const gtConverted = document.getElementById('gt-converted-label');
   const svLocal = document.getElementById('sv-local-label');
   const svConverted = document.getElementById('sv-converted-label');
+  const regionalLocal = document.getElementById('regional-local-label');
+  const regionalConverted = document.getElementById('regional-converted-label');
 
   if (gtLocal) gtLocal.classList.toggle('selected', country === 'GUATEMALA' && current === 'GTQ');
   if (gtConverted) gtConverted.classList.toggle('selected', country === 'GUATEMALA' && current === 'USD');
   if (svLocal) svLocal.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'USD');
   if (svConverted) svConverted.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'GTQ');
+  if (regionalLocal) regionalLocal.classList.toggle('selected', country === 'CONSOLIDADO' && current === 'GTQ');
+  if (regionalConverted) regionalConverted.classList.toggle('selected', country === 'CONSOLIDADO' && current === 'USD');
 
   updateExchangeDisplays();
 }
