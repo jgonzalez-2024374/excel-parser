@@ -6869,19 +6869,84 @@ def construir_dashboard_data(
             "banks": (
                 gt_data.get("banks", [])
                 +
-                sv_data.get("banks", [])
+                [
+                    {
+                        **dict(banco),
+                        **{
+                            campo: convertir_valores_usd_a_gtq(
+                                banco.get(campo),
+                                tipo_cambio
+                            )
+                            for campo in [
+                                "initial",
+                                "final",
+                                "credits",
+                                "debits",
+                                "change",
+                                "netFlow",
+                                "saldo",
+                                "balance"
+                            ]
+                            if campo in banco
+                        },
+                        "currency": "GTQ"
+                    }
+                    for banco in sv_data.get("banks", [])
+                ]
             ),
 
             "accounts": (
                 gt_data.get("accounts", [])
                 +
-                sv_data.get("accounts", [])
+                [
+                    {
+                        **dict(cuenta),
+                        **{
+                            campo: convertir_valores_usd_a_gtq(
+                                cuenta.get(campo),
+                                tipo_cambio
+                            )
+                            for campo in [
+                                "initial",
+                                "final",
+                                "credits",
+                                "debits",
+                                "change",
+                                "netFlow",
+                                "saldo",
+                                "balance"
+                            ]
+                            if campo in cuenta
+                        },
+                        "currency": "GTQ"
+                    }
+                    for cuenta in sv_data.get("accounts", [])
+                ]
             ),
 
             "daily": (
                 gt_data.get("daily", [])
                 +
-                sv_data.get("daily", [])
+                [
+                    {
+                        **dict(dia),
+                        **{
+                            campo: convertir_valores_usd_a_gtq(
+                                dia.get(campo),
+                                tipo_cambio
+                            )
+                            for campo in [
+                                "credits",
+                                "debits",
+                                "netFlow",
+                                "change"
+                            ]
+                            if campo in dia
+                        },
+                        "currency": "GTQ"
+                    }
+                    for dia in sv_data.get("daily", [])
+                ]
             ),
 
             "transactions": (
