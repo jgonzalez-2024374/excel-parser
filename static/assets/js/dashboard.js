@@ -541,9 +541,6 @@ function initCurrencyControls() {
     };
 
     element.addEventListener('change', handler);
-    element.addEventListener('click', () => {
-      setTimeout(handler, 0);
-    });
   };
 
   bindToggle(gtToggle, 'GUATEMALA', 'USD', 'GTQ');
