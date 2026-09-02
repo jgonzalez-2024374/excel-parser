@@ -547,10 +547,12 @@ function initCurrencyControls() {
         COUNTRY_CURRENCY_VIEW[country]
       );
 
-      applyCurrency(
-        country,
-        newCurrency
-      );
+     console.log("BOTON:", country, element.checked, newCurrency);
+
+applyCurrency(
+    country,
+    newCurrency
+);
     };
 
     element.addEventListener('change', handler);
