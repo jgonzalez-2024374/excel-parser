@@ -7,6 +7,31 @@
   <title>Red intelfon | Estados Bancarios</title>
   <link rel="icon" type="image/png" href="/static/assets/img/Logo.png">
   <link rel="stylesheet" href="/static/assets/css/dashboard.css">
+
+<style>
+.card,
+.kpi,
+.insights,
+.grid2,
+.grid-equal {
+    margin-bottom: 18px;
+}
+
+.hero,
+.executive-cover,
+.tabs {
+    margin-bottom: 18px;
+}
+
+body.consolidado-regional .tabs {
+    display: none !important;
+}
+
+body.consolidado-regional #resumen {
+    margin-top: 18px;
+}
+</style>
+
 </head>
 
 <body>
@@ -344,6 +369,36 @@
 
       return data;
   };
+
+})();
+</script>
+
+
+<script>
+(function(){
+
+function controlarVistaConsolidado(country){
+    if(country === "CONSOLIDADO"){
+        document.body.classList.add("consolidado-regional");
+    }else{
+        document.body.classList.remove("consolidado-regional");
+    }
+}
+
+window.controlarVistaConsolidado = controlarVistaConsolidado;
+
+document.querySelectorAll('.country-btn[data-country]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+        controlarVistaConsolidado(btn.dataset.country);
+    });
+});
+
+setTimeout(function(){
+    var activo = document.querySelector('.country-btn.active[data-country]');
+    if(activo){
+        controlarVistaConsolidado(activo.dataset.country);
+    }
+},100);
 
 })();
 </script>
