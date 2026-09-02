@@ -32,6 +32,28 @@ body.consolidado-regional #resumen {
 }
 </style>
 
+
+<style>
+.regional-currency-control{
+    display:none;
+    align-items:center;
+    gap:12px;
+    margin-left:15px;
+}
+
+body.consolidado-regional .regional-currency-control{
+    display:flex;
+}
+
+.regional-currency-control .currency-toggle{
+    cursor:pointer;
+}
+
+.regional-currency-label{
+    font-weight:700;
+}
+</style>
+
 </head>
 
 <body>
@@ -399,6 +421,49 @@ setTimeout(function(){
         controlarVistaConsolidado(activo.dataset.country);
     }
 },100);
+
+})();
+</script>
+
+
+<script>
+(function(){
+
+window.REGIONAL_DISPLAY_USD = false;
+
+function actualizarMonedaRegional(){
+    if(window.DASHBOARD_ACTIVE_COUNTRY !== "CONSOLIDADO") return;
+
+    const data = window.DASHBOARD_CURRENT_DATA || window.DATA;
+    if(!data) return;
+
+    const rate = Number(
+        data.meta?.exchangeRate ||
+        window.FX_RATE ||
+        1
+    );
+
+    data.meta = data.meta || {};
+
+    if(window.REGIONAL_DISPLAY_USD){
+        data.meta.displayCurrency = "USD";
+    }else{
+        data.meta.displayCurrency = "GTQ";
+    }
+
+    if(typeof window.renderAll === "function"){
+        window.renderAll(data);
+    }
+}
+
+const toggle = document.getElementById("currency-toggle-regional");
+
+if(toggle){
+    toggle.addEventListener("change", function(){
+        window.REGIONAL_DISPLAY_USD = this.checked;
+        actualizarMonedaRegional();
+    });
+}
 
 })();
 </script>
