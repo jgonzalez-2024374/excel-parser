@@ -33,26 +33,7 @@ body.consolidado-regional #resumen {
 </style>
 
 
-<style>
-.regional-currency-control{
-    display:none;
-    align-items:center;
-    gap:12px;
-    margin-left:15px;
-}
 
-body.consolidado-regional .regional-currency-control{
-    display:flex;
-}
-
-.regional-currency-control .currency-toggle{
-    cursor:pointer;
-}
-
-.regional-currency-label{
-    font-weight:700;
-}
-</style>
 
 </head>
 
@@ -426,44 +407,59 @@ setTimeout(function(){
 </script>
 
 
+
+
+
 <script>
 (function(){
 
-window.REGIONAL_DISPLAY_USD = false;
+    /*
+      Consolidado Regional usa el mismo flujo de moneda del dashboard.
+      No crea una conversión independiente.
+    */
 
-function actualizarMonedaRegional(){
-    if(window.DASHBOARD_ACTIVE_COUNTRY !== "CONSOLIDADO") return;
+    window.actualizarControlMonedaRegional = function(){
 
-    const data = window.DASHBOARD_CURRENT_DATA || window.DATA;
-    if(!data) return;
+        if(window.DASHBOARD_ACTIVE_COUNTRY !== "CONSOLIDADO"){
+            return;
+        }
 
-    const rate = Number(
-        data.meta?.exchangeRate ||
-        window.FX_RATE ||
-        1
-    );
+        var toggle = document.getElementById("currency-toggle-regional");
 
-    data.meta = data.meta || {};
+        if(!toggle){
+            return;
+        }
 
-    if(window.REGIONAL_DISPLAY_USD){
-        data.meta.displayCurrency = "USD";
-    }else{
-        data.meta.displayCurrency = "GTQ";
-    }
+        toggle.onchange = function(){
 
-    if(typeof window.renderAll === "function"){
-        window.renderAll(data);
-    }
-}
+            if(typeof window.syncCurrencyControls === "function"){
+                window.syncCurrencyControls();
+            }
 
-const toggle = document.getElementById("currency-toggle-regional");
+            if(typeof window.renderAll === "function"){
+                window.renderAll(window.DASHBOARD_CURRENT_DATA || window.DATA);
+            }
+        };
+    };
 
-if(toggle){
-    toggle.addEventListener("change", function(){
-        window.REGIONAL_DISPLAY_USD = this.checked;
-        actualizarMonedaRegional();
+
+    document.addEventListener("DOMContentLoaded", function(){
+
+        var buttons = document.querySelectorAll('.country-btn[data-country]');
+
+        buttons.forEach(function(button){
+
+            button.addEventListener("click", function(){
+
+                if(button.dataset.country === "CONSOLIDADO"){
+                    window.actualizarControlMonedaRegional();
+                }
+
+            });
+
+        });
+
     });
-}
 
 })();
 </script>
