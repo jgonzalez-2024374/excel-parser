@@ -791,8 +791,7 @@ function renderKpis() {
     ['Saldo final total', moneyAllViews(DATA.totals.final), 'Saldo al cierre del período seleccionado', 'neutral'],
     ['Créditos acumulados', moneyAllViews(DATA.totals.credits), 'Abonos / entradas del período', 'positive'],
     ['Débitos acumulados', moneyAllViews(DATA.totals.debits), 'Cargos / salidas del período', 'negative'],
-    ['Variación entradas vs salidas', moneyAllViews(DATA.totals.change), pct(DATA.totals.changePct) + ' respecto a salidas', cls(DATA.totals.change)],
-    [
+['Variación entradas vs salidas', moneyAllViews(DATA.totals.netFlow), pct(DATA.totals.debits ? (DATA.totals.netFlow / DATA.totals.debits) * 100 : 0) + ' respecto a salidas', cls(DATA.totals.netFlow)],    [
       'Movimientos totales',
       (DATA.meta.movementCount || DATA.transactions?.length || 0).toLocaleString('en-US'),
       'Registros de ESTADO UNIFORME en el período',
