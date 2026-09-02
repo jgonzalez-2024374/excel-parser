@@ -374,7 +374,8 @@ console.info('[Dashboard v3.2] moneda resuelta:', currencyCode(), 'meta:', (BASE
 
 const COUNTRY_CURRENCY_VIEW = {
   GUATEMALA: 'GTQ',
-  EL_SALVADOR: 'USD'
+  EL_SALVADOR: 'USD',
+  CONSOLIDADO: 'GTQ'
 };
 
 let DASH_EXCHANGE_RATE = null;   // GTQ por 1 USD
@@ -385,6 +386,7 @@ function baseCurrencyForActiveCountry() {
   const country = normalizeCountry(ACTIVE_COUNTRY);
   if (country === 'GUATEMALA') return 'GTQ';
   if (country === 'EL_SALVADOR') return 'USD';
+  if (country === 'CONSOLIDADO') return 'GTQ';
   return currencyCode();
 }
 
@@ -482,6 +484,7 @@ function syncCurrencyControls() {
 
   const gtToggle = document.getElementById('currency-toggle-gt');
   const svToggle = document.getElementById('currency-toggle-sv');
+  const regionalToggle = document.getElementById('currency-toggle-regional');
 
   if (gtToggle) gtToggle.checked = COUNTRY_CURRENCY_VIEW.GUATEMALA === 'USD';
   if (svToggle) svToggle.checked = COUNTRY_CURRENCY_VIEW.EL_SALVADOR === 'GTQ';
@@ -502,6 +505,7 @@ function syncCurrencyControls() {
 function initCurrencyControls() {
   const gtToggle = document.getElementById('currency-toggle-gt');
   const svToggle = document.getElementById('currency-toggle-sv');
+  const regionalToggle = document.getElementById('currency-toggle-regional');
 
   if (gtToggle && !gtToggle.dataset.currencyBound) {
     gtToggle.dataset.currencyBound = '1';
