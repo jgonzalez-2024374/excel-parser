@@ -488,6 +488,7 @@ function syncCurrencyControls() {
 
   if (gtToggle) gtToggle.checked = COUNTRY_CURRENCY_VIEW.GUATEMALA === 'USD';
   if (svToggle) svToggle.checked = COUNTRY_CURRENCY_VIEW.EL_SALVADOR === 'GTQ';
+  if (regionalToggle) regionalToggle.checked = COUNTRY_CURRENCY_VIEW.CONSOLIDADO === 'USD';
 
   const gtLocal = document.getElementById('gt-local-label');
   const gtConverted = document.getElementById('gt-converted-label');
@@ -524,6 +525,18 @@ function initCurrencyControls() {
     svToggle.addEventListener('change', () => {
       COUNTRY_CURRENCY_VIEW.EL_SALVADOR = svToggle.checked ? 'GTQ' : 'USD';
       if (normalizeCountry(ACTIVE_COUNTRY) === 'EL_SALVADOR') {
+        renderAll();
+      } else {
+        syncCurrencyControls();
+      }
+    });
+  }
+
+  if (regionalToggle && !regionalToggle.dataset.currencyBound) {
+    regionalToggle.dataset.currencyBound = '1';
+    regionalToggle.addEventListener('change', () => {
+      COUNTRY_CURRENCY_VIEW.CONSOLIDADO = regionalToggle.checked ? 'USD' : 'GTQ';
+      if (normalizeCountry(ACTIVE_COUNTRY) === 'CONSOLIDADO') {
         renderAll();
       } else {
         syncCurrencyControls();
@@ -1034,8 +1047,9 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
   window.changeDashboardCountry = function (country) {
 
     window.DASHBOARD_ACTIVE_COUNTRY = country;
+    ACTIVE_COUNTRY = normalizeCountry(country);
 
-    const data = getActiveDashboardData(country);
+    const data = getActiveDashboardData(ACTIVE_COUNTRY);
 
     window.DASHBOARD_CURRENT_DATA = data;
 
@@ -1112,3 +1126,5 @@ function toggleFullscreen() { document.fullscreenElement ? document.exitFullscre
   });
 
 })();
+
+window.COUNTRY_CURRENCY_VIEW = COUNTRY_CURRENCY_VIEW;
