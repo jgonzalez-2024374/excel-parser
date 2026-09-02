@@ -534,9 +534,22 @@ function initCurrencyControls() {
     element.dataset.currencyBound = '1';
 
     const handler = () => {
+      const newCurrency = element.checked
+        ? checkedCurrency
+        : uncheckedCurrency;
+
+      // Guardar la selección actual para que renderAll no la reinicie
+      COUNTRY_CURRENCY_VIEW[country] = newCurrency;
+
+      console.log(
+        '[MONEDA CAMBIO]',
+        country,
+        COUNTRY_CURRENCY_VIEW[country]
+      );
+
       applyCurrency(
         country,
-        element.checked ? checkedCurrency : uncheckedCurrency
+        newCurrency
       );
     };
 
@@ -548,6 +561,7 @@ function initCurrencyControls() {
   bindToggle(regionalToggle, 'CONSOLIDADO', 'USD', 'GTQ');
 
   window.changeDashboardCurrency = function(country, currency) {
+    COUNTRY_CURRENCY_VIEW[country] = currency;
     applyCurrency(country, currency);
   };
 
