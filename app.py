@@ -7169,9 +7169,9 @@ def renderizar_dashboard_autonomo(datos_override=None):
 
     html = patron_js.sub(reemplazar_js, html)
 
-    # 3) Imágenes de /static: src="/static/...png" -> data:image/...;base64,...
+    # 3) Imágenes y favicon de /static -> data:image/...;base64,...
     patron_img = re.compile(
-        r'(<img\b[^>]*?\bsrc=["\'])(/static/[^"\']+)(["\'][^>]*>)',
+        r'((?:<img\b[^>]*?\bsrc|<link\b[^>]*?\bhref)=["\'])(/static/[^"\']+)(["\'][^>]*>)',
         re.IGNORECASE
     )
 
