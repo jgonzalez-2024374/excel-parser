@@ -8350,13 +8350,55 @@ def construir_consolidado_regional(dashboard_gt, dashboard_sv, tipo_cambio=None)
                     sv_converted_totals["debits"],
 
                 "change":
-                    gt_totals.get("change", 0) +
-                    sv_converted_totals["change"]
+                    gt_totals.get("change", gt_totals.get("netFlow", 0)) +
+                    sv_converted_totals["change"],
+
+                "netFlow":
+                    (
+                        gt_totals.get("netFlow", gt_totals.get("change", 0))
+                        +
+                        (
+                            sv_converted_totals["credits"]
+                            -
+                            sv_converted_totals["debits"]
+                        )
+                    ),
+
+                "changePct":
+                    (
+                        (
+                            (
+                                gt_totals.get("netFlow", gt_totals.get("change", 0))
+                                +
+                                (
+                                    sv_converted_totals["credits"]
+                                    -
+                                    sv_converted_totals["debits"]
+                                )
+                            )
+                            /
+                            (
+                                gt_totals.get("debits", 0)
+                                +
+                                sv_converted_totals["debits"]
+                            )
+                        ) * 100
+                    )
+                    if (
+                        gt_totals.get("debits", 0)
+                        +
+                        sv_converted_totals["debits"]
+                    )
+                    else 0
             },
 
 
             "highlights": {
 
+                "maxCredit": None,
+                "maxDebit": None,
+                "maxNet": None,
+                "minNet": None,
                 **gt.get("highlights", {}),
                 **sv.get("highlights", {})
 
