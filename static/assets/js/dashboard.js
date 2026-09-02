@@ -806,6 +806,30 @@ function renderBankList() {
 }
 
 function renderInsights() {
+
+  // Consolidado Regional no utiliza indicadores individuales
+  // No modifica datos, monedas ni conversiones.
+  if (window.DASHBOARD_ACTIVE_COUNTRY === "CONSOLIDADO") {
+    const box = document.getElementById('insights');
+    if (box) {
+      box.innerHTML = '';
+      box.style.display = 'none';
+    }
+    return;
+  }
+
+  const box = document.getElementById('insights');
+  if (box) {
+    box.style.display = '';
+  }
+
+  DATA.highlights = DATA.highlights || {
+    maxCredit: null,
+    maxDebit: null,
+    maxNet: null,
+    minNet: null
+  };
+
   const largestBank = DATA.banks.slice().sort((a, b) => b.final - a.final)[0];
   const biggestDrop = DATA.banks.slice().sort((a, b) => a.change - b.change)[0];
   const mc = DATA.highlights.maxCredit, md = DATA.highlights.maxDebit;
