@@ -511,17 +511,11 @@ function initCurrencyControls() {
   const applyCurrency = (country, currency) => {
     const c = normalizeCountry(country);
 
-    if (c === 'GUATEMALA') {
-      COUNTRY_CURRENCY_VIEW.GUATEMALA = currency;
-    }
+    if (c === 'GUATEMALA') COUNTRY_CURRENCY_VIEW.GUATEMALA = currency;
+    if (c === 'EL_SALVADOR') COUNTRY_CURRENCY_VIEW.EL_SALVADOR = currency;
+    if (c === 'CONSOLIDADO') COUNTRY_CURRENCY_VIEW.CONSOLIDADO = currency;
 
-    if (c === 'EL_SALVADOR') {
-      COUNTRY_CURRENCY_VIEW.EL_SALVADOR = currency;
-    }
-
-    if (c === 'CONSOLIDADO') {
-      COUNTRY_CURRENCY_VIEW.CONSOLIDADO = currency;
-    }
+    console.log('[MONEDA CAMBIO]', c, currency, COUNTRY_CURRENCY_VIEW);
 
     syncCurrencyControls();
 
@@ -530,40 +524,28 @@ function initCurrencyControls() {
     }
   };
 
-  if (gtToggle && !gtToggle.dataset.currencyBound) {
-    gtToggle.dataset.currencyBound = '1';
+  const bindToggle = (element, country, checkedCurrency, uncheckedCurrency) => {
+    if (!element || element.dataset.currencyBound === '1') return;
 
-    gtToggle.addEventListener('change', () => {
+    element.dataset.currencyBound = '1';
+
+    const handler = () => {
       applyCurrency(
-        'GUATEMALA',
-        gtToggle.checked ? 'USD' : 'GTQ'
+        country,
+        element.checked ? checkedCurrency : uncheckedCurrency
       );
+    };
+
+    element.addEventListener('change', handler);
+    element.addEventListener('click', () => {
+      setTimeout(handler, 0);
     });
-  }
+  };
 
-  if (svToggle && !svToggle.dataset.currencyBound) {
-    svToggle.dataset.currencyBound = '1';
+  bindToggle(gtToggle, 'GUATEMALA', 'USD', 'GTQ');
+  bindToggle(svToggle, 'EL_SALVADOR', 'GTQ', 'USD');
+  bindToggle(regionalToggle, 'CONSOLIDADO', 'USD', 'GTQ');
 
-    svToggle.addEventListener('change', () => {
-      applyCurrency(
-        'EL_SALVADOR',
-        svToggle.checked ? 'GTQ' : 'USD'
-      );
-    });
-  }
-
-  if (regionalToggle && !regionalToggle.dataset.currencyBound) {
-    regionalToggle.dataset.currencyBound = '1';
-
-    regionalToggle.addEventListener('change', () => {
-      applyCurrency(
-        'CONSOLIDADO',
-        regionalToggle.checked ? 'USD' : 'GTQ'
-      );
-    });
-  }
-
-  // Permite también activar la conversión desde botones externos si existen.
   window.changeDashboardCurrency = function(country, currency) {
     applyCurrency(country, currency);
   };
