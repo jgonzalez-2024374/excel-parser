@@ -30,6 +30,10 @@ body.consolidado-regional .tabs {
 body.consolidado-regional #resumen {
     margin-top: 18px;
 }
+
+body.consolidado-regional #insights {
+    display: none !important;
+}
 </style>
 
 
@@ -440,6 +444,29 @@ window.actualizarControlMonedaRegional = function(){
         }
     });
 };
+})();
+</script>
+
+
+<script>
+(function(){
+    function ocultarInsightsRegional(){
+        const country = window.DASHBOARD_ACTIVE_COUNTRY || 
+                        document.querySelector('.country-btn.active')?.dataset.country;
+
+        document.body.classList.toggle(
+            'consolidado-regional',
+            country === 'CONSOLIDADO'
+        );
+    }
+
+    document.querySelectorAll('.country-btn[data-country]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+            setTimeout(ocultarInsightsRegional, 50);
+        });
+    });
+
+    setTimeout(ocultarInsightsRegional, 200);
 })();
 </script>
 
