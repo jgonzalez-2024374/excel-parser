@@ -100,6 +100,9 @@ body.consolidado-regional #insights {
       <button type="button" onclick="toggleFullscreen()">
         <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
       </button>
+      <button type="button" onclick="generarDashboardIngresos()">
+        📥 Descargar Dashboard de Ingresos
+      </button>
     </div>
   </div>
   <title>Saldos Bancarios Consolidados</title>
@@ -467,6 +470,96 @@ window.actualizarControlMonedaRegional = function(){
     });
 
     setTimeout(ocultarInsightsRegional, 200);
+})();
+</script>
+
+
+<script>
+(function(){
+
+window.generarDashboardIngresos = function(){
+
+    const data = {
+        baseData: window.DASHBOARD_BASE_DATA || {},
+        transactions: window.DASHBOARD_RAW_TRANSACTIONS || []
+    };
+
+    const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard de Ingresos Intelfon</title>
+<style>
+body{font-family:Arial,sans-serif;padding:30px;background:#f5f7fb;color:#1f2937}
+.card{background:white;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px #ddd}
+h1{color:#111827}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}
+.kpi{font-size:28px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<h1>Dashboard Ejecutivo de Ingresos</h1>
+
+<div class="card">
+<h2>Ingresos Acumulados</h2>
+<div id="summary"></div>
+</div>
+
+<div class="card">
+<h2>Detalle de Ingresos</h2>
+<table>
+<thead>
+<tr>
+<th>Fecha</th>
+<th>País</th>
+<th>Banco</th>
+<th>Descripción</th>
+<th>Monto</th>
+</tr>
+</thead>
+<tbody id="detail"></tbody>
+</table>
+</div>
+
+<script>
+const payload = ${JSON.stringify(data)};
+
+const transactions = payload.transactions || [];
+
+const ingresos = transactions.filter(t=>{
+    const tipo = JSON.stringify(t).toLowerCase();
+    return tipo.includes("credito") || tipo.includes("haber") || tipo.includes("credit");
+});
+
+document.getElementById("summary").innerHTML =
+"<div class='kpi'>Movimientos de ingreso: " + ingresos.length + "</div>";
+
+document.getElementById("detail").innerHTML =
+ingresos.map(t=>`
+<tr>
+<td>${t.fecha || t.date || ""}</td>
+<td>${t.pais || t.country || ""}</td>
+<td>${t.banco || t.bank || ""}</td>
+<td>${t.descripcion || t.description || ""}</td>
+<td>${t.monto || t.amount || ""} ${t.moneda || ""}</td>
+</tr>
+`).join("");
+
+</script>
+
+</body>
+</html>`;
+
+    const blob = new Blob([html], {type:"text/html"});
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "Dashboard_Ingresos_Intelfon.html";
+    link.click();
+};
+
 })();
 </script>
 

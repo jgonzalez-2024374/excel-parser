@@ -547,7 +547,7 @@ function initCurrencyControls() {
         COUNTRY_CURRENCY_VIEW[country]
       );
 
-     console.log("BOTON:", country, element.checked, newCurrency);
+      console.log("BOTON:", country, element.checked, newCurrency);
 
 applyCurrency(
     country,
