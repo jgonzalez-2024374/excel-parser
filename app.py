@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file, after_this_request
+from flask_cors import CORS
 from flask import render_template
 from flask import make_response
 from openpyxl import load_workbook
@@ -25,7 +26,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
-
+CORS(app)
 
 # ============================================================
 # SEGURIDAD API / RUTAS CONFIDENCIALES
