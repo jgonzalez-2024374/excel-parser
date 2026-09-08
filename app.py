@@ -64,7 +64,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v5.6-consolidado-regional-20260901"
+APP_BUILD = "dashboard-v5.7-cheques-20260908"
 
 
 # ============================================================
@@ -1101,7 +1101,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.6-saldo-disponible-separado"
+PARSER_VERSION = "universal-3.7-identificacion-cheques"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -3510,6 +3510,122 @@ def detectar_saldo_inicial(rows, header_index):
     return None
 
 
+
+# ============================================================
+# IDENTIFICACIÓN DE MOVIMIENTOS CON CHEQUE
+# ============================================================
+
+CHEQUE_INDICATOR_RE = re.compile(
+    r"(?:"
+    r"\b(?:cheque(?:s)?|cheq(?:ues)?|chq(?:s)?|check(?:s)?)\b"
+    r"|\b(?:chq|cheq|ck)(?=[#:\- ]*\d)"
+    r")",
+    re.IGNORECASE,
+)
+
+CHEQUE_RETURN_RE = re.compile(
+    r"(?:"
+    r"devuelt|devoluc|rechaz|sin\s+fondos|fondos\s+insuficient|"
+    r"protestad|returned|unpaid|\bnsf\b|revers(?:o|ion)|reversi[oó]n"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def detectar_movimiento_cheque(
+    referencia="",
+    codigo="",
+    descripcion="",
+    debito=0.0,
+    credito=0.0,
+):
+    """Clasifica movimientos bancarios relacionados con cheques.
+
+    Devuelve un diccionario con:
+      - es_cheque: True/False
+      - tipo_cheque: INGRESO / EGRESO / DEVUELTO / CHEQUE
+      - numero_cheque: número detectado cuando aparece en texto o referencia
+
+    La clasificación es informativa: NO cambia débitos, créditos ni saldos.
+    DEVUELTO tiene prioridad sobre el signo porque una devolución puede aparecer
+    como débito o crédito dependiendo de si se revierte un cheque depositado o
+    un cheque emitido.
+    """
+
+    partes = [
+        str(referencia or "").strip(),
+        str(codigo or "").strip(),
+        str(descripcion or "").strip(),
+    ]
+    texto_original = " | ".join(p for p in partes if p)
+    texto = clean_text(texto_original)
+
+    if not texto or not CHEQUE_INDICATOR_RE.search(texto):
+        return {
+            "es_cheque": False,
+            "tipo_cheque": "",
+            "numero_cheque": "",
+        }
+
+    # Una devolución/rechazo prevalece sobre la dirección financiera.
+    if CHEQUE_RETURN_RE.search(texto):
+        tipo_cheque = "DEVUELTO"
+    else:
+        try:
+            debito_num = float(debito or 0)
+        except Exception:
+            debito_num = 0.0
+
+        try:
+            credito_num = float(credito or 0)
+        except Exception:
+            credito_num = 0.0
+
+        if credito_num > 0 and debito_num == 0:
+            tipo_cheque = "INGRESO"
+        elif debito_num < 0 and credito_num == 0:
+            tipo_cheque = "EGRESO"
+        elif credito_num > abs(debito_num):
+            tipo_cheque = "INGRESO"
+        elif abs(debito_num) > credito_num:
+            tipo_cheque = "EGRESO"
+        else:
+            tipo_cheque = "CHEQUE"
+
+    numero_cheque = ""
+
+    # Primero buscar un número ligado explícitamente a CHEQUE / CHQ / CHECK.
+    patrones_numero = [
+        r"\b(?:cheque|cheq|chq|check)\s*(?:no\.?|nro\.?|num\.?|numero|#)?\s*[:#\-]?\s*((?=[A-Z0-9\-]*\d)[A-Z0-9\-]{3,24})\b",
+        r"\b(?:no\.?|nro\.?|num\.?|numero)\s*(?:de\s+)?(?:cheque|cheq|chq|check)\s*[:#\-]?\s*((?=[A-Z0-9\-]*\d)[A-Z0-9\-]{3,24})\b",
+    ]
+
+    for patron in patrones_numero:
+        match = re.search(patron, texto_original, re.IGNORECASE)
+        if match:
+            candidato = str(match.group(1) or "").strip(" -:#")
+            if candidato:
+                numero_cheque = candidato
+                break
+
+    # Si no aparece junto a la palabra cheque, usar la referencia solo cuando
+    # parezca realmente un identificador (contiene dígitos y no es una frase).
+    if not numero_cheque:
+        ref = str(referencia or "").strip()
+        if (
+            ref
+            and len(ref) <= 30
+            and re.search(r"\d", ref)
+            and re.fullmatch(r"[A-Za-z0-9._/\-]+", ref)
+        ):
+            numero_cheque = ref
+
+    return {
+        "es_cheque": True,
+        "tipo_cheque": tipo_cheque,
+        "numero_cheque": numero_cheque,
+    }
+
 def extraer_transaccion(
     row,
     columns,
@@ -3595,6 +3711,14 @@ def extraer_transaccion(
     if not (has_money and has_identity):
         return None
 
+    cheque_info = detectar_movimiento_cheque(
+        referencia=texto_ref,
+        codigo=texto_codigo,
+        descripcion=texto_desc,
+        debito=debito,
+        credito=credito,
+    )
+
     return {
         "banco": valor_o_nd(banco),
         "cuenta": valor_o_nd(cuenta),
@@ -3609,6 +3733,10 @@ def extraer_transaccion(
         # Si el banco no trae esa columna, se deja None y el reporte usa saldo final como respaldo.
         "saldo_disponible": available_val,
         "saldo_inicial_cuenta": saldo_inicial_cuenta,
+        # Identificación informativa de cheques; no altera importes.
+        "es_cheque": cheque_info["es_cheque"],
+        "tipo_cheque": cheque_info["tipo_cheque"],
+        "numero_cheque": cheque_info["numero_cheque"],
         # Conserva si el dato existía realmente en el estado de cuenta.
         "_tiene_debito": debit_val is not None or (amount_val not in (None, 0) and debito != 0),
         "_tiene_credito": credit_val is not None or (amount_val not in (None, 0) and credito != 0),
@@ -5306,6 +5434,88 @@ def generar_por_moneda_si_aplica(workbook, transactions):
     return len(monedas) > 1
 
 
+
+# ============================================================
+# REPORTE DE MOVIMIENTOS CON CHEQUE
+# ============================================================
+
+SHEET_CHEQUES = "MOVIMIENTOS CHEQUES"
+
+
+def escribir_movimientos_cheques(workbook, transactions):
+    """Crea una hoja independiente con todos los movimientos detectados como cheque.
+
+    La hoja es informativa y no modifica las hojas ni fórmulas originales de la
+    plantilla. Incluye ingreso, egreso y devuelto, además del número de cheque
+    cuando puede identificarse.
+    """
+
+    if SHEET_CHEQUES in workbook.sheetnames:
+        ws = workbook[SHEET_CHEQUES]
+        if ws.max_row:
+            ws.delete_rows(1, ws.max_row)
+    else:
+        ws = workbook.create_sheet(SHEET_CHEQUES)
+
+    headers = [
+        "BANCO",
+        "CUENTA",
+        "PAÍS",
+        "MONEDA",
+        "FECHA",
+        "REFERENCIA",
+        "NÚMERO CHEQUE",
+        "TIPO CHEQUE",
+        "DESCRIPCIÓN",
+        "DÉBITO",
+        "CRÉDITO",
+        "SALDO",
+    ]
+
+    for col, header in enumerate(headers, start=1):
+        ws.cell(row=1, column=col, value=header)
+
+    cheque_transactions = [
+        t for t in (transactions or [])
+        if bool(t.get("es_cheque"))
+    ]
+
+    for row_number, transaction in enumerate(cheque_transactions, start=2):
+        values = [
+            transaction.get("banco", "N/D"),
+            transaction.get("cuenta", "N/D"),
+            transaction.get("pais", "NO_IDENTIFICADO"),
+            normalizar_codigo_moneda(transaction.get("moneda", "N/D")),
+            transaction.get("fecha"),
+            transaction.get("referencia", ""),
+            transaction.get("numero_cheque", ""),
+            transaction.get("tipo_cheque", ""),
+            transaction.get("descripcion", ""),
+            abs(float(transaction.get("debito", 0) or 0)),
+            abs(float(transaction.get("credito", 0) or 0)),
+            transaction.get("saldo") if transaction.get("_tiene_saldo") else None,
+        ]
+
+        for col, value in enumerate(values, start=1):
+            ws.cell(row=row_number, column=col, value=value)
+
+        ws.cell(row=row_number, column=5).number_format = "dd/mm/yyyy"
+        money_format = formato_moneda_excel(transaction.get("moneda", "N/D"))
+        for col in (10, 11, 12):
+            ws.cell(row=row_number, column=col).number_format = money_format
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:L{max(1, ws.max_row)}"
+
+    widths = {
+        "A": 24, "B": 20, "C": 18, "D": 12, "E": 13, "F": 22,
+        "G": 18, "H": 16, "I": 48, "J": 16, "K": 16, "L": 16,
+    }
+    for column, width in widths.items():
+        ws.column_dimensions[column].width = width
+
+    return len(cheque_transactions)
+
 def insertar_en_plantilla(
     transactions,
     output_path
@@ -5341,6 +5551,9 @@ def insertar_en_plantilla(
             escribir_saldos_por_cuenta(workbook, transactions)
             escribir_reporte_creditos(workbook, transactions)
             actualizar_tablero(workbook, transactions)
+
+        # Reporte independiente: no altera las hojas financieras existentes.
+        escribir_movimientos_cheques(workbook, transactions)
 
         # 5
         # Aplicar formato global únicamente cuando el libro tiene UNA moneda.
@@ -6025,6 +6238,26 @@ def construir_dashboard_data(
             "description": str(
                 transaction.get(
                     "descripcion",
+                    ""
+                )
+                or ""
+            ),
+            "isCheck": bool(
+                transaction.get(
+                    "es_cheque",
+                    False
+                )
+            ),
+            "checkType": str(
+                transaction.get(
+                    "tipo_cheque",
+                    ""
+                )
+                or ""
+            ),
+            "checkNumber": str(
+                transaction.get(
+                    "numero_cheque",
                     ""
                 )
                 or ""
@@ -6795,6 +7028,35 @@ def construir_dashboard_data(
         latest_display
     )
 
+    movimientos_cheque = [
+        item
+        for item in raw_transactions
+        if item.get("isCheck")
+    ]
+
+    resumen_cheques = {
+        "count": len(movimientos_cheque),
+        "incomeCount": sum(1 for item in movimientos_cheque if item.get("checkType") == "INGRESO"),
+        "expenseCount": sum(1 for item in movimientos_cheque if item.get("checkType") == "EGRESO"),
+        "returnedCount": sum(1 for item in movimientos_cheque if item.get("checkType") == "DEVUELTO"),
+        "incomeAmount": _redondear_dashboard(sum(
+            float(item.get("credit") or 0)
+            for item in movimientos_cheque
+            if item.get("checkType") == "INGRESO"
+        )),
+        "expenseAmount": _redondear_dashboard(sum(
+            float(item.get("debit") or 0)
+            for item in movimientos_cheque
+            if item.get("checkType") == "EGRESO"
+        )),
+        "returnedAmount": _redondear_dashboard(sum(
+            max(float(item.get("debit") or 0), float(item.get("credit") or 0))
+            for item in movimientos_cheque
+            if item.get("checkType") == "DEVUELTO"
+        )),
+        "currency": moneda_dashboard,
+    }
+
     regional_data = {}
 
     # ========================================================
@@ -7029,6 +7291,7 @@ def construir_dashboard_data(
         "banks": banks,
         "accounts": accounts,
         "daily": daily,
+        "checks": resumen_cheques,
         "transactions": raw_transactions
     }
 
