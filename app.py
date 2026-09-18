@@ -7297,9 +7297,41 @@ def construir_dashboard_data(
 
 
 
-def guardar_dashboard_data(
-    data
-):
+def guardar_dashboard_data(data):
+    try:
+        os.makedirs(
+            DASHBOARD_DATA_DIR,
+            exist_ok=True
+        )
+
+        temp_file = DASHBOARD_DATA_FILE + ".tmp"
+
+        with open(
+            temp_file,
+            "w",
+            encoding="utf-8"
+        ) as archivo:
+            json.dump(
+                data,
+                archivo,
+                ensure_ascii=False,
+                indent=2
+            )
+
+        os.replace(
+            temp_file,
+            DASHBOARD_DATA_FILE
+        )
+
+        # Actualiza también memoria mientras Render está activo
+        global DASHBOARD_CACHE
+        DASHBOARD_CACHE = data
+
+    except Exception as error:
+        print(
+            "Error guardando dashboard_data.json:",
+            str(error)
+        )
 
     global DASHBOARD_CACHE
 
