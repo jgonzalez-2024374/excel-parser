@@ -2696,6 +2696,47 @@ def detectar_periodo(rows, sheet_name=""):
 
 
 
+
+
+def separar_nombre_banco_y_cuenta(value):
+    """
+    Separa el nombre del banco de los últimos dígitos de cuenta.
+
+    Ejemplos:
+        BAC 327       -> ("BAC", "327")
+        BAC 6715      -> ("BAC", "6715")
+        CUSCA 2509    -> ("CUSCA", "2509")
+        DAV 68202     -> ("DAV", "68202")
+
+    Los números finales NO forman parte del nombre del banco.
+    """
+    if value in (None, ""):
+        return "", ""
+
+    original = str(value).strip()
+    texto = clean_text(original)
+
+    # Quitar separadores antes del número final
+    match = re.search(r"[\s\-_/#]+(\d{1,8})\s*$", texto)
+
+    if match:
+        cuenta = match.group(1)
+        banco = texto[:match.start()].strip(" -_/#")
+        return banco, cuenta
+
+    return texto, ""
+
+
+def limpiar_nombre_banco_para_clasificacion(value):
+    """
+    Devuelve únicamente la parte textual del banco.
+    Evita que cuentas como BAC 327, BAC 386 y BAC 6715
+    sean interpretadas como bancos diferentes.
+    """
+    banco, _ = separar_nombre_banco_y_cuenta(value)
+    return banco
+
+
 def detectar_banco_por_nombre_archivo(nombre_archivo):
     """
     Detecta el banco usando primero el nombre REAL del archivo recibido.
@@ -2743,7 +2784,7 @@ def detectar_banco(sheet_name, rows):
       posteriormente pueda actuar el respaldo OCR.
     """
 
-    title = clean_text(sheet_name)
+    title = limpiar_nombre_banco_para_clasificacion(sheet_name)
 
     # 1) Buscar banco conocido en el nombre de la hoja.
     banco_catalogo = _buscar_banco_catalogo_en_texto(title)
@@ -2757,7 +2798,9 @@ def detectar_banco(sheet_name, rows):
             if value in (None, ""):
                 continue
 
-            banco_catalogo = _buscar_banco_catalogo_en_texto(value)
+            banco_catalogo = _buscar_banco_catalogo_en_texto(
+                limpiar_nombre_banco_para_clasificacion(value)
+            )
             if banco_catalogo:
                 return banco_catalogo
 
@@ -2795,7 +2838,7 @@ OCR_MAX_SECONDS_PER_FILE = 12
 
 def _buscar_banco_catalogo_en_texto(texto):
     """Busca un banco de KNOWN_BANKS dentro de cualquier texto libre."""
-    normal = clean_text(texto)
+    normal = limpiar_nombre_banco_para_clasificacion(texto)
 
     if not normal:
         return None
