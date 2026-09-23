@@ -1213,115 +1213,112 @@ DEBIT_HINTS = (
 )
 
 KNOWN_BANKS = [
-    # Guatemala
+    # ==========================
+    # GUATEMALA
+    # ==========================
+
     ([
-        "banco industrial",
-        "banco industrial sa",
-        "banco industrial, s.a.",
-        "industrial",
-        "industrial bank",
-        "bi",
-        "bi sa",
-        "bind"
+        "banco industrial", "banco industrial sa", "industrial",
+        "industrial bank", "bi", "bi sa", "bind"
     ], "BANCO INDUSTRIAL"),
 
     ([
-        "g&t continental",
-        "g y t continental",
-        "gyt continental",
-        "g&t",
-        "g y t",
-        "gyt",
-        "banco gyt",
-        "banco g&t"
-    ], "G&T"),
-
-    ([
-        "bac credomatic",
-        "bac credomatic network",
-        "banco de america central",
-        "banco de américa central",
-        "bac",
-        "bac sa",
-        "banco bac",
-        "bac internacional"
-    ], "BAC"),
-
-    ([
-        "banrural",
-        "banco de desarrollo rural",
-        "banco desarrollo rural",
-        "banco rural",
-        "ban rural",
-        "ban"
+        "banrural", "banco de desarrollo rural",
+        "banco desarrollo rural", "banco rural", "ban rural"
     ], "BANRURAL"),
 
     ([
+        "g&t continental", "g y t continental", "gyt continental",
+        "g&t", "g y t", "gyt", "banco gyt", "banco g&t"
+    ], "G&T"),
+
+    ([
+        "bam", "banco agromercantil",
         "banco agricola mercantil",
-        "banco agromercantil",
-        "agromercantil",
-        "bam",
-        "bam guatemala"
+        "agromercantil"
     ], "BAM"),
 
     ([
-        "banco promerica",
-        "promerica",
-        "promerica guatemala"
+        "bac", "bac credomatic",
+        "banco de america central",
+        "banco america central",
+        "banco bac"
+    ], "BAC"),
+
+    ([
+        "promerica", "banco promerica",
+        "prom"
     ], "PROMERICA"),
 
     ([
-        "banco davivienda",
-        "davivienda",
-        "davivienda guatemala"
+        "davivienda", "banco davivienda",
+        "dav"
     ], "DAVIVIENDA"),
 
     ([
-        "banco ficohsa",
-        "ficohsa"
+        "ficohsa", "banco ficohsa"
     ], "FICOHSA"),
 
-    # El Salvador / regionales
     ([
-        "banco agricola",
-        "banco agrícola",
-        "agricola",
-        "agrícola",
-        "banco agricola comercial",
-        "banco agricola sa"
+        "azteca", "banco azteca"
+    ], "BANCO AZTECA"),
+
+
+    # ==========================
+    # EL SALVADOR
+    # ==========================
+
+    ([
+        "banco agricola", "banco agrícola",
+        "agricola", "agrícola",
+        "agricola comercial"
     ], "BANCO AGRÍCOLA"),
 
     ([
+        "cuscatlan", "cuscatlán",
         "banco cuscatlan",
         "banco cuscatlán",
-        "cuscatlan",
-        "cuscatlán",
-        "cusca",
-        "banco cusca"
+        "cusca"
     ], "CUSCATLÁN"),
 
     ([
-        "banco hipotecario",
-        "hipotecario",
-        "banco hipotecario el salvador"
-    ], "BANCO HIPOTECARIO"),
+        "bac", "bac credomatic",
+        "banco america central",
+        "banco de america central"
+    ], "BAC"),
+
+    ([
+        "davivienda",
+        "banco davivienda",
+        "dav"
+    ], "DAVIVIENDA"),
+
+    ([
+        "promerica",
+        "banco promerica",
+        "prom"
+    ], "PROMERICA"),
 
     ([
         "banco azul",
-        "azul",
-        "abank"
+        "azul"
     ], "BANCO AZUL"),
 
     ([
-        "banco atlantida",
-        "banco atlántida",
+        "hipotecario",
+        "banco hipotecario"
+    ], "BANCO HIPOTECARIO"),
+
+    ([
         "atlantida",
-        "atlántida"
+        "atlántida",
+        "banco atlantida",
+        "banco atlántida"
     ], "BANCO ATLÁNTIDA"),
 
     ([
-        "banco promete",
-        "banco integral"
+        "banco integral",
+        "integral"
     ], "BANCO INTEGRAL"),
 ]
 
@@ -8871,3 +8868,4 @@ if __name__ == "__main__":
         debug=False
     )   
 
+    
