@@ -23,8 +23,6 @@ import hmac
 import base64
 import mimetypes
 import urllib.request
-import urllib.parse
-import urllib.error
 import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
@@ -698,52 +696,6 @@ def _consultar_tipo_cambio_banguat():
         "date": fecha,
         "source": "Banco de Guatemala"
     }
-
-
-def obtener_tipo_cambio_consolidado():
-    """
-    Tipo de cambio para homologar El Salvador a GTQ en el consolidado.
-    FX_CACHE solo se llena cuando alguien consulta /api/tipo-cambio, así que
-    tras un reinicio se consulta Banguat directamente. Si falla, se usa la
-    última tasa guardada en el dashboard. Nunca se asume 1 USD = 1 GTQ.
-    """
-    cache_rate = FX_CACHE.get("rate_gtq_per_usd")
-    cache_age = time.time() - float(FX_CACHE.get("fetched_at", 0.0) or 0.0)
-
-    if cache_rate and cache_age < FX_CACHE_TTL_SECONDS:
-        return cache_rate
-
-    try:
-        live = _consultar_tipo_cambio_banguat()
-        FX_CACHE.update({
-            "rate_gtq_per_usd": live["rate_gtq_per_usd"],
-            "date": live.get("date", ""),
-            "source": live.get("source", "Banco de Guatemala"),
-            "fetched_at": time.time()
-        })
-        return FX_CACHE["rate_gtq_per_usd"]
-    except Exception as error:
-        print(
-            "No se pudo consultar el tipo de cambio para el consolidado:",
-            str(error)
-        )
-
-    if cache_rate:
-        return cache_rate
-
-    previo = (
-        (DASHBOARD_CACHE.get("regional") or {})
-        .get("CONSOLIDADO", {})
-        .get("meta", {})
-        .get("exchangeRate")
-    )
-
-    try:
-        previo = float(previo)
-    except (TypeError, ValueError):
-        previo = 0.0
-
-    return previo if previo > 0 else None
 
 
 @app.route(
@@ -7238,27 +7190,22 @@ def construir_dashboard_data(
     # Se genera una vista adicional sin mezclar las monedas.
     # Cada país mantiene sus propios bancos y cuentas.
     if incluir_regional:
-        # A nivel de hoja el país puede quedar como GUATEMALA por texto del
-        # encabezado aunque la cuenta sea de El Salvador, por eso se vuelve a
-        # detectar con banco + moneda + archivo. Cada movimiento se asigna a
-        # un solo país para no contarlo en ambos.
-        tx_gt = []
-        tx_sv = []
+        tx_gt = [
+            tx for tx in transactions
+            if normalizar_pais_bancario(tx.get("pais")) == "GUATEMALA"
+        ]
 
-        for tx in transactions:
-            pais_tx = normalizar_pais_bancario(tx.get("pais"))
-
-            if (
-                pais_tx == "EL_SALVADOR"
-                or detectar_pais_bancario(
-                    banco=tx.get("banco", ""),
-                    moneda=tx.get("moneda", "N/D"),
-                    nombre_archivo=nombre_archivo
-                ) == "EL_SALVADOR"
-            ):
-                tx_sv.append(tx)
-            elif pais_tx == "GUATEMALA":
-                tx_gt.append(tx)
+        tx_sv = [
+    tx for tx in transactions
+    if normalizar_pais_bancario(
+        tx.get("pais")
+    ) == "EL_SALVADOR"
+    or detectar_pais_bancario(
+        banco=tx.get("banco", ""),
+        moneda=tx.get("moneda", "N/D"),
+        nombre_archivo=nombre_archivo
+    ) == "EL_SALVADOR"
+]
 
         regional_data = {
             "GUATEMALA": construir_dashboard_data(
@@ -7288,13 +7235,7 @@ def construir_dashboard_data(
         gt_totals = gt_data.get("totals", {})
         sv_totals = sv_data.get("totals", {})
 
-        tipo_cambio = obtener_tipo_cambio_consolidado()
-
-        # Sin tasa disponible El Salvador queda fuera del consolidado
-        # y se avisa en meta, en lugar de sumar USD como si fueran GTQ.
-        tipo_cambio_faltante = tipo_cambio is None
-        if tipo_cambio_faltante:
-            tipo_cambio = 0.0
+        tipo_cambio = FX_CACHE.get("rate_gtq_per_usd") or 1
 
         regional_data["CONSOLIDADO"] = {
             "meta": {
@@ -7310,8 +7251,7 @@ def construir_dashboard_data(
                     sv_data.get("banks", [])
                 ),
                 "currency": "GTQ",
-                "exchangeRate": tipo_cambio,
-                "exchangeRateMissing": tipo_cambio_faltante
+                "exchangeRate": tipo_cambio
             },
 
             "banks": (
@@ -7386,7 +7326,6 @@ def construir_dashboard_data(
                             for campo in [
                                 "credits",
                                 "debits",
-                                "net",
                                 "netFlow",
                                 "change"
                             ]
@@ -7520,129 +7459,6 @@ def guardar_dashboard_data(data):
             "Error guardando dashboard_data.json:",
             str(error)
         )
-
-
-# ============================================================
-# DATOS QUEMADOS EN EL FRONTEND
-# ============================================================
-# Cada ejecución de Make publica un archivo JS con los datos en el repo
-# del dashboard. Así cualquier usuario ve la última información aunque
-# Render se haya reiniciado o dormido.
-PUBLISH_TOKEN_ENV = "DASHBOARD_PUBLISH_TOKEN"
-PUBLISH_REPO_ENV = "DASHBOARD_PUBLISH_REPO"
-PUBLISH_BRANCH_ENV = "DASHBOARD_PUBLISH_BRANCH"
-PUBLISH_PATH_ENV = "DASHBOARD_PUBLISH_PATH"
-PUBLISH_DEFAULT_PATH = "assets/js/ingreso/dashboard-data.js"
-
-
-def _github_request(url, token, method="GET", body=None):
-    req = urllib.request.Request(
-        url,
-        data=(
-            json.dumps(body).encode("utf-8")
-            if body is not None
-            else None
-        ),
-        method=method,
-        headers={
-            "Authorization": "Bearer " + token,
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "Content-Type": "application/json",
-            "User-Agent": "excel-parser/1.0"
-        }
-    )
-
-    with urllib.request.urlopen(
-        req,
-        timeout=20
-    ) as response:
-        return json.loads(
-            response.read().decode("utf-8") or "{}"
-        )
-
-
-def publicar_datos_quemados(data):
-    """
-    Sube window.DASHBOARD_BASE_DATA = {...} al repo del frontend.
-    Si faltan las variables de entorno no hace nada.
-    """
-    token = str(os.environ.get(PUBLISH_TOKEN_ENV, "") or "").strip()
-    repo = str(os.environ.get(PUBLISH_REPO_ENV, "") or "").strip()
-
-    if not token or not repo:
-        return {
-            "published": False,
-            "reason": "Variables de publicación no configuradas"
-        }
-
-    branch = str(os.environ.get(PUBLISH_BRANCH_ENV, "") or "main").strip()
-    path = str(
-        os.environ.get(PUBLISH_PATH_ENV, "")
-        or PUBLISH_DEFAULT_PATH
-    ).strip().lstrip("/")
-
-    url = (
-        "https://api.github.com/repos/"
-        + repo
-        + "/contents/"
-        + urllib.parse.quote(path)
-    )
-
-    contenido = (
-        "// Archivo generado automáticamente por excel-parser. No editar.\n"
-        + "window.DASHBOARD_BASE_DATA = "
-        + json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-        + ";\n"
-    )
-
-    try:
-        sha = None
-
-        try:
-            actual = _github_request(
-                url + "?ref=" + urllib.parse.quote(branch),
-                token
-            )
-            sha = actual.get("sha")
-        except urllib.error.HTTPError as error:
-            if error.code != 404:
-                raise
-
-        body = {
-            "message": "data: actualizar datos del dashboard",
-            "content": base64.b64encode(
-                contenido.encode("utf-8")
-            ).decode("ascii"),
-            "branch": branch
-        }
-
-        if sha:
-            body["sha"] = sha
-
-        resultado = _github_request(
-            url,
-            token,
-            method="PUT",
-            body=body
-        )
-
-        return {
-            "published": True,
-            "path": path,
-            "branch": branch,
-            "commit": (resultado.get("commit") or {}).get("sha", "")
-        }
-
-    except Exception as error:
-        print(
-            "Error publicando datos quemados:",
-            str(error)
-        )
-        return {
-            "published": False,
-            "reason": str(error)
-        }
 
 
 def cargar_dashboard_data():
@@ -8316,10 +8132,6 @@ def process_excel():
             dashboard_payload
         )
 
-        publicar_datos_quemados(
-            dashboard_payload
-        )
-
         # ====================================================
         # ELIMINAR INPUT
         # ====================================================
@@ -8577,10 +8389,6 @@ def finalize_batch():
             dashboard_payload
         )
 
-        publicacion = publicar_datos_quemados(
-            dashboard_payload
-        )
-
         state["dashboard_payload"] = dashboard_payload
         state["result_path"] = result_path
         state["finalized"] = True
@@ -8626,7 +8434,6 @@ def finalize_batch():
         return jsonify({
             "success": True,
             "batch_id": batch_id,
-            "published_data": publicacion,
             "files_processed": len(
                 files
             ),
