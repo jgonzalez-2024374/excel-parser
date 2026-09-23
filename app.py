@@ -64,7 +64,7 @@ def require_api_key(func):
     return wrapper
 
 # Identificador visible para confirmar qué versión está ejecutando Render.
-APP_BUILD = "dashboard-v5.7-cheques-20260908"
+APP_BUILD = "dashboard-v5.8-persistencia-json-20260923"
 
 
 # ============================================================
@@ -539,6 +539,32 @@ DASHBOARD_CACHE = {
     "daily": [],
     "transactions": []
 }
+
+
+# ============================================================
+# CARGA INICIAL DE DATOS PERSISTENTES DEL DASHBOARD
+# ============================================================
+# Mantiene la última información generada por Make aunque la variable
+# temporal DASHBOARD_CACHE se reinicie dentro del proceso de Flask.
+def cargar_cache_dashboard_inicial():
+    try:
+        if os.path.exists(DASHBOARD_DATA_FILE):
+            with open(
+                DASHBOARD_DATA_FILE,
+                "r",
+                encoding="utf-8"
+            ) as archivo:
+                data = json.load(archivo)
+                if isinstance(data, dict):
+                    DASHBOARD_CACHE.update(data)
+    except Exception as error:
+        print(
+            "Error cargando cache inicial del dashboard:",
+            str(error)
+        )
+
+
+cargar_cache_dashboard_inicial()
 
 
 # Versión del generador del dashboard descargable.
@@ -7297,6 +7323,11 @@ def construir_dashboard_data(
 
 
 def guardar_dashboard_data(data):
+    """
+    Guarda el último dashboard generado por Make en disco.
+    El archivo permanece disponible para nuevos usuarios hasta la siguiente
+    ejecución del flujo que genere nuevos datos.
+    """
     try:
         os.makedirs(
             DASHBOARD_DATA_DIR,
