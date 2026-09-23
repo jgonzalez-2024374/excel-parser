@@ -1214,21 +1214,115 @@ DEBIT_HINTS = (
 
 KNOWN_BANKS = [
     # Guatemala
-    (["banco industrial", "bi"], "BANCO INDUSTRIAL"),
-    (["g&t continental", "gyt continental", "g&t", "gyt"], "G&T"),
-    (["bac credomatic", "banco de america central", "bac"], "BAC"),
-    (["banrural", "banco de desarrollo rural", "ban"], "BANRURAL"),
-    (["banco agricola mercantil", "bam"], "BAM"),
-    (["banco promerica", "promerica"], "PROMERICA"),
-    (["banco davivienda", "davivienda"], "DAVIVIENDA"),
-    (["banco ficohsa", "ficohsa"], "FICOHSA"),
+    ([
+        "banco industrial",
+        "banco industrial sa",
+        "banco industrial, s.a.",
+        "industrial",
+        "industrial bank",
+        "bi",
+        "bi sa",
+        "bind"
+    ], "BANCO INDUSTRIAL"),
+
+    ([
+        "g&t continental",
+        "g y t continental",
+        "gyt continental",
+        "g&t",
+        "g y t",
+        "gyt",
+        "banco gyt",
+        "banco g&t"
+    ], "G&T"),
+
+    ([
+        "bac credomatic",
+        "bac credomatic network",
+        "banco de america central",
+        "banco de américa central",
+        "bac",
+        "bac sa",
+        "banco bac",
+        "bac internacional"
+    ], "BAC"),
+
+    ([
+        "banrural",
+        "banco de desarrollo rural",
+        "banco desarrollo rural",
+        "banco rural",
+        "ban rural",
+        "ban"
+    ], "BANRURAL"),
+
+    ([
+        "banco agricola mercantil",
+        "banco agromercantil",
+        "agromercantil",
+        "bam",
+        "bam guatemala"
+    ], "BAM"),
+
+    ([
+        "banco promerica",
+        "promerica",
+        "promerica guatemala"
+    ], "PROMERICA"),
+
+    ([
+        "banco davivienda",
+        "davivienda",
+        "davivienda guatemala"
+    ], "DAVIVIENDA"),
+
+    ([
+        "banco ficohsa",
+        "ficohsa"
+    ], "FICOHSA"),
+
     # El Salvador / regionales
-    (["banco agricola", "banco agrícola"], "BANCO AGRÍCOLA"),
-    (["banco cuscatlan", "banco cuscatlán", "cuscatlan", "cuscatlán"], "CUSCATLÁN"),
-    (["banco hipotecario"], "BANCO HIPOTECARIO"),
-    (["banco azul", "abank"], "BANCO AZUL"),
-    (["banco atlantida", "banco atlántida", "atlantida", "atlántida"], "BANCO ATLÁNTIDA"),
-    (["banco promete", "banco integral"], "BANCO INTEGRAL"),
+    ([
+        "banco agricola",
+        "banco agrícola",
+        "agricola",
+        "agrícola",
+        "banco agricola comercial",
+        "banco agricola sa"
+    ], "BANCO AGRÍCOLA"),
+
+    ([
+        "banco cuscatlan",
+        "banco cuscatlán",
+        "cuscatlan",
+        "cuscatlán",
+        "cusca",
+        "banco cusca"
+    ], "CUSCATLÁN"),
+
+    ([
+        "banco hipotecario",
+        "hipotecario",
+        "banco hipotecario el salvador"
+    ], "BANCO HIPOTECARIO"),
+
+    ([
+        "banco azul",
+        "azul",
+        "abank"
+    ], "BANCO AZUL"),
+
+    ([
+        "banco atlantida",
+        "banco atlántida",
+        "atlantida",
+        "atlántida"
+    ], "BANCO ATLÁNTIDA"),
+
+    ([
+        "banco promete",
+        "banco integral"
+    ], "BANCO INTEGRAL"),
 ]
 
 
