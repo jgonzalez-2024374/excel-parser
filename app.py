@@ -7238,18 +7238,27 @@ def construir_dashboard_data(
     # Se genera una vista adicional sin mezclar las monedas.
     # Cada país mantiene sus propios bancos y cuentas.
     if incluir_regional:
-        tx_gt = [
-            tx for tx in transactions
-            if normalizar_pais_bancario(tx.get("pais")) == "GUATEMALA"
-        ]
+        # A nivel de hoja el país puede quedar como GUATEMALA por texto del
+        # encabezado aunque la cuenta sea de El Salvador, por eso se vuelve a
+        # detectar con banco + moneda + archivo. Cada movimiento se asigna a
+        # un solo país para no contarlo en ambos.
+        tx_gt = []
+        tx_sv = []
 
-        # El país ya quedó asignado a cada transacción al inicio de esta
-        # función; volver a detectarlo aquí duplicaba en El Salvador
-        # movimientos que ya estaban en Guatemala.
-        tx_sv = [
-            tx for tx in transactions
-            if normalizar_pais_bancario(tx.get("pais")) == "EL_SALVADOR"
-        ]
+        for tx in transactions:
+            pais_tx = normalizar_pais_bancario(tx.get("pais"))
+
+            if (
+                pais_tx == "EL_SALVADOR"
+                or detectar_pais_bancario(
+                    banco=tx.get("banco", ""),
+                    moneda=tx.get("moneda", "N/D"),
+                    nombre_archivo=nombre_archivo
+                ) == "EL_SALVADOR"
+            ):
+                tx_sv.append(tx)
+            elif pais_tx == "GUATEMALA":
+                tx_gt.append(tx)
 
         regional_data = {
             "GUATEMALA": construir_dashboard_data(
