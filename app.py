@@ -1271,9 +1271,10 @@ KNOWN_BANKS = [
     ], "BANCO INDUSTRIAL"),
 
     ([
-        "banrural", "banco de desarrollo rural",
-        "banco desarrollo rural", "banco rural", "ban rural"
-    ], "BANRURAL"),
+    "banrural", "banco de desarrollo rural",
+    "banco desarrollo rural", "banco rural", "ban rural",
+    "ban"
+], "BANRURAL"),
 
     ([
         "g&t continental", "g y t continental", "gyt continental",
