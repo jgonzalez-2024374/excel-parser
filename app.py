@@ -3076,22 +3076,24 @@ def detectar_pais_bancario(
     nombre_archivo=""
 ):
     """
-    Clasifica una hoja bancaria como Guatemala o El Salvador.
+    Clasifica país bancario sin asumir que USD = El Salvador.
 
     Prioridad:
-    1. País escrito explícitamente en la hoja.
-    2. Bancos exclusivos o fuertemente asociados a un país.
-    3. Moneda de la hoja como respaldo para bancos regionales.
-    4. Nombre del archivo como último respaldo.
+    1. País escrito explícitamente en el archivo/hoja.
+    2. Bancos exclusivos por país.
+    3. Bancos compartidos usando señales disponibles.
+    4. Nombre del archivo.
+    5. No identificado.
 
-    No convierte importes ni cambia la moneda detectada.
+    La moneda NO define país por sí sola.
     """
 
     rows = rows or []
 
     contexto_local = [
         str(sheet_name or ""),
-        str(banco or "")
+        str(banco or ""),
+        str(nombre_archivo or "")
     ]
 
     for row in rows[:40]:
@@ -3099,157 +3101,110 @@ def detectar_pais_bancario(
             if value not in (None, ""):
                 contexto_local.append(str(value))
 
-    texto_local = clean_text(
-        " | ".join(contexto_local)
-    )
+    texto_local = clean_text(" | ".join(contexto_local))
+    banco_texto = clean_text(banco)
+    archivo = clean_text(nombre_archivo)
+    moneda_codigo = normalizar_codigo_moneda(moneda)
 
-    # País explícito dentro de la propia hoja.
-    if (
-        "el salvador" in texto_local
-        or "salvadoreno" in texto_local
-        or "salvadorena" in texto_local
-    ):
+    # País explícito
+    if any(x in texto_local for x in [
+        "el salvador",
+        "salvadoreno",
+        "salvadorena"
+    ]):
         return "EL_SALVADOR"
 
-    if (
-        "guatemala" in texto_local
-        or "guatemalteco" in texto_local
-        or "guatemalteca" in texto_local
-    ):
+    if any(x in texto_local for x in [
+        "guatemala",
+        "guatemalteco",
+        "guatemalteca"
+    ]):
         return "GUATEMALA"
 
-    banco_texto = clean_text(
-        banco
-    )
-
-    # Bancos que identifican con fuerza Guatemala.
-    senales_gt = (
-        "g&t",
-        "gyt",
+    # Bancos exclusivos Guatemala
+    bancos_gt = (
+        "banco industrial",
         "banrural",
         "desarrollo rural",
+        "g&t",
+        "gyt",
+        "bam",
         "agricola mercantil",
         "bantrab",
         "banco de los trabajadores",
-        "credito hipotecario nacional",
-        "banco inmobiliario",
         "interbanco",
         "banco internacional",
-        "vivibanco",
-        "banco de antigua",
-        "banco azteca",
-        "banco inv",
         "ficohsa",
     )
 
-    if any(
-        signal in banco_texto
-        for signal in senales_gt
-    ):
+    if any(x in banco_texto for x in bancos_gt):
         return "GUATEMALA"
 
-    # Bancos que identifican con fuerza El Salvador.
-    senales_sv = (
+    # Bancos exclusivos El Salvador
+    bancos_sv = (
         "banco agricola",
         "cuscatlan",
-        "davivienda",
         "banco hipotecario",
         "banco azul",
         "abank",
         "banco atlantida",
-        "apoyo integral",
         "banco integral",
-        "fomento agropecuario",
-        "citibank",
     )
 
-    if any(
-        signal in banco_texto
-        for signal in senales_sv
-    ):
+    if any(x in banco_texto for x in bancos_sv):
         return "EL_SALVADOR"
 
-    # Banco Industrial, BAC y Promerica operan/regionalizan nombres.
-    # Para ellos la moneda de la hoja es el respaldo más seguro disponible
-    # cuando el país no está escrito explícitamente.
-    moneda_codigo = normalizar_codigo_moneda(
-        moneda
-    )
-
-    if moneda_codigo == "GTQ":
-        return "GUATEMALA"
-
-    if moneda_codigo in {
-        "USD",
-        "SVC"
-    }:
-        return "EL_SALVADOR"
-
-    # Banco Industrial sin otra señal conserva Guatemala como respaldo
-    # histórico del parser. Si es El Salvador, normalmente la hoja indicará
-    # USD o "El Salvador" y se clasificará antes de llegar aquí.
-    if "banco industrial" in banco_texto:
-        return "GUATEMALA"
-
-    # ==========================================================
-    # DETECCION POR NOMBRE DE ARCHIVO
-    # Algunos bancos no escriben el nombre dentro del Excel.
-    # La identificación viene del archivo recibido.
-    # ==========================================================
-    archivo = clean_text(
-        nombre_archivo
-    )
-
-    # Bancos identificados por nombre de archivo - El Salvador
-    senales_archivo_sv = (
-        "cusca",
-        "cuscatlan",
-        "dav",
+    # Bancos compartidos
+    bancos_compartidos = (
+        "bac",
+        "promerica",
         "davivienda",
-        "agricola",
-        "atlantida",
-        "hipotecario",
-        "azul",
     )
 
-    if any(
-        señal in archivo
-        for señal in senales_archivo_sv
-    ):
-        return "EL_SALVADOR"
+    if any(x in banco_texto for x in bancos_compartidos):
 
-    # Bancos regionales: BAC y Promerica dependen de moneda
-    if "bac" in archivo or "promerica" in archivo:
-        moneda_codigo = normalizar_codigo_moneda(
-            moneda
-        )
-
-        if moneda_codigo == "USD":
-            return "EL_SALVADOR"
-
+        # Si es GTQ, normalmente corresponde a Guatemala.
         if moneda_codigo == "GTQ":
             return "GUATEMALA"
 
-    # Bancos identificados por archivo - Guatemala
-    senales_archivo_gt = (
+        # Si es USD no asumir El Salvador.
+        # Se revisan señales del archivo.
+        if any(x in archivo for x in [
+            "salvador",
+            "sv",
+            "sv_",
+            "_sv",
+        ]):
+            return "EL_SALVADOR"
+
+        if any(x in archivo for x in [
+            "guatemala",
+            "gt",
+            "gt_",
+            "_gt",
+        ]):
+            return "GUATEMALA"
+
+        return "NO_IDENTIFICADO"
+
+    # Respaldo por nombre de archivo
+    if any(x in archivo for x in [
         "industrial",
         "banrural",
         "g&t",
         "gyt",
         "bam",
-    )
-
-    if any(
-        señal in archivo
-        for señal in senales_archivo_gt
-    ):
+    ]):
         return "GUATEMALA"
 
-    if "el salvador" in archivo:
+    if any(x in archivo for x in [
+        "agricola",
+        "cusca",
+        "cuscatlan",
+        "hipotecario",
+        "azul",
+    ]):
         return "EL_SALVADOR"
-
-    if "guatemala" in archivo:
-        return "GUATEMALA"
 
     return "NO_IDENTIFICADO"
 
