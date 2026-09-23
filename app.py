@@ -1265,7 +1265,9 @@ KNOWN_BANKS = [
 
 
     # ==========================
-    # EL SALVADOR
+    # EL SALVADOR (exclusivos)
+    # BAC, DAVIVIENDA y PROMERICA son compartidos con GT;
+    # NO se repiten aquí — la distinción se hace en detectar_pais_bancario.
     # ==========================
 
     ([
@@ -1280,24 +1282,6 @@ KNOWN_BANKS = [
         "banco cuscatlán",
         "cusca"
     ], "CUSCATLÁN"),
-
-    ([
-        "bac", "bac credomatic",
-        "banco america central",
-        "banco de america central"
-    ], "BAC"),
-
-    ([
-        "davivienda",
-        "banco davivienda",
-        "dav"
-    ], "DAVIVIENDA"),
-
-    ([
-        "promerica",
-        "banco promerica",
-        "prom"
-    ], "PROMERICA"),
 
     ([
         "banco azul",
@@ -3301,23 +3285,31 @@ def detectar_pais_bancario(
         if moneda_codigo == "GTQ":
             return "GUATEMALA"
 
-        # Si es USD no asumir El Salvador.
-        # Se revisan señales del archivo.
-        if any(x in archivo for x in [
-            "salvador",
-            "sv",
-            "sv_",
-            "_sv",
-        ]):
+        # Si es USD, revisar señales del archivo.
+        #
+        # Se usan regex con límites de palabra para los tokens cortos (gt/sv)
+        # y también se reconocen abreviaturas de empresa conocidas (intgt/intsv).
+        # Esto evita falsos positivos como "intgt" → GT cuando la señal
+        # correcta viene de "intsv", y viceversa.
+        _señal_sv = (
+            re.search(r"(?<![a-z])salvador(?![a-z])|(?<![a-z])sv(?![a-z])", archivo)
+            or "intsv" in archivo
+        )
+        _señal_gt = (
+            re.search(r"(?<![a-z])guatemala(?![a-z])|(?<![a-z])gt(?![a-z])", archivo)
+            or "intgt" in archivo
+        )
+
+        if _señal_sv and not _señal_gt:
             return "EL_SALVADOR"
 
-        if any(x in archivo for x in [
-            "guatemala",
-            "gt",
-            "gt_",
-            "_gt",
-        ]):
+        if _señal_gt and not _señal_sv:
             return "GUATEMALA"
+
+        # Como último recurso para bancos compartidos, la moneda USD
+        # orientada a El Salvador es la señal más confiable que queda.
+        if moneda_codigo == "USD":
+            return "EL_SALVADOR"
 
         return "NO_IDENTIFICADO"
 
@@ -3338,6 +3330,24 @@ def detectar_pais_bancario(
         "hipotecario",
         "azul",
     ]):
+        return "EL_SALVADOR"
+
+    # Señales de país en el nombre del archivo.
+    # Se combinan regex de límite de palabra con abreviaturas de empresa
+    # conocidas (intgt = INTELFON GUATEMALA, intsv = INTELFON EL SALVADOR).
+    _señal_sv_global = (
+        re.search(r"(?<![a-z])salvador(?![a-z])|(?<![a-z])sv(?![a-z])", archivo)
+        or "intsv" in archivo
+    )
+    _señal_gt_global = (
+        re.search(r"(?<![a-z])guatemala(?![a-z])|(?<![a-z])gt(?![a-z])", archivo)
+        or "intgt" in archivo
+    )
+
+    if _señal_gt_global and not _señal_sv_global:
+        return "GUATEMALA"
+
+    if _señal_sv_global and not _señal_gt_global:
         return "EL_SALVADOR"
 
     return "NO_IDENTIFICADO"
@@ -8866,6 +8876,4 @@ if __name__ == "__main__":
             )
         ),
         debug=False
-    )   
-
-    
+    )
