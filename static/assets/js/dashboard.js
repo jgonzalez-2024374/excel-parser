@@ -621,10 +621,10 @@
       updateExchangeDisplays();
 
       // Redibujar todos los valores cuando cambia la tasa o durante la primera carga.
-      if (forceRender && DATA && (changed || !document.querySelector('.currencyLabel')?.textContent)) {
-        renderAll();
-      } else if (forceRender && DATA) {
-        renderAll();
+      // Como los montos de cada cuenta se llevan a la moneda base usando la tasa,
+      // si la tasa cambió hay que reconstruir DATA y no solo redibujar.
+      if (forceRender && DATA) {
+        if (!changed || !applyCurrentDateFilter(false)) renderAll();
       }
 
       return rate;
@@ -699,7 +699,76 @@
     return round2(bal);
   }
 
+  // ============================================================
+  // MONEDA ORIGINAL POR CUENTA
+  // Una cuenta puede estar en una moneda distinta a la base del país (p. ej. una
+  // cuenta en dólares de Banco Industrial dentro de Guatemala, cuya base es GTQ).
+  // Antes de sumar, cada monto se lleva a la moneda base del país. Así el botón
+  // $/Q convierte una sola vez y una cuenta que ya está en $ no se vuelve a
+  // dividir entre el tipo de cambio.
+  // ============================================================
+  // Si alguna cuenta no se detecta bien, se puede forzar aquí:
+  //   'CLAVE_BANCO|NUMERO_CUENTA': 'USD'
+  const ACCOUNT_CURRENCY_OVERRIDES = {};
+
+  function normalizeCurrencyCode(value) {
+    const s = String(value || '').trim().toUpperCase().replace(/[.\s]/g, '');
+    if (!s) return '';
+    if (s === 'USD' || s === 'US$' || s === '$' || s === 'US' || s.startsWith('DOLAR') || s.startsWith('DÓLAR')) return 'USD';
+    if (s === 'GTQ' || s === 'Q' || s === 'QTZ' || s.startsWith('QUETZAL')) return 'GTQ';
+    return CURRENCY_SYMBOLS[s] ? s : '';
+  }
+
+  function currencyFromText(a) {
+    const hint = [a.account, a.name, a.alias, a.label, a.type, a.product, a.description]
+      .filter(x => typeof x === 'string').join(' ');
+    if (/(^|[^A-Z])USD([^A-Z]|$)|US\$|D[ÓO]LAR/i.test(hint)) return 'USD';
+    if (/(^|[^A-Z])GTQ([^A-Z]|$)|QUETZAL/i.test(hint)) return 'GTQ';
+    return '';
+  }
+
+  const ACCOUNT_BY_KEY = {};
+  (BASE_DATA.accounts || []).forEach(a => { ACCOUNT_BY_KEY[txKey(a.bankKey, a.account)] = a; });
+  const ACCOUNT_CURRENCY_CACHE = {};
+
+  // Moneda en la que está realmente la cuenta ('' en el caché = sin detectar -> moneda base).
+  function accountCurrency(ref) {
+    const key = txKey(ref.bankKey, ref.account);
+    if (!(key in ACCOUNT_CURRENCY_CACHE)) {
+      const a = ACCOUNT_BY_KEY[key] || ref;
+      let cur = normalizeCurrencyCode(ACCOUNT_CURRENCY_OVERRIDES[key])
+        || normalizeCurrencyCode(a.currency || a.moneda);
+      if (!cur) {
+        const txs = TX_BY_ACCOUNT[key] || [];
+        for (const t of txs) {
+          cur = normalizeCurrencyCode(t.currency || t.moneda);
+          if (cur) break;
+        }
+      }
+      if (!cur) cur = currencyFromText(a);
+      ACCOUNT_CURRENCY_CACHE[key] = cur;
+    }
+    return ACCOUNT_CURRENCY_CACHE[key] || baseCurrencyForActiveCountry();
+  }
+
+  const txCurrency = t => accountCurrency({ bankKey: t.bankKey, account: t.account });
+
+  // Lleva un monto de su moneda original a la moneda base del país.
+  function convertToBase(value, from, to) {
+    const n = Number(value) || 0;
+    const rate = Number(DASH_EXCHANGE_RATE);
+    if (!from || !to || from === to) return n;
+    if (!(Number.isFinite(rate) && rate > 0)) return n;   // sin tasa: se rehace al llegar (ver loadExchangeRate)
+    if (from === 'USD' && to === 'GTQ') return n * rate;
+    if (from === 'GTQ' && to === 'USD') return n / rate;
+    return n;
+  }
+
+  const MONEDA_LOG_PAISES = {};
+
   function buildFiltered(startDate, endDate) {
+    const baseCur = baseCurrencyForActiveCountry();
+    const txAmt = (t, v) => convertToBase(Number(v || 0), txCurrency(t), baseCur);
     // Primero separar por país; después aplicar el período.
     const countryTransactions = RAW_TRANSACTIONS.filter(
       t => recordCountry(t) === ACTIVE_COUNTRY
@@ -729,9 +798,16 @@
       const debits = round2(periodTx.reduce((s, t) => s + Number(t.debit || 0), 0));
       const change = round2(final - initial);
       const changePct = initial !== 0 ? round2(change / initial * 100) : null;
-      return { ...a, initial, final, change, changePct, credits, debits, movements: periodTx.length };
+      const cur = accountCurrency(a);
+      const k = v => round2(convertToBase(v, cur, baseCur));
+      return { ...a, currencyOriginal: cur, initial: k(initial), final: k(final), change: k(change), changePct, credits: k(credits), debits: k(debits), movements: periodTx.length };
     });
 
+    if (!MONEDA_LOG_PAISES[ACTIVE_COUNTRY]) {
+      MONEDA_LOG_PAISES[ACTIVE_COUNTRY] = true;
+      console.info('[Moneda por cuenta] base =', baseCur);
+      console.table(accounts.map(a => ({ banco: a.bank || a.bankKey, cuenta: a.account, moneda_detectada: a.currencyOriginal })));
+    }
     const totalFinal = round2(accounts.reduce((s, a) => s + a.final, 0));
     const colorByKey = Object.fromEntries(baseBanks.map(b => [b.key, b.color]));
     const nameByKey = Object.fromEntries(baseBanks.map(b => [b.key, b.name]));
@@ -741,8 +817,8 @@
       const bankTx = inRange.filter(t => t.bankKey === base.key);
       const initial = round2(aa.reduce((s, a) => s + a.initial, 0));
       const final = round2(aa.reduce((s, a) => s + a.final, 0));
-      const credits = round2(bankTx.reduce((s, t) => s + Number(t.credit || 0), 0));
-      const debits = round2(bankTx.reduce((s, t) => s + Number(t.debit || 0), 0));
+      const credits = round2(bankTx.reduce((s, t) => s + txAmt(t, t.credit), 0));
+      const debits = round2(bankTx.reduce((s, t) => s + txAmt(t, t.debit), 0));
       const change = round2(final - initial);
       const changePct = initial !== 0 ? round2(change / initial * 100) : null;
       const netFlow = round2(credits - debits);
@@ -754,8 +830,8 @@
       };
     });
 
-    const credits = round2(inRange.reduce((s, t) => s + Number(t.credit || 0), 0));
-    const debits = round2(inRange.reduce((s, t) => s + Number(t.debit || 0), 0));
+    const credits = round2(inRange.reduce((s, t) => s + txAmt(t, t.credit), 0));
+    const debits = round2(inRange.reduce((s, t) => s + txAmt(t, t.debit), 0));
     const net = round2(credits - debits);
     const initial = round2(accounts.reduce((s, a) => s + a.initial, 0));
     const final = round2(accounts.reduce((s, a) => s + a.final, 0));
@@ -765,8 +841,8 @@
     inRange.forEach(t => {
       const d = byDate[t.date] || (byDate[t.date] = { date: t.date, moves: 0, debits: 0, credits: 0 });
       d.moves += 1;
-      d.debits += Number(t.debit || 0);
-      d.credits += Number(t.credit || 0);
+      d.debits += txAmt(t, t.debit);
+      d.credits += txAmt(t, t.credit);
     });
     const daily = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date)).map(d => ({
       date: d.date,
@@ -1102,32 +1178,14 @@
 
     }
 
+    // Delegar en el botón real: el manejador principal ya hace buildFiltered() + renderAll().
+    // (Antes esto reemplazaba DATA por los datos regionales crudos y llamaba a
+    // window.renderAll, que no existe porque renderAll es local al IIFE principal.)
     window.changeDashboardCountry = function (country) {
-
       window.DASHBOARD_ACTIVE_COUNTRY = country;
-      ACTIVE_COUNTRY = normalizeCountry(country);
-
-      const data = getActiveDashboardData(ACTIVE_COUNTRY);
-
-      window.DASHBOARD_CURRENT_DATA = data;
-
-      DATA = data;
-
-      window.DATA = data;
-    controlarVistaConsolidado(country);
-
-
-      if (typeof window.renderAll === "function") {
-
-          window.renderAll();
-
-      } else if (typeof window.refreshDashboard === "function") {
-
-          window.refreshDashboard(data);
-
-      }
-
-  };
+      const btn = document.querySelector('.country-btn[data-country="' + country + '"]');
+      if (btn && !btn.classList.contains('active')) btn.click();
+    };
 
     function unirConsolidado(gt, sv) {
       gt = gt || {};
@@ -1172,16 +1230,6 @@
         regional.EL_SALVADOR
       );
     };
-
-    document.addEventListener("DOMContentLoaded", function () {
-      document.querySelectorAll("button[data-country]").forEach(button => {
-        button.addEventListener("click", function () {
-          window.changeDashboardCountry(
-            this.dataset.country
-          );
-        });
-      });
-    });
 
   })();
 
