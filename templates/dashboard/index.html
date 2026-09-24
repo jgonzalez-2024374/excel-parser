@@ -525,7 +525,7 @@ th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}
 </div>
 
 <script>
-const payload = ${JSON.stringify(data)};
+const payload = ${JSON.stringify(data).replace(/</g, "\\u003c")};
 
 const transactions = payload.transactions || [];
 
@@ -538,17 +538,17 @@ document.getElementById("summary").innerHTML =
 "<div class='kpi'>Movimientos de ingreso: " + ingresos.length + "</div>";
 
 document.getElementById("detail").innerHTML =
-ingresos.map(t=>`
+ingresos.map(t=>\`
 <tr>
-<td>${t.fecha || t.date || ""}</td>
-<td>${t.pais || t.country || ""}</td>
-<td>${t.banco || t.bank || ""}</td>
-<td>${t.descripcion || t.description || ""}</td>
-<td>${t.monto || t.amount || ""} ${t.moneda || ""}</td>
+<td>\${t.fecha || t.date || ""}</td>
+<td>\${t.pais || t.country || ""}</td>
+<td>\${t.banco || t.bank || ""}</td>
+<td>\${t.descripcion || t.description || ""}</td>
+<td>\${t.monto || t.amount || ""} \${t.moneda || ""}</td>
 </tr>
-`).join("");
+\`).join("");
 
-</script>
+<\/script>
 
 </body>
 </html>`;
