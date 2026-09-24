@@ -34,6 +34,123 @@ body.consolidado-regional #resumen {
 body.consolidado-regional #insights {
     display: none !important;
 }
+/* ===== Tema profesional (capa sobre dashboard.css; solo pantalla, la impresión no cambia) ===== */
+@media screen {
+:root{--bg:#0A1120;--surface:#111B2E;--raised:#16223A;--line:#22304A;--line-soft:#1B2740;--text:#E7EDF6;--muted:#93A3BC;--accent:#5EA1FF;--pos:#34D399;--neg:#FB7185;--r-lg:14px;--r-md:10px;--r-sm:8px}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",system-ui,-apple-system,Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{max-width:1440px;margin:0 auto;padding:24px 28px 32px}
+.positive{color:var(--pos)}.negative{color:var(--neg)}
+button{font-family:inherit}
+
+/* Barra superior */
+.top-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px;padding:12px 28px;background:#0D1526;border-bottom:1px solid var(--line)}
+.top-toolbar-left{display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px}
+.country-buttons{display:inline-flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.country-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+.country-btn:hover{color:var(--text);background:var(--raised)}
+.country-btn.active{background:var(--accent);color:#06101F}
+.country-btn img{height:16px;width:auto;border-radius:2px}
+.country-count{padding:1px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-variant-numeric:tabular-nums}
+.country-btn.active .country-count{background:rgba(6,16,31,.18)}
+.country-currency-control{display:flex;align-items:center;gap:14px}
+.country-currency-copy strong{display:block;font-size:13px;font-weight:600}
+.exchange-info{color:var(--muted);font-size:12.5px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:8px}
+.hero-actions button{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+.hero-actions button:hover{background:var(--raised);border-color:#33466B}
+.save-icon{width:16px;height:16px;object-fit:contain}
+
+/* Portada */
+.executive-cover{background:#0E1A31;border:1px solid var(--line);border-radius:var(--r-lg);padding:32px 36px;box-shadow:inset 4px 0 0 var(--accent)}
+.cover-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:center}
+.cover-kicker{color:var(--accent);font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;margin-bottom:8px}
+.cover-title{font-size:clamp(26px,3vw,38px);font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.cover-copy{max-width:64ch;margin-top:12px;color:var(--muted);font-size:15px;line-height:1.6}
+.cover-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.cover-badges span{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03);color:var(--muted);font-size:13px}
+.cover-badges b{color:var(--text);font-weight:600}
+.cover-badges img,.meta img{width:15px;height:15px;object-fit:contain;opacity:.85}
+.cover-bank-strip{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;max-width:380px}
+
+/* Filtros de período */
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;color:var(--muted);font-size:13px}
+.meta>span{display:inline-flex;align-items:center;gap:6px}
+.meta b{color:var(--text);font-weight:600}
+.date-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.date-filter-title{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-weight:600}
+.date-filter label{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+input[type=date],.select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 10px;font-family:inherit;font-size:13px;color-scheme:dark}
+.date-apply{padding:7px 16px;background:var(--accent);color:#06101F;border:0;border-radius:var(--r-sm);font-weight:600;cursor:pointer}
+.date-reset{padding:6px 10px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:var(--r-sm);cursor:pointer}
+.date-reset:hover{color:var(--text);background:var(--raised)}
+
+/* Pestañas */
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tab{margin-bottom:-1px;padding:12px 18px;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;color:var(--muted);font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent);background:none}
+
+/* Indicadores */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:18px}
+.kpis .kpi{margin-bottom:0;padding:18px 20px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:none}
+.kpi .label{color:var(--muted);font-size:13px;font-weight:500;text-transform:none;letter-spacing:0}
+.kpi .value{margin:6px 0 4px;font-size:26px;font-weight:700;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .hint{color:var(--muted);font-size:12.5px}
+
+/* Tarjetas y gráficos */
+.card{padding:22px 24px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:none}
+.card h2,.section-heading h2{margin:0 0 4px;color:var(--text);font-size:17px;font-weight:650;letter-spacing:-.01em}
+.desc,.section-heading p{max-width:70ch;margin:0 0 14px;color:var(--muted);font-size:13px}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin:0 0 12px;color:var(--muted);font-size:12.5px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:18px}
+.grid-equal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid2 .card,.grid-equal .card{margin-bottom:0}
+@media (max-width:960px){.grid2,.grid-equal{grid-template-columns:1fr}.cover-grid{grid-template-columns:1fr}.cover-bank-strip{justify-content:flex-start}}
+
+/* Hallazgos y composición */
+.insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.insight{padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r-md)}
+.insight .tag{padding:0;margin-bottom:4px;background:none;color:var(--muted);font-size:12.5px;text-transform:none;letter-spacing:0}
+.insight b{display:block;font-size:16px}
+.insight p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.bank-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.bank-row:last-child{border-bottom:0}
+.bank-row .dot{width:10px;height:10px;margin-top:6px;border-radius:50%}
+.bank-row small{display:block;color:var(--muted);font-size:12.5px}
+.bank-row .amount{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.progress{height:6px;margin-top:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.progress i{display:block;height:100%;border-radius:99px}
+
+/* Detalle por banco */
+.section-heading{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px 16px;margin-bottom:16px}
+.section-chip{padding:4px 12px;background:none;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px}
+.tab-currency{margin:0 0 12px;color:var(--muted);font-size:13px}
+.tab-currency b{color:var(--text)}
+.bank-detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.bank-card{padding:18px 20px;background:var(--raised);border:1px solid var(--line);border-top:3px solid var(--bank,var(--accent));border-radius:var(--r-md)}
+.bank-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:600}
+.bank-card .big{margin-top:10px;font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bank-card .small{color:var(--muted);font-size:12.5px}
+.bank-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.mini b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.mini span{color:var(--muted);font-size:12px}
+
+/* Tablas */
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r-md)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{padding:10px 14px;background:var(--raised);border-bottom:1px solid var(--line);color:var(--muted);font-size:12.5px;font-weight:600;text-align:left;white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--line-soft)}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:rgba(94,161,255,.06)}
+
+.footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;margin-top:8px;padding:18px 4px 0;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+}
 </style>
 
 
@@ -53,12 +170,12 @@ body.consolidado-regional #insights {
             <span class="country-count" data-country-count="GUATEMALA">0</span>
           </button>
           <button type="button" class="country-btn" data-country="EL_SALVADOR">
-            <span>🇸🇻 El Salvador</span>
+            <span>El Salvador</span>
             <img src="/static/assets/img/elsalvador.png" alt="El Salvador">
             <span class="country-count" data-country-count="EL_SALVADOR">0</span>
           </button>
           <button type="button" class="country-btn" data-country="CONSOLIDADO">
-            <span>🌎 Consolidado Regional</span>
+            <span>Consolidado Regional</span>
             <span class="country-count" data-country-count="CONSOLIDADO">0</span>
           </button>
         </div>
@@ -101,11 +218,10 @@ body.consolidado-regional #insights {
         <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
       </button>
       <button type="button" onclick="generarDashboardIngresos()">
-        📥 Descargar Dashboard de Ingresos
+        Descargar dashboard de ingresos
       </button>
     </div>
   </div>
-  <title>Saldos Bancarios Consolidados</title>
   <div class="app">
     <section class="executive-cover" aria-label="Portada ejecutiva">
       <div class="cover-grid">
