@@ -867,7 +867,7 @@
     document.getElementById('bankCards').innerHTML = DATA.banks.map(b => `
       <div class="bank-card" style="--bank:${b.color}"><div class="bank-title"><span>${esc(b.name)}</span><span class="bank-icon ${logoClass(b)}">${bankLogoHtml(b, 'card')}</span></div><div class="big">${moneyAllViews(b.final)}</div><div class="small">Saldo final · ${b.share.toFixed(2)}% del total</div><div class="bank-metrics"><div class="mini"><b>${moneyAllViews(b.initial)}</b><span>Saldo inicial</span></div><div class="mini"><b class="${cls(b.change)}">${moneyAllViews(b.change)}</b><span>Variación</span></div><div class="mini"><b class="positive">${moneyAllViews(b.credits)}</b><span>Créditos</span></div><div class="mini"><b class="negative">${moneyAllViews(b.debits)}</b><span>Débitos</span></div></div></div>`).join('');
   }
-  cmd
+  
   const bankFilter = document.getElementById('bankFilter');
 
   function rebuildBankFilter() {
