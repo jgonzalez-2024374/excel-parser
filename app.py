@@ -3208,7 +3208,8 @@ def detectar_bancos_desde_imagenes_excel(
 # ============================================================
 
 def normalizar_pais_bancario(value):
-    texto = clean_text(value)
+    # "EL_SALVADOR" llega con guion bajo; sin esto se perdía como NO_IDENTIFICADO.
+    texto = clean_text(value).replace("_", " ")
 
     if texto in {
         "guatemala",
@@ -3355,9 +3356,10 @@ def detectar_pais_bancario(
         if _señal_gt and not _señal_sv:
             return "GUATEMALA"
 
-        # Como último recurso para bancos compartidos, la moneda USD
-        # orientada a El Salvador es la señal más confiable que queda.
-        if moneda_codigo == "USD":
+        # Como último recurso para bancos compartidos: los estados de
+        # Guatemala ya salieron por GTQ, así que USD o moneda no detectada
+        # (ej. BAC 327 sin texto "USD") corresponden a El Salvador.
+        if moneda_codigo != "MULTI":
             return "EL_SALVADOR"
 
         return "NO_IDENTIFICADO"
@@ -7267,6 +7269,13 @@ def construir_dashboard_data(
                 tx_sv.append(tx)
             elif pais_tx == "GUATEMALA":
                 tx_gt.append(tx)
+            else:
+                print(
+                    "Movimiento sin país asignado en vista regional:",
+                    tx.get("banco", ""),
+                    tx.get("cuenta", ""),
+                    tx.get("moneda", "")
+                )
 
         regional_data = {
             "GUATEMALA": construir_dashboard_data(
