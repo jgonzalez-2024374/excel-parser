@@ -7579,12 +7579,19 @@ def publicar_datos_quemados(data):
     repo = str(os.environ.get(PUBLISH_REPO_ENV, "") or "").strip()
 
     if not token or not repo:
+        print(
+            "Datos quemados no publicados: faltan "
+            + PUBLISH_TOKEN_ENV
+            + " o "
+            + PUBLISH_REPO_ENV
+        )
         return {
             "published": False,
             "reason": "Variables de publicación no configuradas"
         }
 
-    branch = str(os.environ.get(PUBLISH_BRANCH_ENV, "") or "main").strip()
+    # El dashboard centralizado se despliega desde develop.
+    branch = str(os.environ.get(PUBLISH_BRANCH_ENV, "") or "develop").strip()
     path = str(
         os.environ.get(PUBLISH_PATH_ENV, "")
         or PUBLISH_DEFAULT_PATH
