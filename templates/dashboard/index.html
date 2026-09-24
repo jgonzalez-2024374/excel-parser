@@ -5,233 +5,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Red intelfon | Estados Bancarios</title>
-  <link rel="icon" type="image/png" href="/static/assets/img/Logo.png">
-  <link rel="stylesheet" href="/static/assets/css/dashboard.css">
+  <link rel="stylesheet" href="../../assets/css/Ingresos.css?v=all-containers-151c2e-20260904">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
 
-<style>
-.card,
-.kpi,
-.insights,
-.grid2,
-.grid-equal {
-    margin-bottom: 18px;
-}
+  <style>
+    .kpi,
+    .insights,
+    .grid2,
+    .grid-equal {
+      margin-bottom: 1rem;
+    }
 
-.hero,
-.executive-cover,
-.tabs {
-    margin-bottom: 18px;
-}
+    .hero,
+    .executive-cover,
+    .tabs {
+      margin-bottom: 0.5rem;
+    }
 
-body.consolidado-regional #resumen {
-    margin-top: 18px;
-}
+    body.consolidado-regional #resumen {
+      margin-top: 18px;
+    }
 
-body.consolidado-regional #insights {
-    display: none !important;
-}
-/* ===== Tema profesional: paleta única en :root (capa sobre dashboard.css; solo pantalla, la impresión no cambia) ===== */
-@media screen {
-:root{--bg:#0B1220;--surface:#111B2D;--raised:#17233A;--line:#24324D;--line-soft:#1C2942;--text:#E6ECF5;--muted:#90A0B8;--accent:#60A5FA;--pos:#34D399;--neg:#FB7185;--s1:#60A5FA;--s2:#A78BFA;--s3:#22D3EE;--s4:#FBBF24;--s5:#818CF8;--s6:#94A3B8;--s7:#2DD4BF;--s8:#E9A8D2;--hl:#E0707C;--hl-soft:rgba(224,112,124,.14);--hl-line:rgba(224,112,124,.5);--hl-text:#FFD6DA;--r-lg:12px;--r-md:9px;--r-sm:7px}
-[hidden]{display:none!important}
-body{background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",system-ui,-apple-system,Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.app{max-width:1440px;margin:0 auto;padding:24px 28px 32px}
-.positive{color:var(--pos)}.negative{color:var(--neg)}
-button{font-family:inherit}
-
-/* Barra superior */
-.top-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px;padding:12px 28px;background:#0D1526;border-bottom:1px solid var(--line)}
-.top-toolbar-left{display:flex;flex-wrap:wrap;align-items:center;gap:14px 24px}
-.country-buttons{display:inline-flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
-.country-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
-.country-btn:hover{color:var(--text);background:var(--raised)}
-.country-btn.active{background:var(--accent);color:#06101F}
-.country-btn img{height:16px;width:auto;border-radius:2px}
-.country-count{padding:1px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;font-variant-numeric:tabular-nums}
-.country-btn.active .country-count{background:rgba(6,16,31,.18)}
-.country-currency-control{display:flex;align-items:center;gap:14px}
-.country-currency-copy strong{display:block;font-size:13px;font-weight:600}
-.exchange-info{color:var(--muted);font-size:12.5px}
-.hero-actions{display:flex;flex-wrap:wrap;gap:8px}
-.hero-actions button{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
-.hero-actions button:hover{background:var(--raised);border-color:#33466B}
-.save-icon{width:16px;height:16px;object-fit:contain}
-
-/* Portada */
-.executive-cover{background:#0E1A31;border:1px solid var(--line);border-radius:var(--r-lg);padding:32px 36px;box-shadow:inset 4px 0 0 var(--accent)}
-.cover-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:center}
-.cover-kicker{color:var(--accent);font-size:13px;font-weight:600;text-transform:none;letter-spacing:0;margin-bottom:8px}
-.cover-title{font-size:clamp(26px,3vw,38px);font-weight:700;letter-spacing:-.02em;line-height:1.15}
-.cover-copy{max-width:64ch;margin-top:12px;color:var(--muted);font-size:15px;line-height:1.6}
-.cover-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
-.cover-badges span{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03);color:var(--muted);font-size:13px}
-.cover-badges b{color:var(--text);font-weight:600}
-.cover-badges img,.meta img{width:15px;height:15px;object-fit:contain;opacity:.85}
-.cover-bank-strip{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;max-width:380px}
-
-/* Filtros de período */
-.meta{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;color:var(--muted);font-size:13px}
-.meta>span{display:inline-flex;align-items:center;gap:6px}
-.meta b{color:var(--text);font-weight:600}
-.date-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
-.date-filter-title{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-weight:600}
-.date-filter label{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
-input[type=date],.select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 10px;font-family:inherit;font-size:13px;color-scheme:dark}
-.date-apply{padding:7px 16px;background:var(--accent);color:#06101F;border:0;border-radius:var(--r-sm);font-weight:600;cursor:pointer}
-.date-reset{padding:6px 10px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:var(--r-sm);cursor:pointer}
-.date-reset:hover{color:var(--text);background:var(--raised)}
-
-/* Pestañas */
-.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
-.tab{margin-bottom:-1px;padding:12px 18px;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;color:var(--muted);font-size:14px;font-weight:600;white-space:nowrap;cursor:pointer;transition:color .15s}
-.tab:hover{color:var(--text)}
-.tab.active{color:var(--text);border-bottom-color:var(--accent);background:none}
-
-/* Indicadores */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:18px}
-.kpis .kpi{margin-bottom:0;padding:18px 20px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:none}
-.kpi .label{color:var(--muted);font-size:13px;font-weight:500;text-transform:none;letter-spacing:0}
-.kpi .value{margin:6px 0 4px;font-size:26px;font-weight:700;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.kpi .hint{color:var(--muted);font-size:12.5px}
-
-/* Tarjetas y gráficos */
-.card{padding:22px 24px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:none}
-.card h2,.section-heading h2{margin:0 0 4px;color:var(--text);font-size:17px;font-weight:650;letter-spacing:-.01em}
-.desc,.section-heading p{max-width:70ch;margin:0 0 14px;color:var(--muted);font-size:13px}
-.legend{display:flex;flex-wrap:wrap;gap:16px;margin:0 0 12px;color:var(--muted);font-size:12.5px}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:3px}
-.grid2{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:18px}
-.grid-equal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.grid2 .card,.grid-equal .card{margin-bottom:0}
-@media (max-width:960px){.grid2,.grid-equal{grid-template-columns:1fr}.cover-grid{grid-template-columns:1fr}.cover-bank-strip{justify-content:flex-start}}
-
-/* Hallazgos y composición */
-.insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-.insight{padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r-md)}
-.insight .tag{padding:0;margin-bottom:4px;background:none;color:var(--muted);font-size:12.5px;text-transform:none;letter-spacing:0}
-.insight b{display:block;font-size:16px}
-.insight p{margin:4px 0 0;color:var(--muted);font-size:13px}
-.bank-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft)}
-.bank-row:last-child{border-bottom:0}
-.bank-row .dot{width:10px;height:10px;margin-top:6px;border-radius:50%}
-.bank-row small{display:block;color:var(--muted);font-size:12.5px}
-.bank-row .amount{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
-.progress{height:6px;margin-top:8px;border-radius:99px;background:var(--line);overflow:hidden}
-.progress i{display:block;height:100%;border-radius:99px}
-
-/* Detalle por banco */
-.section-heading{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px 16px;margin-bottom:16px}
-.section-chip{padding:4px 12px;background:none;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px}
-.tab-currency{margin:0 0 12px;color:var(--muted);font-size:13px}
-.tab-currency b{color:var(--text)}
-.bank-detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-.bank-card{padding:18px 20px;background:var(--raised);border:1px solid var(--line);border-top:3px solid var(--bank,var(--accent));border-radius:var(--r-md)}
-.bank-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:600}
-.bank-card .big{margin-top:10px;font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.bank-card .small{color:var(--muted);font-size:12.5px}
-.bank-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
-.mini b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
-.mini span{color:var(--muted);font-size:12px}
-
-/* Tablas */
-.toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
-.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r-md)}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th{padding:10px 14px;background:var(--raised);border-bottom:1px solid var(--line);color:var(--muted);font-size:12.5px;font-weight:600;text-align:left;white-space:nowrap}
-td{padding:11px 14px;border-bottom:1px solid var(--line-soft)}
-tbody tr:last-child td{border-bottom:0}
-tbody tr:hover{background:rgba(94,161,255,.06)}
-
-.footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;margin-top:8px;padding:18px 4px 0;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
-}
-
-/* ===== Densidad compacta y paleta de bancos ===== */
-@media screen {
-body{font-size:13px}
-.app{padding:18px 24px 24px}
-.top-toolbar{padding:8px 24px;gap:10px 20px}
-.country-buttons{padding:3px;border-radius:10px}
-.country-btn{padding:5px 11px;font-size:12.5px;border-radius:7px;gap:6px}
-.country-btn img{height:13px}
-.country-count{padding:0 7px;font-size:11px}
-.country-currency-copy strong{font-size:12.5px}
-.exchange-info{font-size:12px}
-.hero-actions button{padding:5px 11px;font-size:12.5px;border-radius:7px;gap:6px}
-.save-icon{width:14px;height:14px}
-.executive-cover{padding:20px 26px}
-.cover-grid{gap:24px}
-.cover-kicker{font-size:12px;margin-bottom:6px}
-.cover-title{font-size:clamp(22px,2.4vw,28px)}
-.cover-copy{margin-top:8px;font-size:13.5px;line-height:1.55;max-width:72ch}
-.cover-badges{gap:6px;margin-top:14px}
-.cover-badges span{padding:4px 10px;font-size:12px}
-.cover-badges img,.meta img{width:13px;height:13px}
-.cover-bank-strip{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:280px}
-.cover-logo{display:flex;flex:0 0 auto;align-items:center;justify-content:center;width:76px;height:32px;min-height:0;margin:0;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.95);overflow:hidden}
-.cover-logo img{width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain}
-.bank-logo-fallback{font-size:11px;font-weight:700;color:#0B1220}
-.bank-icon{display:inline-flex;align-items:center;justify-content:center;width:auto;height:26px;min-width:26px;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.95);overflow:hidden}
-.bank-icon img{width:auto;height:100%;max-width:56px;object-fit:contain}
-.meta{gap:8px 14px;font-size:12.5px}
-.date-filter{padding:5px 12px;gap:6px 10px}
-.date-filter label{font-size:12.5px}
-input[type=date],.select{padding:4px 8px;font-size:12.5px}
-.date-apply{padding:5px 12px;font-size:12.5px}
-.date-reset{padding:4px 9px}
-.tab{padding:9px 14px;font-size:13px}
-.kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}
-.kpis .kpi{padding:14px 16px}
-.kpi .label{font-size:12.5px}
-.kpi .value{font-size:20px;margin:4px 0 2px}
-.kpi .hint{font-size:12px}
-.card{padding:18px 20px}
-.card h2,.section-heading h2{font-size:15px}
-.desc,.section-heading p{font-size:12.5px;margin-bottom:10px}
-.legend{font-size:12px;gap:12px}
-.grid2,.grid-equal{gap:14px}
-.insights{gap:12px}
-.insight{padding:12px 14px}
-.insight b{font-size:14px}
-.insight p{font-size:12.5px}
-.bank-row{padding:9px 0}
-.bank-detail-grid{grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
-.bank-card{padding:14px 16px}
-.bank-card .big{font-size:20px;margin-top:8px}
-.bank-metrics{margin-top:12px;padding-top:10px;gap:10px 14px}
-.section-chip{padding:3px 10px;font-size:11.5px}
-th{padding:8px 12px;font-size:12px}
-td{padding:8px 12px}
-.footer{font-size:12px;padding-top:14px}
-/* paleta única para los bancos (sustituye los colores individuales; verde/rojo quedan solo para positivo/negativo) */
-.bank-row:nth-child(8n+1),.bank-card:nth-child(8n+1){--c:var(--s1)}
-.bank-row:nth-child(8n+2),.bank-card:nth-child(8n+2){--c:var(--s2)}
-.bank-row:nth-child(8n+3),.bank-card:nth-child(8n+3){--c:var(--s3)}
-.bank-row:nth-child(8n+4),.bank-card:nth-child(8n+4){--c:var(--s4)}
-.bank-row:nth-child(8n+5),.bank-card:nth-child(8n+5){--c:var(--s5)}
-.bank-row:nth-child(8n+6),.bank-card:nth-child(8n+6){--c:var(--s6)}
-.bank-row:nth-child(8n+7),.bank-card:nth-child(8n+7){--c:var(--s7)}
-.bank-row:nth-child(8n+8),.bank-card:nth-child(8n+8){--c:var(--s8)}
-.bank-row .dot,.bank-row .progress i{background:var(--c)!important}
-.bank-card{--bank:var(--c)!important}
-}
-
-/* ===== Estados de botones: coral suave (hover y seleccionado) ===== */
-@media screen {
-:focus-visible{outline-color:var(--hl)}
-.country-btn:hover,.hero-actions button:hover,.date-reset:hover{background:rgba(224,112,124,.09);border-color:var(--hl-line);color:var(--hl-text)}
-.country-btn{border:1px solid transparent}
-.country-btn.active{background:var(--hl-soft);border-color:var(--hl-line);color:var(--hl-text)}
-.country-btn.active:hover{background:rgba(224,112,124,.2)}
-.country-btn.active .country-count{background:rgba(224,112,124,.28);color:var(--hl-text)}
-.tab:hover{color:var(--hl-text)}
-.tab.active{color:var(--hl-text);border-bottom-color:var(--hl)}
-.date-apply{background:var(--hl-soft);color:var(--hl-text);border:1px solid var(--hl-line);transition:background .15s}
-.date-apply:hover{background:rgba(224,112,124,.26)}
-}
-</style>
+    body.consolidado-regional #insights {
+      display: none !important;
+    }
+  </style>
 
 
 
@@ -239,22 +38,27 @@ td{padding:8px 12px}
 </head>
 
 <body>
-
+  <section class="title-container">
+    <div class="cover-kicker">Ingresos</div>
+    <div class="cover-title">Saldos Bancarios</div>
+    <div class="cover-copy">Resumen de saldos, movimientos y flujo financiero por banco y cuenta.</div>
+  </section>
   <div class="top-toolbar">
     <div class="top-toolbar-left">
       <div class="country-switcher" id="countrySwitcher">
         <div class="country-buttons">
           <button type="button" class="country-btn active" data-country="GUATEMALA">
+            <img src="../../assets/img/ingresos/guatemala.png" alt="Guatemala">
             <span>Guatemala</span>
-            <img src="/static/assets/img/guatemala.png" alt="Guatemala">
             <span class="country-count" data-country-count="GUATEMALA">0</span>
           </button>
           <button type="button" class="country-btn" data-country="EL_SALVADOR">
+            <img src="../../assets/img/ingresos/elsalvador.png" alt="El Salvador">
             <span>El Salvador</span>
-            <img src="/static/assets/img/elsalvador.png" alt="El Salvador">
             <span class="country-count" data-country-count="EL_SALVADOR">0</span>
           </button>
           <button type="button" class="country-btn" data-country="CONSOLIDADO">
+            <img src="../../assets/img/ingresos/consolidad.png" alt="Consolidado Regional">
             <span>Consolidado Regional</span>
             <span class="country-count" data-country-count="CONSOLIDADO">0</span>
           </button>
@@ -262,89 +66,97 @@ td{padding:8px 12px}
       </div>
 
       <div id="currency-controls" class="currency-switcher" aria-label="Conversión de moneda por país">
-            <div class="country-currency-control" data-currency-country="GUATEMALA">
-              <div class="country-currency-copy">
-                <strong>Guatemala · moneda</strong>
-                <span id="exchange-display-gt" class="exchange-info">Actualizando tipo de cambio...</span>
-              </div>
-              <label class="currency-toggle" for="currency-toggle-gt">
-                <span class="currency-toggle-labels"><span id="gt-local-label" class="selected">Q</span></span>
-                <input type="checkbox" id="currency-toggle-gt" aria-label="Cambiar Guatemala entre quetzales y dólares">
-                <span class="currency-toggle-track" aria-hidden="true"></span>
-                <span class="currency-toggle-labels"><span id="gt-converted-label">$</span></span>
-              </label>
-            </div>
-            <div class="country-currency-control" data-currency-country="EL_SALVADOR" hidden style="display:none;">
-              <div class="country-currency-copy">
-                <strong>El Salvador · moneda</strong>
-                <span id="exchange-display-sv" class="exchange-info">Actualizando tipo de cambio...</span>
-              </div>
-              <label class="currency-toggle" for="currency-toggle-sv">
-                <span class="currency-toggle-labels"><span id="sv-local-label" class="selected">$</span></span>
-                <input type="checkbox" id="currency-toggle-sv"
-                  aria-label="Cambiar El Salvador entre dólares y quetzales">
-                <span class="currency-toggle-track" aria-hidden="true"></span>
-                <span class="currency-toggle-labels"><span id="sv-converted-label">Q</span></span>
-              </label>
-            </div>
+        <div class="country-currency-control" data-currency-country="GUATEMALA">
+          <div class="country-currency-copy">
+            <strong>Guatemala · moneda</strong>
+            <span id="exchange-display-gt" class="exchange-info">Actualizando tipo de cambio...</span>
           </div>
+          <label class="currency-toggle" for="currency-toggle-gt">
+            <span class="currency-toggle-labels"><span id="gt-local-label" class="selected">$</span></span>
+            <input type="checkbox" id="currency-toggle-gt" aria-label="Cambiar Guatemala entre quetzales y dólares">
+            <span class="currency-toggle-track" aria-hidden="true"></span>
+            <span class="currency-toggle-labels"><span id="gt-converted-label">Q</span></span>
+          </label>
+        </div>
+        <div class="country-currency-control" data-currency-country="EL_SALVADOR" hidden style="display:none;">
+          <div class="country-currency-copy">
+            <strong>El Salvador · moneda</strong>
+            <span id="exchange-display-sv" class="exchange-info">Actualizando tipo de cambio...</span>
+          </div>
+          <label class="currency-toggle" for="currency-toggle-sv">
+            <span class="currency-toggle-labels"><span id="sv-local-label" class="selected">$</span></span>
+            <input type="checkbox" id="currency-toggle-sv" aria-label="Cambiar El Salvador entre dólares y quetzales">
+            <span class="currency-toggle-track" aria-hidden="true"></span>
+            <span class="currency-toggle-labels"><span id="sv-converted-label">Q</span></span>
+          </label>
+        </div>
+        <div class="country-currency-control" data-currency-country="CONSOLIDADO" hidden style="display:none;">
+          <div class="country-currency-copy">
+            <strong>Consolidado regional · moneda</strong>
+            <span id="exchange-display-regional" class="exchange-info">Actualizando tipo de cambio...</span>
+          </div>
+          <label class="currency-toggle" for="currency-toggle-regional">
+            <span class="currency-toggle-labels"><span id="regional-local-label" class="selected">$</span></span>
+            <input type="checkbox" id="currency-toggle-regional"
+              aria-label="Cambiar consolidado regional entre quetzales y dólares">
+            <span class="currency-toggle-track" aria-hidden="true"></span>
+            <span class="currency-toggle-labels"><span id="regional-converted-label">Q</span></span>
+          </label>
+        </div>
+      </div>
     </div>
 
     <div class="hero-actions">
-      <button type="button" onclick="window.print()">
-        <img class="save-icon" src="/static/assets/img/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
+      <button type="button" onclick="window.openPrintSelection()">
+        <img class="save-icon" src="../../assets/img/ingresos/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
       </button>
-      <button type="button" onclick="toggleFullscreen()">
-        <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
-      </button>
-      <button type="button" onclick="generarDashboardIngresos()">
-        Descargar dashboard de ingresos
-      </button>
+
+    </div>
+  </div>
+
+  <div class="print-selection-modal" id="printSelectionModal" hidden>
+    <div class="print-selection-dialog" role="dialog" aria-modal="true" aria-labelledby="printSelectionTitle">
+      <div class="print-selection-header">
+        <div>
+          <span class="print-selection-kicker">Exportar reporte</span>
+          <h2 id="printSelectionTitle">¿Qué información deseas imprimir?</h2>
+        </div>
+        <button type="button" class="print-selection-close" id="closePrintSelection" aria-label="Cerrar">×</button>
+      </div>
+      <div class="print-selection-options">
+        <button type="button" data-print-country="GUATEMALA">
+          <strong>Guatemala</strong>
+          <span>Reporte de bancos y cuentas de Guatemala</span>
+        </button>
+        <button type="button" data-print-country="EL_SALVADOR">
+          <strong>El Salvador</strong>
+          <span>Reporte de bancos y cuentas de El Salvador</span>
+        </button>
+        <button type="button" data-print-country="CONSOLIDADO">
+          <strong>Consolidado Regional</strong>
+          <span>Información combinada de ambos países</span>
+        </button>
+      </div>
     </div>
   </div>
   <div class="app">
     <section class="executive-cover" aria-label="Portada ejecutiva">
       <div class="cover-grid">
-        <div>
-          <div class="cover-kicker">Presentación ejecutiva · Junta Directiva</div>
-          
-
-          <div class="cover-title">Saldos Bancarios Consolidados</div>
-          <div class="cover-copy">Resumen visual del comportamiento bancario consolidado, incluyendo saldos, créditos,
-            débitos, variación entre entradas y salidas, movimientos y detalle individual por banco y cuenta.</div>
-          <div class="cover-badges">
-            <span><img src="/static/assets/img/tiempo.png" alt="Periodo"> Período: <b id="coverCut"></b></span>
-            <span><img src="/static/assets/img/pais.png" alt="País"> País: <b class="countryLabel">—</b></span>
-            <span><img src="/static/assets/img/moneda.png" alt="Moneda"> Moneda: <b class="currencyLabel">—</b></span>
-            <span><img src="/static/assets/img/banco.png" alt="Banco"> <b id="coverBanks"></b> bancos</span>
-            <span><img src="/static/assets/img/cuenta.png" alt="Cuenta"> <b id="coverAccounts"></b> cuentas</span>
-          </div>
+        <div class="cover-summary">
+          <span><img src="../../assets/img/ingresos/tiempo.png" alt="Periodo"><span
+              class="cover-summary-text"><small>Rango de fechas analizado</small><b><span id="coverCutFrom"></span>&nbsp;→&nbsp;<span id="coverCutTo"></span></b></span></span>
+          <span><img src="../../assets/img/ingresos/pais.png" alt="País"><span
+              class="cover-summary-text"><small>País</small><b class="countryLabel">—</b></span></span>
+          <span><img src="../../assets/img/ingresos/moneda.png" alt="Moneda"><span
+              class="cover-summary-text"><small>Moneda</small><b class="currencyLabel">—</b></span></span>
+          <span><img src="../../assets/img/ingresos/banco.png" alt="Banco"><span
+              class="cover-summary-text"><small>Bancos</small><b id="coverBanks"></b></span></span>
+          <span><img src="../../assets/img/ingresos/cuenta.png" alt="Cuenta"><span
+              class="cover-summary-text"><small>Cuentas</small><b id="coverAccounts"></b></span></span>
         </div>
-        <div class="cover-bank-strip" id="coverBankLogos"></div>
       </div>
     </section>
-    <header class="hero">
-      <div class="hero-left">
-       
-        <div class="meta">
-          <div class="date-filter" aria-label="Filtro de fecha">
-            <span class="date-filter-title"><img src="/static/assets/img/tiempo.png" alt="Periodo"> Período</span>
-            <label>Desde <input type="date" id="dateFrom" aria-label="Fecha desde"></label>
-            <span class="date-sep">—</span>
-            <label>Hasta <input type="date" id="dateTo" aria-label="Fecha hasta"></label>
-            <button type="button" class="date-apply" id="applyDateFilter">Aplicar</button>
-            <button type="button" class="date-reset" id="resetDateFilter" title="Restablecer período"
-              aria-label="Restablecer período">↺</button>
-          </div>
-          <span><img src="/static/assets/img/pais.png" alt="País"> País: <b class="countryLabel">—</b></span>
-          <span><img src="/static/assets/img/moneda.png" alt="Moneda"> Moneda: <b class="currencyLabel">—</b></span>
-          <span><img src="/static/assets/img/banco.png" alt="Banco"> <b id="bankCount"></b> bancos</span>
-          <span><img src="/static/assets/img/cuenta.png" alt="Cuenta"> <b id="accountCount"></b> cuentas</span>
-          <span><img src="/static/assets/img/movimiento.png" alt="Movimiento"> Último movimiento: <b id="latestMovement"></b></span>
-        </div>
-      </div>
 
-    </header>
 
 
 
@@ -353,6 +165,15 @@ td{padding:8px 12px}
       <button class="tab" data-target="bancos">Detalle por banco</button>
       <button class="tab" data-target="flujo">Flujo diario</button>
       <button class="tab" data-target="cuentas">Detalle de cuentas</button>
+      <button class="tab" data-target="cheques">Movimientos de cheques</button>
+      <div class="date-filter" id="periodFilter" aria-label="Filtro de fecha">
+        <span class="date-filter-title"><img src="../../assets/img/ingresos/tiempo.png" alt="Periodo"> Período</span>
+        <label><input type="date" id="dateFrom" aria-label="Fecha desde"></label>
+        <span class="date-sep">—</span>
+        <label><input type="date" id="dateTo" aria-label="Fecha hasta"></label>
+        <button type="button" class="date-reset" id="resetDateFilter" title="Restablecer período"
+          aria-label="Restablecer período">↺</button>
+      </div>
     </nav>
 
     <section id="resumen" class="section active">
@@ -360,16 +181,15 @@ td{padding:8px 12px}
 
       <div class="grid2">
         <div class="card">
-          <h2>Saldos por banco</h2>
-          <div class="desc">Comparación entre saldo inicial y saldo final registrado.</div>
-          <div class="legend"><span><i style="background:#60A5FA"></i>Saldo inicial</span><span><i
-                style="background:#34D399"></i>Saldo final</span></div>
+          <h2>Saldos por banco <span class="heading-note">(Saldo inicial vs Saldo final.)</span></h2>
+            <div class="legend" id="balancesLegend"><span><i style="background:#00D9FF"></i>Saldo inicial</span><span
+              id="positiveBalanceLegend"><i style="background:#00FF66"></i>Saldo final positivo</span><span
+              id="negativeBalanceLegend"><i style="background:#FF1744"></i>Saldo final negativo</span></div>
           <canvas id="balancesChart"></canvas>
         </div>
         <div class="card">
-          <h2>Composición del saldo final</h2>
-          <div class="desc">Participación de cada banco dentro del saldo final total.</div>
-          <div class="bank-list" id="bankList"></div>
+          <h2>Total por banco</h2>
+          <canvas id="bankCompositionChart"></canvas>
         </div>
       </div>
 
@@ -377,49 +197,73 @@ td{padding:8px 12px}
 
       <div class="grid-equal">
         <div class="card">
-          <h2>Créditos vs. débitos por banco</h2>
-          <div class="desc">Totales acumulados del consolidado por día.</div>
-          <div class="legend"><span><i style="background:#34D399"></i>Créditos</span><span><i
-                style="background:#FB7185"></i>Débitos</span></div>
+          <h2>Ingresos vs. Egresos por banco</h2>
+              <div class="legend"><span><i style="background:#00FF66"></i>Ingresos</span><span><i
+                style="background:#FF1744"></i>Egresos</span></div>
           <canvas id="flowBankChart"></canvas>
         </div>
         <div class="card">
-          <h2>Flujo neto por banco</h2>
-          <div class="desc">Créditos menos débitos. Verde = positivo; rosado = negativo.</div>
+          <h2>Flujo neto por banco <span class="heading-note">(= Ingresos - Egresos)</span></h2>
+              <div class="legend"><span><i style="background:#00FF66"></i>Positivo</span><span><i
+                style="background:#FF1744"></i>Negativo</span></div>
           <canvas id="netBankChart"></canvas>
         </div>
       </div>
     </section>
 
     <section id="bancos" class="section">
-      <div class="tab-currency">Moneda: <b class="currencyLabel">—</b></div>
-
       <div class="card">
         <div class="section-heading">
           <div>
             <h2>Resumen individual por banco</h2>
-            <p>Saldos y movimientos acumulados sin modificar las cifras originales.</p>
-          </div><span class="section-chip">Detalle ejecutivo</span>
+          </div>
+          <div class="bank-detail-grid" id="bankCards"></div>
         </div>
-        <div class="bank-detail-grid" id="bankCards"></div>
-      </div>
     </section>
 
     <section id="flujo" class="section">
-      <div class="tab-currency">Moneda: <b class="currencyLabel">—</b></div>
-
       <div class="card">
-        <h2>Evolución diaria de créditos y débitos</h2>
+        <h2>Evolución diaria de ingresos y egresos</h2>
         <div class="desc">Fechas disponibles en la hoja de resumen diario consolidado.</div>
-        <div class="legend"><span><i style="background:#34D399"></i>Créditos</span><span><i
-              style="background:#FB7185"></i>Débitos</span></div>
+            <div class="legend"><span><i style="background:#00FF66"></i>Ingresos</span><span><i
+              style="background:#FF1744"></i>Egresos</span></div>
         <canvas id="dailyChart"></canvas>
       </div>
       <div class="card" style="margin-top:16px">
-        <div class="toolbar">
+        <div class="toolbar" style="align-items:flex-end; gap:12px; flex-wrap:wrap;">
           <div>
             <h2>Detalle diario</h2>
-            <div class="desc" style="margin:4px 0 0">Incluye número de movimientos y flujo neto por fecha.</div>
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-left:auto;">
+            <label
+              style="display:flex; flex-direction:column; gap:6px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:#9aa8bc; font-weight:700;">
+              <span>Métrica</span>
+              <div class="custom-select" data-select="dailyMetricFilter">
+                <select id="dailyMetricFilter" class="select" aria-label="Seleccionar métrica diaria" hidden>
+                  <option value="all" selected>Todos</option>
+                  <option value="credits">Ingresos</option>
+                  <option value="debits">Egresos</option>
+                  <option value="net">Flujo neto</option>
+                </select>
+                <button type="button" class="select custom-select-trigger">Todos<span
+                    aria-hidden="true">⌄</span></button>
+                <div class="custom-select-menu" hidden></div>
+              </div>
+            </label>
+            <label
+              style="display:flex; flex-direction:column; gap:6px; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:#9aa8bc; font-weight:700;">
+              <span>Orden</span>
+              <div class="custom-select" data-select="dailySortFilter">
+                <select id="dailySortFilter" class="select" aria-label="Seleccionar orden diario" hidden>
+                  <option value="none" selected>Ninguno</option>
+                  <option value="desc">Mayor</option>
+                  <option value="asc">Menor</option>
+                </select>
+                <button type="button" class="select custom-select-trigger">Ninguno<span
+                    aria-hidden="true">⌄</span></button>
+                <div class="custom-select-menu" hidden></div>
+              </div>
+            </label>
           </div>
         </div>
         <div class="table-wrap">
@@ -428,8 +272,8 @@ td{padding:8px 12px}
               <tr>
                 <th>Fecha</th>
                 <th>Movimientos</th>
-                <th>Débitos</th>
-                <th>Créditos</th>
+                <th>Egresos</th>
+                <th>Ingresos</th>
                 <th>Flujo neto</th>
               </tr>
             </thead>
@@ -440,17 +284,21 @@ td{padding:8px 12px}
     </section>
 
     <section id="cuentas" class="section">
-      <div class="tab-currency">Moneda: <b class="currencyLabel">—</b></div>
-
       <div class="card">
         <div class="toolbar">
           <div>
             <h2>Detalle de cuentas bancarias</h2>
             <div class="desc" style="margin:4px 0 0">Saldos iniciales/finales y movimientos acumulados por cuenta.</div>
           </div>
-          <select class="select" id="bankFilter">
+          <select class="select bank-filter-data" id="bankFilter" multiple aria-label="Seleccionar bancos">
             <option value="ALL">Todos los bancos</option>
           </select>
+          <div class="bank-filter" id="bankFilterControl">
+            <button type="button" class="select bank-filter-toggle" id="bankFilterToggle" aria-expanded="false">
+              <span id="bankFilterLabel">Todos los bancos</span><span aria-hidden="true">⌄</span>
+            </button>
+            <div class="bank-filter-menu" id="bankFilterMenu" hidden></div>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -462,8 +310,8 @@ td{padding:8px 12px}
                 <th>Saldo final</th>
                 <th>Variación</th>
                 <th>%</th>
-                <th>Créditos</th>
-                <th>Débitos</th>
+                <th>Ingresos</th>
+                <th>Egresos</th>
               </tr>
             </thead>
             <tbody id="accountsTable"></tbody>
@@ -472,293 +320,207 @@ td{padding:8px 12px}
       </div>
     </section>
 
-   
-    <div class="footer">
-      <span>Fuente: <b id="sourceFile"></b></span>
-      <span>Dashboard generado a partir de información contenida en el Excel suministrado.</span>
-    </div>
+    <section id="cheques" class="section">
+      <div class="card">
+        <div class="section-heading">
+          <div>
+            <h2>Movimientos de cheques</h2>
+            <p>Detalle de movimientos registrados en el período seleccionado.</p>
+          </div>
+          <div class="cheque-heading-actions">
+            <select class="select bank-filter-data" id="chequeBankFilter" multiple
+              aria-label="Seleccionar bancos para cheques">
+              <option value="ALL">Todos los bancos</option>
+            </select>
+            <div class="bank-filter" id="chequeBankFilterControl">
+              <button type="button" class="select bank-filter-toggle" id="chequeBankFilterToggle" aria-expanded="false">
+                <span id="chequeBankFilterLabel">Todos los bancos</span><span aria-hidden="true">⌄</span>
+              </button>
+              <div class="bank-filter-menu" id="chequeBankFilterMenu" hidden></div>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Banco</th>
+                <th>Fecha</th>
+                <th>No. cheque</th>
+                <th>Tipo</th>
+                <th class="num">Egreso</th>
+                <th class="num">Ingreso</th>
+              </tr>
+            </thead>
+            <tbody id="chequesTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </div>
 
+  <!-- DATOS_QUEMADOS_INICIO: excel-parser reescribe este bloque en cada ejecución de Make. No editar. -->
   <script>
-    window.DASHBOARD_BASE_DATA = {{ base_data | tojson | safe }};
-    window.DASHBOARD_RAW_TRANSACTIONS = {{ raw_transactions | tojson | safe }};
+    window.DASHBOARD_BASE_DATA = {};
   </script>
-  <script src="/static/assets/js/dashboard.js"></script>
+  <!-- DATOS_QUEMADOS_FIN -->
   <script>
-    // Muestra únicamente el control de moneda correspondiente al país activo.
+    window.DASHBOARD_BASE_DATA = window.DASHBOARD_BASE_DATA || {};
+    window.DASHBOARD_RAW_TRANSACTIONS = window.DASHBOARD_RAW_TRANSACTIONS || [];
+  </script>
+
+  <script>
     (function () {
-      function mostrarControlMonedaPais(country) {
-        document.querySelectorAll('.country-currency-control').forEach(function (control) {
-          var visible = control.dataset.currencyCountry === country;
-          control.hidden = !visible;
-          control.style.display = visible ? '' : 'none';
-        });
+      /*
+        Consolidado Regional:
+        - La vista consolidada utiliza GTQ como moneda base.
+        - Los valores USD de El Salvador se convierten usando el tipo de cambio disponible.
+        - La conversión visual posterior puede usar el control existente.
+      */
 
-        if(country === 'CONSOLIDADO' && typeof window.actualizarControlMonedaRegional === 'function'){
-          window.actualizarControlMonedaRegional();
-        }
-      }
+      window.REGIONAL_BASE_CURRENCY = "GTQ";
 
-      document.querySelectorAll('.country-btn[data-country]').forEach(function (button) {
-        button.addEventListener('click', function () {
-          mostrarControlMonedaPais(button.dataset.country);
-        });
-      });
+      window.convertRegionalUSDToGTQ = function (value, exchangeRate) {
+        return (Number(value) || 0) * (Number(exchangeRate) || 0);
+      };
 
-      function sincronizarInicial() {
-        var activo = document.querySelector('.country-btn.active[data-country]');
-        if (activo) {
-          mostrarControlMonedaPais(activo.dataset.country);
-          return;
-        }
-        mostrarControlMonedaPais('GUATEMALA');
-      }
+      window.normalizeRegionalConsolidado = function (data, exchangeRate) {
+        if (!data) return data;
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', sincronizarInicial);
-      } else {
-        sincronizarInicial();
-      }
+        const sv = data.EL_SALVADOR || {};
+        const gt = data.GUATEMALA || {};
 
-      setTimeout(function () {
-        var activo = document.querySelector('.country-btn.active[data-country]');
-        if (activo) mostrarControlMonedaPais(activo.dataset.country);
-      }, 0);
-    })();
-  </script>
+        const svTotals = sv.totals || {};
+        const gtTotals = gt.totals || {};
 
-<script>
-(function(){
-  /*
-    Consolidado Regional:
-    - La vista consolidada utiliza GTQ como moneda base.
-    - Los valores USD de El Salvador se convierten usando el tipo de cambio disponible.
-    - La conversión visual posterior puede usar el control existente.
-  */
+        const convert = (v) => window.convertRegionalUSDToGTQ(v, exchangeRate);
 
-  window.REGIONAL_BASE_CURRENCY = "GTQ";
-
-  window.convertRegionalUSDToGTQ = function(value, exchangeRate){
-      return (Number(value) || 0) * (Number(exchangeRate) || 0);
-  };
-
-  window.normalizeRegionalConsolidado = function(data, exchangeRate){
-      if(!data) return data;
-
-      const sv = data.EL_SALVADOR || {};
-      const gt = data.GUATEMALA || {};
-
-      const svTotals = sv.totals || {};
-      const gtTotals = gt.totals || {};
-
-      const convert = (v) => window.convertRegionalUSDToGTQ(v, exchangeRate);
-
-      const convertedSV = {
+        const convertedSV = {
           initial: convert(svTotals.initial),
           final: convert(svTotals.final),
           credits: convert(svTotals.credits),
           debits: convert(svTotals.debits),
           change: convert(svTotals.change || 0)
-      };
+        };
 
-      const gtqTotals = {
+        const gtqTotals = {
           initial: (gtTotals.initial || 0) + convertedSV.initial,
           final: (gtTotals.final || 0) + convertedSV.final,
           credits: (gtTotals.credits || 0) + convertedSV.credits,
           debits: (gtTotals.debits || 0) + convertedSV.debits,
           change: (gtTotals.change || 0) + convertedSV.change
-      };
+        };
 
-      if(data.CONSOLIDADO){
+        if (data.CONSOLIDADO) {
           data.CONSOLIDADO.totals = gtqTotals;
           data.CONSOLIDADO.meta = data.CONSOLIDADO.meta || {};
           data.CONSOLIDADO.meta.currency = "GTQ";
           data.CONSOLIDADO.meta.baseCurrency = "GTQ";
           data.CONSOLIDADO.meta.note = "El Salvador convertido a GTQ para consolidado regional";
+        }
+
+        return data;
+      };
+
+    })();
+  </script>
+
+
+  <script>
+    (function () {
+
+      function controlarVistaConsolidado(country) {
+        if (country === "CONSOLIDADO") {
+          document.body.classList.add("consolidado-regional");
+        } else {
+          document.body.classList.remove("consolidado-regional");
+        }
       }
 
-      return data;
-  };
+      window.controlarVistaConsolidado = controlarVistaConsolidado;
 
-})();
-</script>
+      document.querySelectorAll('.country-btn[data-country]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          controlarVistaConsolidado(btn.dataset.country);
+        });
+      });
 
-
-<script>
-(function(){
-
-function controlarVistaConsolidado(country){
-    if(country === "CONSOLIDADO"){
-        document.body.classList.add("consolidado-regional");
-    }else{
-        document.body.classList.remove("consolidado-regional");
-    }
-}
-
-window.controlarVistaConsolidado = controlarVistaConsolidado;
-
-document.querySelectorAll('.country-btn[data-country]').forEach(function(btn){
-    btn.addEventListener('click', function(){
-        controlarVistaConsolidado(btn.dataset.country);
-    });
-});
-
-setTimeout(function(){
-    var activo = document.querySelector('.country-btn.active[data-country]');
-    if(activo){
-        controlarVistaConsolidado(activo.dataset.country);
-    }
-},100);
-
-})();
-</script>
-
-
-
-
-
-<script>
-(function(){
-window.actualizarControlMonedaRegional = function(){
-
-    const toggle = document.getElementById("currency-toggle-regional");
-    if(!toggle) return;
-
-    if(toggle.dataset.bound) return;
-    toggle.dataset.bound = "1";
-
-    toggle.addEventListener("change", function(){
-
-        if(window.COUNTRY_CURRENCY_VIEW){
-            window.COUNTRY_CURRENCY_VIEW.CONSOLIDADO =
-                this.checked ? "USD" : "GTQ";
+      setTimeout(function () {
+        var activo = document.querySelector('.country-btn.active[data-country]');
+        if (activo) {
+          controlarVistaConsolidado(activo.dataset.country);
         }
+      }, 100);
 
-        if(typeof window.syncCurrencyControls === "function"){
-            window.syncCurrencyControls();
-        }
-
-        if(typeof window.renderAll === "function"){
-            window.renderAll(window.DASHBOARD_CURRENT_DATA || window.DATA);
-        }
-    });
-};
-})();
-</script>
+    })();
+  </script>
 
 
-<script>
-(function(){
-    function ocultarInsightsRegional(){
-        const country = window.DASHBOARD_ACTIVE_COUNTRY || 
-                        document.querySelector('.country-btn.active')?.dataset.country;
+
+
+
+
+  <script>
+    (function () {
+      function ocultarInsightsRegional() {
+        const country = window.DASHBOARD_ACTIVE_COUNTRY ||
+          document.querySelector('.country-btn.active')?.dataset.country;
 
         document.body.classList.toggle(
-            'consolidado-regional',
-            country === 'CONSOLIDADO'
+          'consolidado-regional',
+          country === 'CONSOLIDADO'
         );
-    }
+      }
 
-    document.querySelectorAll('.country-btn[data-country]').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-            setTimeout(ocultarInsightsRegional, 50);
+      document.querySelectorAll('.country-btn[data-country]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setTimeout(ocultarInsightsRegional, 50);
         });
-    });
+      });
 
-    setTimeout(ocultarInsightsRegional, 200);
-})();
-</script>
+      setTimeout(ocultarInsightsRegional, 200);
+    })();
+  </script>
 
 
-<script>
-(function(){
+  <script src="../../assets/js/ingreso/income.js"></script>
+  <script>
+    (function () {
+      const modal = document.getElementById('printSelectionModal');
+      const closeButton = document.getElementById('closePrintSelection');
+      if (!modal) return;
 
-window.generarDashboardIngresos = function(){
+      function closePrintSelection() {
+        modal.hidden = true;
+      }
 
-    const data = {
-        baseData: window.DASHBOARD_BASE_DATA || {},
-        transactions: window.DASHBOARD_RAW_TRANSACTIONS || []
-    };
+      window.openPrintSelection = function () {
+        modal.hidden = false;
+        document.querySelector('[data-print-country="' + (window.DASHBOARD_ACTIVE_COUNTRY || 'GUATEMALA') + '"]')?.focus();
+      };
 
-    const html = `
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Dashboard de Ingresos Intelfon</title>
-<style>
-body{font-family:Arial,sans-serif;padding:30px;background:#f5f7fb;color:#1f2937}
-.card{background:white;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px #ddd}
-h1{color:#111827}
-table{width:100%;border-collapse:collapse}
-th,td{padding:10px;border-bottom:1px solid #ddd;text-align:left}
-.kpi{font-size:28px;font-weight:bold}
-</style>
-</head>
-<body>
+      closeButton?.addEventListener('click', closePrintSelection);
+      modal.addEventListener('click', event => {
+        if (event.target === modal) closePrintSelection();
+      });
 
-<h1>Dashboard Ejecutivo de Ingresos</h1>
+      modal.querySelectorAll('[data-print-country]').forEach(button => {
+        button.addEventListener('click', () => {
+          const country = button.dataset.printCountry;
+          closePrintSelection();
+          if (country !== window.DASHBOARD_ACTIVE_COUNTRY && typeof window.changeDashboardCountry === 'function') {
+            window.changeDashboardCountry(country);
+          }
+          setTimeout(() => window.print(), 350);
+        });
+      });
 
-<div class="card">
-<h2>Ingresos Acumulados</h2>
-<div id="summary"></div>
-</div>
-
-<div class="card">
-<h2>Detalle de Ingresos</h2>
-<table>
-<thead>
-<tr>
-<th>Fecha</th>
-<th>País</th>
-<th>Banco</th>
-<th>Descripción</th>
-<th>Monto</th>
-</tr>
-</thead>
-<tbody id="detail"></tbody>
-</table>
-</div>
-
-<script>
-const payload = ${JSON.stringify(data).replace(/</g, "\\u003c")};
-
-const transactions = payload.transactions || [];
-
-const ingresos = transactions.filter(t=>{
-    const tipo = JSON.stringify(t).toLowerCase();
-    return tipo.includes("credito") || tipo.includes("haber") || tipo.includes("credit");
-});
-
-document.getElementById("summary").innerHTML =
-"<div class='kpi'>Movimientos de ingreso: " + ingresos.length + "</div>";
-
-document.getElementById("detail").innerHTML =
-ingresos.map(t=>\`
-<tr>
-<td>\${t.fecha || t.date || ""}</td>
-<td>\${t.pais || t.country || ""}</td>
-<td>\${t.banco || t.bank || ""}</td>
-<td>\${t.descripcion || t.description || ""}</td>
-<td>\${t.monto || t.amount || ""} \${t.moneda || ""}</td>
-</tr>
-\`).join("");
-
-<\/script>
-
-</body>
-</html>`;
-
-    const blob = new Blob([html], {type:"text/html"});
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "Dashboard_Ingresos_Intelfon.html";
-    link.click();
-};
-
-})();
-</script>
-
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !modal.hidden) closePrintSelection();
+      });
+    })();
+  </script>
 </body>
 
 </html>
