@@ -7631,17 +7631,23 @@ def guardar_dashboard_data(data):
 # ============================================================
 # DATOS QUEMADOS EN EL FRONTEND
 # ============================================================
-# Cada ejecución de Make publica un archivo JS con los datos en el repo
-# del dashboard. Así cualquier usuario ve la última información aunque
-# Render se haya reiniciado o dormido.
+# Cada ejecución de Make escribe los datos directamente dentro del HTML del
+# dashboard de ingresos (entre las marcas DATOS_QUEMADOS_INICIO/FIN). Así
+# cualquier usuario ve la última información aunque Render se haya
+# reiniciado o dormido.
 PUBLISH_TOKEN_ENV = "DASHBOARD_PUBLISH_TOKEN"
 PUBLISH_REPO_ENV = "DASHBOARD_PUBLISH_REPO"
 PUBLISH_BRANCH_ENV = "DASHBOARD_PUBLISH_BRANCH"
 PUBLISH_PATH_ENV = "DASHBOARD_PUBLISH_PATH"
-PUBLISH_DEFAULT_PATH = "assets/js/ingreso/dashboard-data.js"
+PUBLISH_DEFAULT_PATH = "dashboards/ingresos/ingresos.html"
+
+DATOS_QUEMADOS_RE = re.compile(
+    r"(<!-- DATOS_QUEMADOS_INICIO[^>]*-->)(.*?)(<!-- DATOS_QUEMADOS_FIN -->)",
+    re.S
+)
 
 
-def _github_request(url, token, method="GET", body=None):
+def _github_request(url, token, method="GET", body=None, raw=False):
     req = urllib.request.Request(
         url,
         data=(
@@ -7652,7 +7658,11 @@ def _github_request(url, token, method="GET", body=None):
         method=method,
         headers={
             "Authorization": "Bearer " + token,
-            "Accept": "application/vnd.github+json",
+            "Accept": (
+                "application/vnd.github.raw+json"
+                if raw
+                else "application/vnd.github+json"
+            ),
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
             "User-Agent": "excel-parser/1.0"
@@ -7661,17 +7671,52 @@ def _github_request(url, token, method="GET", body=None):
 
     with urllib.request.urlopen(
         req,
-        timeout=20
+        timeout=30
     ) as response:
+        contenido = response.read().decode("utf-8")
+
+        if raw:
+            return contenido
+
         return json.loads(
-            response.read().decode("utf-8") or "{}"
+            contenido or "{}"
         )
+
+
+def incrustar_datos_en_html(html, data):
+    """
+    Reemplaza solo el bloque entre las marcas por
+    <script>window.DASHBOARD_BASE_DATA = {...};</script>.
+    Devuelve None si el HTML no tiene las marcas.
+    """
+    if not DATOS_QUEMADOS_RE.search(html):
+        return None
+
+    datos_json = json.dumps(
+        data,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        default=str
+    ).replace("</", "<\\/")  # evita que un texto cierre el <script>
+
+    bloque = (
+        "\n  <script>\n"
+        + "    window.DASHBOARD_BASE_DATA = "
+        + datos_json
+        + ";\n  </script>\n  "
+    )
+
+    return DATOS_QUEMADOS_RE.sub(
+        lambda m: m.group(1) + bloque + m.group(3),
+        html,
+        count=1
+    )
 
 
 def publicar_datos_quemados(data):
     """
-    Sube window.DASHBOARD_BASE_DATA = {...} al repo del frontend.
-    Si faltan las variables de entorno no hace nada.
+    Escribe window.DASHBOARD_BASE_DATA = {...} dentro del HTML del dashboard
+    en el repo del frontend. Si faltan las variables de entorno no hace nada.
     """
     token = str(os.environ.get(PUBLISH_TOKEN_ENV, "") or "").strip()
     repo = str(os.environ.get(PUBLISH_REPO_ENV, "") or "").strip()
@@ -7702,36 +7747,35 @@ def publicar_datos_quemados(data):
         + urllib.parse.quote(path)
     )
 
-    contenido = (
-        "// Archivo generado automáticamente por excel-parser. No editar.\n"
-        + "window.DASHBOARD_BASE_DATA = "
-        + json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-        + ";\n"
-    )
+    url_ref = url + "?ref=" + urllib.parse.quote(branch)
 
     try:
-        sha = None
+        # sha para actualizar y contenido actual del HTML (raw porque la
+        # API no devuelve el contenido en JSON para archivos de más de 1 MB).
+        sha = _github_request(url_ref, token).get("sha")
+        html_actual = _github_request(url_ref, token, raw=True)
 
-        try:
-            actual = _github_request(
-                url + "?ref=" + urllib.parse.quote(branch),
-                token
+        contenido = incrustar_datos_en_html(html_actual, data)
+
+        if contenido is None:
+            motivo = (
+                "No se encontraron las marcas DATOS_QUEMADOS_INICIO/FIN en "
+                + path
             )
-            sha = actual.get("sha")
-        except urllib.error.HTTPError as error:
-            if error.code != 404:
-                raise
+            print("Datos quemados no publicados:", motivo)
+            return {
+                "published": False,
+                "reason": motivo
+            }
 
         body = {
             "message": "data: actualizar datos del dashboard",
             "content": base64.b64encode(
                 contenido.encode("utf-8")
             ).decode("ascii"),
-            "branch": branch
+            "branch": branch,
+            "sha": sha
         }
-
-        if sha:
-            body["sha"] = sha
 
         resultado = _github_request(
             url,
