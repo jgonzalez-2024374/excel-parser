@@ -4065,7 +4065,96 @@ def procesar_hoja(
             if transactions and invalid_streak >= 25:
                 break
 
+    # Cuenta sin movimientos en el período (ej. BAC 327): sin esto la cuenta
+    # desaparecía del dashboard junto con su saldo.
+    if not transactions and banco != "BANCO NO IDENTIFICADO":
+        registro_saldo = _registro_cuenta_sin_movimientos(
+            rows,
+            header_index,
+            banco,
+            cuenta,
+            expected_month,
+            expected_year
+        )
+
+        if registro_saldo:
+            registro_saldo["moneda"] = moneda
+            registro_saldo["pais"] = pais
+            transactions.append(registro_saldo)
+
     return transactions
+
+
+def _registro_cuenta_sin_movimientos(
+    rows,
+    header_index,
+    banco,
+    cuenta,
+    expected_month=None,
+    expected_year=None
+):
+    """
+    Genera un único registro sin importes con el saldo del encabezado para
+    que la cuenta siga apareciendo cuando el estado no trae movimientos.
+    Sin movimientos el saldo no cambia, así que inicial = final = saldo actual.
+    """
+    etiquetas_saldo = (
+        "saldo en libros",
+        "saldo actual",
+        "saldo final",
+        "saldo disponible",
+    )
+
+    saldo = None
+    fecha = None
+
+    for row in rows[:header_index + 1]:
+        for c, value in enumerate(row):
+            label = compact_text(value)
+
+            if not label:
+                continue
+
+            if saldo is None and any(k in label for k in etiquetas_saldo):
+                for siguiente in row[c + 1:]:
+                    parsed = parse_number(siguiente)
+                    if parsed is not None:
+                        saldo = parsed
+                        break
+
+            if fecha is None and label == "fecha":
+                for siguiente in row[c + 1:]:
+                    if siguiente in (None, ""):
+                        continue
+                    parsed = clean_date(siguiente, expected_month, expected_year)
+                    if parsed:
+                        # Solo el día, igual que los demás movimientos.
+                        fecha = datetime(parsed.year, parsed.month, parsed.day)
+                    break
+
+    if saldo is None:
+        return None
+
+    return {
+        "banco": valor_o_nd(banco),
+        "cuenta": valor_o_nd(cuenta),
+        "fecha": fecha or datetime.now(),
+        "referencia": "",
+        "codigo": "",
+        "descripcion": "SIN MOVIMIENTOS EN EL PERÍODO",
+        "debito": 0.0,
+        "credito": 0.0,
+        "saldo": saldo,
+        "saldo_disponible": None,
+        "saldo_inicial_cuenta": saldo,
+        "es_cheque": False,
+        "tipo_cheque": "",
+        "numero_cheque": "",
+        "_tiene_debito": False,
+        "_tiene_credito": False,
+        "_tiene_saldo": True,
+        "_tiene_saldo_disponible": False,
+    }
 
 
 # ============================================================
