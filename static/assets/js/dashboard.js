@@ -1174,7 +1174,7 @@
     };
 
     document.addEventListener("DOMContentLoaded", function () {
-      document.querySelectorAll("[data-country]").forEach(button => {
+      document.querySelectorAll("button[data-country]").forEach(button => {
         button.addEventListener("click", function () {
           window.changeDashboardCountry(
             this.dataset.country

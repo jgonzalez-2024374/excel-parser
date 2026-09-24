@@ -266,27 +266,28 @@ body{background:var(--bg)}
 .currency-toggle-track::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
 .currency-toggle input:checked+.currency-toggle-track{background:var(--red);border-color:var(--red)}
 .currency-toggle input:checked+.currency-toggle-track::after{transform:translateX(20px)}
-.hero-actions{margin-left:auto}
 .hero-actions button{gap:8px}
 .save-icon{width:20px;height:20px}
 
 /* datos del período */
-.info-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px;padding:12px;background:rgba(14,18,27,.7);border:1px solid var(--line);border-radius:14px}
-.info-tile{display:flex;align-items:center;gap:12px;padding:9px 14px;background:rgba(9,12,19,.6);border:1px solid var(--line);border-radius:10px}
+.info-strip{display:grid;grid-template-columns:minmax(230px,1.4fr) repeat(4,minmax(130px,1fr));gap:12px;margin-bottom:14px;padding:12px;background:rgba(14,18,27,.7);border:1px solid var(--line);border-radius:14px}
+.info-tile{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(9,12,19,.6);border:1px solid var(--line);border-radius:10px}
 .info-tile img{width:26px;height:26px;object-fit:contain;flex:none}
 .info-tile span{display:block;color:var(--muted);font-size:12px}
-.info-tile b{display:block;font-size:14px;font-weight:700}
+.info-tile b{display:block;font-size:13.5px;font-weight:700;white-space:nowrap}
+@media (max-width:1100px){.info-strip{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}}
 
 /* pestañas + período */
 .tabs-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
 .tabs-row .tabs{gap:10px;margin:0;overflow:visible;border-bottom:0}
 .tab{margin:0;white-space:nowrap}
-.tabs-row .date-filter{height:var(--ctl-h);padding:0 10px;gap:8px;background:rgba(16,20,30,.8);border-radius:10px}
+.tabs-row .date-filter{flex-wrap:nowrap;align-items:center;min-height:var(--ctl-h);padding:4px 10px;gap:8px;background:rgba(16,20,30,.8);border-radius:10px}
 .date-filter label{font-size:0}
 .date-filter input{font-size:13px}
 .date-filter-title img{width:22px;height:22px;object-fit:contain}
 .date-filter-title{font-size:13px}
-.date-apply{height:28px;padding:0 12px;background:var(--hl-soft);color:#fff;border:1px solid var(--hl-line)}
+.date-apply{height:28px;padding:0 12px;line-height:1;background:var(--hl-soft);color:#fff;border:1px solid var(--hl-line)}
+.date-reset{height:28px;min-width:28px;padding:0 8px;line-height:1}
 .date-apply:hover{background:rgba(240,40,74,.3)}
 :focus-visible{outline-color:var(--red)}
 
@@ -302,6 +303,12 @@ body{background:var(--bg)}
 .card>.desc{display:inline-block;font-size:13px}
 .legend i{border-radius:50%}
 .insight{border-left-color:var(--red)}
+/* mismo aspecto de indicadores en las tres vistas (anula las reglas body[data-country=CONSOLIDADO] de dashboard.css) */
+body[data-country] .kpis{gap:14px}
+body[data-country] .kpi{padding:16px 22px;min-height:0}
+body[data-country] .kpi .label{min-height:0;font-size:13.5px;letter-spacing:0}
+body[data-country] .kpi .value{margin:8px 0 4px;font-size:clamp(22px,2vw,28px);line-height:1.15}
+body[data-country] .kpi .hint{font-size:12.5px;line-height:1.4}
 .executive-cover{box-shadow:none}
 @media (max-width:900px){.kpis{grid-template-columns:1fr}.hero-actions{margin-left:0}}
 }
