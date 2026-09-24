@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Datos generados en tiempo de ejecución por el parser
+data/
