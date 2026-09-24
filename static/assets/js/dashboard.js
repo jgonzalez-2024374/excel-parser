@@ -368,14 +368,14 @@
 
   // ============================================================
   // MONEDA POR PAÍS + TIPO DE CAMBIO ACTUALIZADO AUTOMÁTICAMENTE
-  // Guatemala: GTQ (Q) <-> USD ($)
-  // El Salvador: USD ($) <-> GTQ (Q)
+  // Las tres vistas (Guatemala, El Salvador y Consolidado Regional) se muestran
+  // por defecto en dólares ($). El botón cambia de $ a Q en todas.
   // ============================================================
 
   const COUNTRY_CURRENCY_VIEW = {
-    GUATEMALA: 'GTQ',
+    GUATEMALA: 'USD',
     EL_SALVADOR: 'USD',
-    CONSOLIDADO: 'GTQ'
+    CONSOLIDADO: 'USD'
   };
 
   let DASH_EXCHANGE_RATE = null;   // GTQ por 1 USD
@@ -392,7 +392,15 @@
 
   function displayCurrencyCode() {
     const country = normalizeCountry(ACTIVE_COUNTRY);
-    return COUNTRY_CURRENCY_VIEW[country] || baseCurrencyForActiveCountry();
+    const base = baseCurrencyForActiveCountry();
+    const wanted = COUNTRY_CURRENCY_VIEW[country] || base;
+    const rate = Number(DASH_EXCHANGE_RATE);
+
+    // Sin tipo de cambio no se puede convertir: se muestra la moneda original
+    // (con su símbolo correcto) hasta que llegue la tasa.
+    if (wanted !== base && !(Number.isFinite(rate) && rate > 0)) return base;
+
+    return wanted;
   }
 
   const currencySymbol = () => CURRENCY_SYMBOLS[displayCurrencyCode()] || '';
@@ -459,6 +467,7 @@
   function updateExchangeDisplays() {
     const gt = document.getElementById('exchange-display-gt');
     const sv = document.getElementById('exchange-display-sv');
+    const regional = document.getElementById('exchange-display-regional');
     const rate = Number(DASH_EXCHANGE_RATE);
 
     let textValue = 'Actualizando tipo de cambio...';
@@ -469,6 +478,7 @@
 
     if (gt) gt.textContent = textValue;
     if (sv) sv.textContent = textValue;
+    if (regional) regional.textContent = textValue;
   }
 
   function syncCurrencyControls() {
@@ -486,9 +496,10 @@
     const svToggle = document.getElementById('currency-toggle-sv');
     const regionalToggle = document.getElementById('currency-toggle-regional');
 
-    if (gtToggle) gtToggle.checked = COUNTRY_CURRENCY_VIEW.GUATEMALA === 'USD';
+    // Sin marcar = dólares ($) · marcado = quetzales (Q), en las tres vistas.
+    if (gtToggle) gtToggle.checked = COUNTRY_CURRENCY_VIEW.GUATEMALA === 'GTQ';
     if (svToggle) svToggle.checked = COUNTRY_CURRENCY_VIEW.EL_SALVADOR === 'GTQ';
-    if (regionalToggle) regionalToggle.checked = COUNTRY_CURRENCY_VIEW.CONSOLIDADO === 'USD';
+    if (regionalToggle) regionalToggle.checked = COUNTRY_CURRENCY_VIEW.CONSOLIDADO === 'GTQ';
 
     const gtLocal = document.getElementById('gt-local-label');
     const gtConverted = document.getElementById('gt-converted-label');
@@ -497,12 +508,13 @@
     const regionalLocal = document.getElementById('regional-local-label');
     const regionalConverted = document.getElementById('regional-converted-label');
 
-    if (gtLocal) gtLocal.classList.toggle('selected', country === 'GUATEMALA' && current === 'GTQ');
-    if (gtConverted) gtConverted.classList.toggle('selected', country === 'GUATEMALA' && current === 'USD');
+    // Etiqueta izquierda = $ · etiqueta derecha = Q.
+    if (gtLocal) gtLocal.classList.toggle('selected', country === 'GUATEMALA' && current === 'USD');
+    if (gtConverted) gtConverted.classList.toggle('selected', country === 'GUATEMALA' && current === 'GTQ');
     if (svLocal) svLocal.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'USD');
     if (svConverted) svConverted.classList.toggle('selected', country === 'EL_SALVADOR' && current === 'GTQ');
-    if (regionalLocal) regionalLocal.classList.toggle('selected', country === 'CONSOLIDADO' && current === 'GTQ');
-    if (regionalConverted) regionalConverted.classList.toggle('selected', country === 'CONSOLIDADO' && current === 'USD');
+    if (regionalLocal) regionalLocal.classList.toggle('selected', country === 'CONSOLIDADO' && current === 'USD');
+    if (regionalConverted) regionalConverted.classList.toggle('selected', country === 'CONSOLIDADO' && current === 'GTQ');
 
     updateExchangeDisplays();
   }
@@ -558,9 +570,9 @@
       element.addEventListener('change', handler);
     };
 
-    bindToggle(gtToggle, 'GUATEMALA', 'USD', 'GTQ');
+    bindToggle(gtToggle, 'GUATEMALA', 'GTQ', 'USD');
     bindToggle(svToggle, 'EL_SALVADOR', 'GTQ', 'USD');
-    bindToggle(regionalToggle, 'CONSOLIDADO', 'USD', 'GTQ');
+    bindToggle(regionalToggle, 'CONSOLIDADO', 'GTQ', 'USD');
 
     window.changeDashboardCurrency = function(country, currency) {
       COUNTRY_CURRENCY_VIEW[country] = currency;
