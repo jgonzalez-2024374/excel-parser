@@ -123,6 +123,8 @@
 
   function resolveBankKey(bank) {
     const values = [
+      typeof bank === 'string' ? bank : '',
+      bank && bank.bankKey,
       bank && bank.key,
       bank && bank.name,
       bank && bank.bank,
@@ -262,6 +264,8 @@
     const direct = normalizeCountry(item && (item.country || item.pais));
     if (direct !== 'NO_IDENTIFICADO') return direct;
 
+    // Primero identificar el país por el banco. Una cuenta USD puede pertenecer
+    // a Guatemala, como la cuenta 0584 de Banco Industrial.
     const text = normalizeBankName(
       `${item && (item.bankCanonical || item.bankKey || '')} ${item && (item.bank || item.name || '')}`
     );
@@ -271,7 +275,8 @@
       text.includes('G&T') ||
       text.includes('GYT') ||
       text.includes('BANTRAB') ||
-      text.includes('BAM')
+      text.includes('BAM') ||
+      text.includes('INDUSTRIAL')
     ) return 'GUATEMALA';
 
     if (
@@ -283,8 +288,8 @@
       text.includes('ATLANTIDA')
     ) return 'EL_SALVADOR';
 
-    const cur = String(item && (item.currency || item.moneda) || '').toUpperCase();
-    if (cur === 'USD  ') return 'GUATEMALA';
+    const cur = String(item && (item.currency || item.moneda) || '').trim().toUpperCase();
+    if (cur === 'GTQ') return 'GUATEMALA';
     if (cur === 'USD' || cur === 'SVC') return 'EL_SALVADOR';
 
     return 'NO_IDENTIFICADO';
@@ -734,9 +739,9 @@
   // contra el estado de cuenta original ("Saldo inicial (USD)"), a diferencia
   // de la cuenta 0040040592 del mismo banco, que es en quetzales.
   function isKnownUsdAccount(a) {
-    if (resolveBankKey(a.bank || a.bankKey) !== 'BANCO INDUSTRIAL') return false;
+    if (resolveBankKey(a) !== 'BANCO INDUSTRIAL') return false;
     const digits = String(a.account || '').replace(/\D/g, '');
-    return digits.endsWith('584');
+    return digits.endsWith('0584') || digits.endsWith('584');
   }
 
   const ACCOUNT_BY_KEY = {};
