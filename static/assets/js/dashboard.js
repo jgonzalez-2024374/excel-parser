@@ -216,6 +216,11 @@
       label: 'El Salvador',
       currency: 'USD'
     },
+    CONSOLIDADO: {
+      label: 'Consolidado Regional',
+      // El consolidado se calcula internamente en GTQ y luego puede mostrarse en USD.
+      currency: 'GTQ'
+    },
     NO_IDENTIFICADO: {
       label: 'Sin clasificar',
       currency: 'N/D'
@@ -322,6 +327,9 @@
           ? 'EL_SALVADOR'
           : 'NO_IDENTIFICADO'
       );
+
+  // Mantener sincronizados los scripts auxiliares del index.
+  window.DASHBOARD_ACTIVE_COUNTRY = ACTIVE_COUNTRY;
 
   function countryLabel(country = ACTIVE_COUNTRY) {
     return (COUNTRY_INFO[normalizeCountry(country)] || COUNTRY_INFO.NO_IDENTIFICADO).label;
@@ -787,22 +795,32 @@
   function buildFiltered(startDate, endDate) {
     const baseCur = baseCurrencyForActiveCountry();
     const txAmt = (t, v) => convertToBase(Number(v || 0), txCurrency(t), baseCur);
-    // Primero separar por país; después aplicar el período.
-    const countryTransactions = RAW_TRANSACTIONS.filter(
-      t => recordCountry(t) === ACTIVE_COUNTRY
-    );
+
+    // IMPORTANTE:
+    // "CONSOLIDADO" no es el país original de ningún movimiento.
+    // En esa vista se deben incluir tanto GUATEMALA como EL_SALVADOR.
+    const isRegional = normalizeCountry(ACTIVE_COUNTRY) === 'CONSOLIDADO';
+
+    const belongsToActiveCountry = item => {
+      const country = recordCountry(item);
+
+      if (isRegional) {
+        return country === 'GUATEMALA' || country === 'EL_SALVADOR';
+      }
+
+      return country === ACTIVE_COUNTRY;
+    };
+
+    // Primero separar por país/vista; después aplicar el período.
+    const countryTransactions = RAW_TRANSACTIONS.filter(belongsToActiveCountry);
 
     const inRange = countryTransactions.filter(
       t => t.date >= startDate && t.date <= endDate
     );
 
-    const baseAccounts = BASE_DATA.accounts.filter(
-      a => recordCountry(a) === ACTIVE_COUNTRY
-    );
+    const baseAccounts = BASE_DATA.accounts.filter(belongsToActiveCountry);
 
-    const baseBanks = BASE_DATA.banks.filter(
-      b => recordCountry(b) === ACTIVE_COUNTRY
-    );
+    const baseBanks = BASE_DATA.banks.filter(belongsToActiveCountry);
 
     // Recalcular cada cuenta usando saldos reportados en ESTADO UNIFORME.
     // Saldo inicial = último saldo reportado antes del período (o saldo inicial del archivo si aún no había movimientos).
@@ -828,7 +846,18 @@
     }
     const totalFinal = round2(accounts.reduce((s, a) => s + a.final, 0));
     const colorByKey = Object.fromEntries(baseBanks.map(b => [b.key, b.color]));
-    const nameByKey = Object.fromEntries(baseBanks.map(b => [b.key, b.name]));
+
+    const displayBankName = b => {
+      const name = b.name || b.bank || b.bankCanonical || b.key || '';
+      if (!isRegional) return name;
+
+      const country = recordCountry(b);
+      if (country === 'GUATEMALA') return `${name} (GT)`;
+      if (country === 'EL_SALVADOR') return `${name} (SV)`;
+      return name;
+    };
+
+    const nameByKey = Object.fromEntries(baseBanks.map(b => [b.key, displayBankName(b)]));
 
     const banks = baseBanks.map(base => {
       const aa = accounts.filter(a => a.bankKey === base.key);
@@ -882,7 +911,7 @@
         ...BASE_DATA.meta,
         country: ACTIVE_COUNTRY,
         countryLabel: countryLabel(ACTIVE_COUNTRY),
-        currency: currencyForCountry(ACTIVE_COUNTRY, countryTransactions),
+        currency: isRegional ? 'GTQ' : currencyForCountry(ACTIVE_COUNTRY, countryTransactions),
         banks: banks.length,
         accounts: accounts.length,
         fileCut: periodLabel(startDate, endDate),
@@ -1080,6 +1109,7 @@
       }
 
       ACTIVE_COUNTRY = nextCountry;
+      window.DASHBOARD_ACTIVE_COUNTRY = ACTIVE_COUNTRY;
       bankFilter.value = 'ALL';
 
       DATA = buildFiltered(
