@@ -3220,6 +3220,8 @@ def normalizar_pais_bancario(value):
 
     if texto in {
         "el salvador",
+        "el_salvador",
+        "elsalvador",
         "salvador",
         "sv",
         "slv"
@@ -6650,15 +6652,36 @@ def construir_dashboard_data(
             canonical
         )
 
-        moneda_cuenta = moneda_pais_dashboard(
-            pais,
-            [
-                item.get(
-                    "currency"
-                )
-                for item in movimientos
-            ]
+        monedas_movimientos = [
+            item.get(
+                "currency"
+            )
+            for item in movimientos
+        ]
+
+        # Moneda REAL de la cuenta: la que trae el estado de cuenta.
+        # El respaldo del país solo aplica cuando la hoja no dejó clara la
+        # moneda. Nunca se etiqueta como GTQ una cuenta que viene en USD.
+        monedas_detectadas = {
+            normalizar_codigo_moneda(
+                moneda
+            )
+            for moneda in monedas_movimientos
+        }
+
+        monedas_detectadas.discard(
+            "N/D"
         )
+
+        if len(monedas_detectadas) == 1:
+            moneda_cuenta = next(
+                iter(monedas_detectadas)
+            )
+        else:
+            moneda_cuenta = moneda_pais_dashboard(
+                pais,
+                monedas_movimientos
+            )
 
         accounts.append({
             "bankKey": bank_key,
@@ -6869,16 +6892,36 @@ def construir_dashboard_data(
             canonical
         )
 
-        moneda_banco = moneda_pais_dashboard(
-            pais,
-            [
-                item.get(
+        # Moneda REAL del banco: si todas sus cuentas coinciden, esa manda;
+        # si mezcla dos monedas se usa la moneda de presentación del país.
+        monedas_banco = {
+            normalizar_codigo_moneda(
+                account.get(
                     "currency"
                 )
-                for item
-                in trans_banco
-            ]
+            )
+            for account in cuentas_banco
+        }
+
+        monedas_banco.discard(
+            "N/D"
         )
+
+        if len(monedas_banco) == 1:
+            moneda_banco = next(
+                iter(monedas_banco)
+            )
+        else:
+            moneda_banco = moneda_pais_dashboard(
+                pais,
+                [
+                    item.get(
+                        "currency"
+                    )
+                    for item
+                    in trans_banco
+                ]
+            )
 
         banks.append({
             "key": bank_key,
@@ -7406,10 +7449,31 @@ def construir_dashboard_data(
                 ]
             ),
 
+            # Los movimientos de El Salvador también se dejan en GTQ aquí.
+            # Si quedaran en USD, el frontend mezclaría cuentas ya convertidas
+            # con movimientos sin convertir y multiplicaría dos veces.
             "transactions": (
                 gt_data.get("transactions", [])
                 +
-                sv_data.get("transactions", [])
+                [
+                    {
+                        **dict(movimiento),
+                        **{
+                            campo: convertir_valores_usd_a_gtq(
+                                movimiento.get(campo),
+                                tipo_cambio
+                            )
+                            for campo in [
+                                "debit",
+                                "credit",
+                                "balance"
+                            ]
+                            if movimiento.get(campo) is not None
+                        },
+                        "currency": "GTQ"
+                    }
+                    for movimiento in sv_data.get("transactions", [])
+                ]
             ),
 
             "totals": {

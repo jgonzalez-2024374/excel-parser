@@ -761,16 +761,25 @@
     const key = txKey(ref.bankKey, ref.account);
     if (!(key in ACCOUNT_CURRENCY_CACHE)) {
       const a = ACCOUNT_BY_KEY[key] || ref;
+      // 1) Overrides manuales y cuentas USD ya confirmadas.
       let cur = normalizeCurrencyCode(ACCOUNT_CURRENCY_OVERRIDES[key]);
       if (!cur && isKnownUsdAccount(a)) cur = 'USD';
-      if (!cur) cur = normalizeCurrencyCode(a.currency || a.moneda);
+
+      // 2) Moneda REAL del estado de cuenta: si todos los movimientos de la
+      //    cuenta traen la misma moneda, esa manda. Así una cuenta que ya
+      //    viene en dólares nunca se divide entre el tipo de cambio.
       if (!cur) {
-        const txs = TX_BY_ACCOUNT[key] || [];
-        for (const t of txs) {
-          cur = normalizeCurrencyCode(t.currency || t.moneda);
-          if (cur) break;
+        const monedas = new Set();
+        for (const t of (TX_BY_ACCOUNT[key] || [])) {
+          const c = normalizeCurrencyCode(t.currency || t.moneda);
+          if (c) monedas.add(c);
+          if (monedas.size > 1) break;
         }
+        if (monedas.size === 1) cur = [...monedas][0];
       }
+
+      // 3) Etiqueta que trae la cuenta (puede ser la moneda del país).
+      if (!cur) cur = normalizeCurrencyCode(a.currency || a.moneda);
       if (!cur) cur = currencyFromText(a);
       ACCOUNT_CURRENCY_CACHE[key] = cur;
     }
