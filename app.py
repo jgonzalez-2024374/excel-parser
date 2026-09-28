@@ -3221,6 +3221,8 @@ def normalizar_pais_bancario(value):
 
     if texto in {
         "el salvador",
+        "el_salvador",
+        "elsalvador",
         "salvador",
         "sv",
         "slv"
@@ -6741,15 +6743,36 @@ def construir_dashboard_data(
             canonical
         )
 
-        moneda_cuenta = moneda_pais_dashboard(
-            pais,
-            [
-                item.get(
-                    "currency"
-                )
-                for item in movimientos
-            ]
+        monedas_movimientos = [
+            item.get(
+                "currency"
+            )
+            for item in movimientos
+        ]
+
+        # Moneda REAL de la cuenta: la que trae el estado de cuenta.
+        # El respaldo del país solo aplica cuando la hoja no dejó clara la
+        # moneda. Nunca se etiqueta como GTQ una cuenta que viene en USD.
+        monedas_detectadas = {
+            normalizar_codigo_moneda(
+                moneda
+            )
+            for moneda in monedas_movimientos
+        }
+
+        monedas_detectadas.discard(
+            "N/D"
         )
+
+        if len(monedas_detectadas) == 1:
+            moneda_cuenta = next(
+                iter(monedas_detectadas)
+            )
+        else:
+            moneda_cuenta = moneda_pais_dashboard(
+                pais,
+                monedas_movimientos
+            )
 
         accounts.append({
             "bankKey": bank_key,
@@ -6960,16 +6983,36 @@ def construir_dashboard_data(
             canonical
         )
 
-        moneda_banco = moneda_pais_dashboard(
-            pais,
-            [
-                item.get(
+        # Moneda REAL del banco: si todas sus cuentas coinciden, esa manda;
+        # si mezcla dos monedas se usa la moneda de presentación del país.
+        monedas_banco = {
+            normalizar_codigo_moneda(
+                account.get(
                     "currency"
                 )
-                for item
-                in trans_banco
-            ]
+            )
+            for account in cuentas_banco
+        }
+
+        monedas_banco.discard(
+            "N/D"
         )
+
+        if len(monedas_banco) == 1:
+            moneda_banco = next(
+                iter(monedas_banco)
+            )
+        else:
+            moneda_banco = moneda_pais_dashboard(
+                pais,
+                [
+                    item.get(
+                        "currency"
+                    )
+                    for item
+                    in trans_banco
+                ]
+            )
 
         banks.append({
             "key": bank_key,
@@ -7504,10 +7547,31 @@ def construir_dashboard_data(
                 ]
             ),
 
+            # Los movimientos de El Salvador también se dejan en GTQ aquí.
+            # Si quedaran en USD, el frontend mezclaría cuentas ya convertidas
+            # con movimientos sin convertir y multiplicaría dos veces.
             "transactions": (
                 gt_data.get("transactions", [])
                 +
-                sv_data.get("transactions", [])
+                [
+                    {
+                        **dict(movimiento),
+                        **{
+                            campo: convertir_valores_usd_a_gtq(
+                                movimiento.get(campo),
+                                tipo_cambio
+                            )
+                            for campo in [
+                                "debit",
+                                "credit",
+                                "balance"
+                            ]
+                            if movimiento.get(campo) is not None
+                        },
+                        "currency": "GTQ"
+                    }
+                    for movimiento in sv_data.get("transactions", [])
+                ]
             ),
 
             "totals": {
@@ -7594,6 +7658,18 @@ def guardar_dashboard_data(data):
     El archivo permanece disponible para nuevos usuarios hasta la siguiente
     ejecución del flujo que genere nuevos datos.
     """
+    # Nunca dejar el dashboard vacío: si el payload no trae datos bancarios
+    # y ya hay data buena, se conserva lo existente.
+    if (
+        not tiene_datos_utiles_dashboard(data)
+        and tiene_datos_utiles_dashboard(DASHBOARD_CACHE)
+    ):
+        print(
+            "guardar_dashboard_data: payload sin datos; "
+            "se conserva la última data buena."
+        )
+        return False
+
     try:
         os.makedirs(
             DASHBOARD_DATA_DIR,
@@ -7621,11 +7697,15 @@ def guardar_dashboard_data(data):
 
         DASHBOARD_CACHE.update(data)
 
+        return True
+
     except Exception as error:
         print(
             "Error guardando dashboard_data.json:",
             str(error)
         )
+
+        return False
 
 
 # ============================================================
@@ -7645,6 +7725,145 @@ DATOS_QUEMADOS_RE = re.compile(
     r"(<!-- DATOS_QUEMADOS_INICIO[^>]*-->)(.*?)(<!-- DATOS_QUEMADOS_FIN -->)",
     re.S
 )
+
+# El disco de Render es efímero: al reiniciar se borra dashboard_data.json.
+# Por eso la última data se respalda como JSON en GitHub y, si el archivo
+# local no existe (o vino vacío), se restaura desde ahí al arrancar.
+# Así /data.json nunca responde vacío y el dashboard no se queda en blanco.
+BACKUP_PATH_ENV = "DASHBOARD_BACKUP_PATH"
+BACKUP_PATH_DEFAULT = "assets/data/excel-parser-backup.json"
+BACKUP_REPO_ENV = "DASHBOARD_BACKUP_REPO"
+BACKUP_BRANCH_ENV = "DASHBOARD_BACKUP_BRANCH"
+BACKUP_RAW_URL_ENV = "DASHBOARD_BACKUP_RAW_URL"
+BACKUP_RAW_URL_DEFECTO = (
+    "https://raw.githubusercontent.com/"
+    + "Ferr-ZeTA/Prototipado_Dashboard_Intelfon/"
+    + "Ingresos/assets/data/ingresos-snapshot.json"
+)
+
+# Snapshot de Ingresos que lee el prototipado (data "quemada" visible para
+# todos, incluidos usuarios que entran en frío). excel-parser lo actualiza
+# SOLO, cada vez que Make procesa un Excel.
+SNAPSHOT_TOKEN_ENV = "INGRESOS_SNAPSHOT_TOKEN"
+SNAPSHOT_REPO_ENV = "INGRESOS_SNAPSHOT_REPO"
+SNAPSHOT_BRANCH_ENV = "INGRESOS_SNAPSHOT_BRANCH"
+SNAPSHOT_PATH_ENV = "INGRESOS_SNAPSHOT_PATH"
+SNAPSHOT_REPO_DEFECTO = "Ferr-ZeTA/Prototipado_Dashboard_Intelfon"
+SNAPSHOT_BRANCH_DEFAULT = "Ingresos"
+SNAPSHOT_PATH_DEFAULT = "assets/data/ingresos-snapshot.json"
+
+
+def _token_github():
+    """
+    Token con permiso de escritura en el repo del prototipado.
+    """
+    token = str(
+        os.environ.get(SNAPSHOT_TOKEN_ENV, "") or ""
+    ).strip()
+
+    if not token:
+        token = str(
+            os.environ.get(PUBLISH_TOKEN_ENV, "") or ""
+        ).strip()
+
+    return token
+
+
+def _config_snapshot():
+    """
+    (token, repo, branch, path) del snapshot de Ingresos.
+    """
+    repo = str(
+        os.environ.get(SNAPSHOT_REPO_ENV, "") or ""
+    ).strip() or SNAPSHOT_REPO_DEFECTO
+
+    branch = str(
+        os.environ.get(SNAPSHOT_BRANCH_ENV, "") or ""
+    ).strip() or SNAPSHOT_BRANCH_DEFAULT
+
+    path = (
+        str(
+            os.environ.get(SNAPSHOT_PATH_ENV, "") or ""
+        ).strip().lstrip("/")
+        or SNAPSHOT_PATH_DEFAULT
+    )
+
+    return (_token_github(), repo, branch, path)
+
+
+def tiene_datos_utiles_dashboard(data):
+    """
+    Misma regla que hasUsableBankData() del frontend:
+    ¿la data trae al menos un banco, cuenta o movimiento?
+    """
+    if not isinstance(data, dict):
+        return False
+
+    regional = data.get(
+        "regional"
+    ) or {}
+
+    fuentes = (
+        list(regional.values())
+        if regional
+        else [data]
+    )
+
+    for fuente in fuentes:
+        if not isinstance(fuente, dict):
+            continue
+
+        for campo in ("banks", "accounts", "transactions"):
+            valor = fuente.get(campo)
+
+            if isinstance(valor, list) and valor:
+                return True
+
+    return False
+
+
+def _subir_archivo_github(token, repo, branch, path, contenido, mensaje):
+    """
+    Crea o actualiza un archivo en el repo y devuelve el sha del commit.
+    """
+    url = (
+        "https://api.github.com/repos/"
+        + repo
+        + "/contents/"
+        + urllib.parse.quote(path)
+    )
+
+    sha = None
+
+    try:
+        actual = _github_request(
+            url + "?ref=" + urllib.parse.quote(branch),
+            token
+        )
+        sha = actual.get("sha")
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise
+
+    body = {
+        "message": mensaje,
+        "content": base64.b64encode(
+            contenido.encode("utf-8")
+        ).decode("ascii"),
+        "branch": branch
+    }
+
+    if sha:
+        body["sha"] = sha
+
+    resultado = _github_request(
+        url,
+        token,
+        method="PUT",
+        body=body
+    )
+
+    return (resultado.get("commit") or {}).get("sha", "")
 
 
 def _github_request(url, token, method="GET", body=None, raw=False):
@@ -7718,6 +7937,16 @@ def publicar_datos_quemados(data):
     Escribe window.DASHBOARD_BASE_DATA = {...} dentro del HTML del dashboard
     en el repo del frontend. Si faltan las variables de entorno no hace nada.
     """
+    # Nunca pisar la data buena con un payload vacío.
+    if (
+        not tiene_datos_utiles_dashboard(data)
+        and tiene_datos_utiles_dashboard(DASHBOARD_CACHE)
+    ):
+        return {
+            "published": False,
+            "reason": "Payload sin datos; se conserva la última data buena"
+        }
+
     token = str(os.environ.get(PUBLISH_TOKEN_ENV, "") or "").strip()
     repo = str(os.environ.get(PUBLISH_REPO_ENV, "") or "").strip()
 
@@ -7802,6 +8031,366 @@ def publicar_datos_quemados(data):
         }
 
 
+def publicar_backup_json(data):
+    """
+    Sube el JSON del dashboard a data/dashboard_data.json en GitHub.
+    Es la copia que sobrevive a los reinicios de Render: al arrancar,
+    cargar_dashboard_data() la descarga si el disco local está vacío.
+    """
+    if not tiene_datos_utiles_dashboard(data):
+        return {
+            "published": False,
+            "reason": "Payload sin datos; no se publica respaldo"
+        }
+
+    token = _token_github()
+
+    repo = (
+        str(os.environ.get(BACKUP_REPO_ENV, "") or "").strip()
+        or str(os.environ.get(PUBLISH_REPO_ENV, "") or "").strip()
+        or SNAPSHOT_REPO_DEFECTO
+    )
+
+    if not token:
+        return {
+            "published": False,
+            "reason": "Variables de publicación no configuradas"
+        }
+
+    branch = str(
+        os.environ.get(BACKUP_BRANCH_ENV, "") or ""
+    ).strip() or str(
+        os.environ.get(PUBLISH_BRANCH_ENV, "") or ""
+    ).strip() or SNAPSHOT_BRANCH_DEFAULT
+
+    path = str(
+        os.environ.get(BACKUP_PATH_ENV, "")
+        or BACKUP_PATH_DEFAULT
+    ).strip().lstrip("/")
+
+    try:
+        commit = _subir_archivo_github(
+            token,
+            repo,
+            branch,
+            path,
+            json.dumps(data, ensure_ascii=False, indent=1),
+            "data: actualizar respaldo del dashboard"
+        )
+
+        return {
+            "published": True,
+            "path": path,
+            "branch": branch,
+            "commit": commit
+        }
+
+    except Exception as error:
+        print(
+            "Error publicando respaldo JSON:",
+            str(error)
+        )
+        return {
+            "published": False,
+            "reason": str(error)
+        }
+
+
+def _descargar_contenido_github(token, repo, branch, path):
+    """
+    Descarga un archivo del repo vía API (funciona aunque sea privado).
+    """
+    url = (
+        "https://api.github.com/repos/"
+        + repo
+        + "/contents/"
+        + urllib.parse.quote(path)
+        + "?ref="
+        + urllib.parse.quote(branch)
+    )
+
+    respuesta = _github_request(url, token)
+
+    return base64.b64decode(
+        respuesta.get("content", "") or ""
+    ).decode("utf-8")
+
+
+def combinar_snapshot_ingresos(base, nueva):
+    """
+    Misma regla que combinarDashboardData() en income.js y que
+    tools/actualizar-snapshot.mjs: lo nuevo solo reemplaza los países que
+    vengan con datos. Así subir un Excel de Guatemala no borra El Salvador.
+    """
+    if not tiene_datos_utiles_dashboard(nueva):
+        return (
+            base
+            if tiene_datos_utiles_dashboard(base)
+            else None
+        )
+
+    if not tiene_datos_utiles_dashboard(base):
+        return nueva
+
+    regional_base = base.get("regional") or {}
+    regional_nueva = nueva.get("regional") or {}
+
+    if not regional_base or not regional_nueva:
+        return nueva
+
+    regional = {}
+
+    for clave in set(regional_base) | set(regional_nueva):
+        rama_nueva = regional_nueva.get(clave)
+        rama_base = regional_base.get(clave)
+
+        if tiene_datos_utiles_dashboard(rama_nueva):
+            regional[clave] = rama_nueva
+        elif tiene_datos_utiles_dashboard(rama_base):
+            regional[clave] = rama_base
+        elif rama_nueva or rama_base:
+            regional[clave] = rama_nueva or rama_base
+
+    combinado = dict(nueva)
+    combinado["regional"] = regional
+
+    return combinado
+
+
+def publicar_snapshot_ingresos(data):
+    """
+    Actualiza assets/data/ingresos-snapshot.json en el repo del
+    prototipado. Es la data "quemada" que ven TODOS los usuarios del
+    dashboard de Ingresos, incluso los que entran en frío o cuando Render
+    se reinicia. Se ejecuta solo cada vez que Make procesa un Excel.
+    """
+    if not tiene_datos_utiles_dashboard(data):
+        return {
+            "published": False,
+            "reason": "Payload sin datos; el snapshot no se toca"
+        }
+
+    token, repo, branch, path = _config_snapshot()
+
+    if not token:
+        return {
+            "published": False,
+            "reason": "Variables de publicación no configuradas"
+        }
+
+    try:
+        base = None
+
+        try:
+            base = json.loads(
+                _descargar_contenido_github(
+                    token,
+                    repo,
+                    branch,
+                    path
+                )
+            )
+
+        except Exception as error:
+            print(
+                "Snapshot actual no disponible (se crea uno nuevo):",
+                str(error)
+            )
+
+        combinado = (
+            combinar_snapshot_ingresos(base, data)
+            if base
+            else data
+        )
+
+        if not combinado:
+            return {
+                "published": False,
+                "reason": "Nada que guardar en el snapshot"
+            }
+
+        salida = dict(combinado)
+        salida.pop("_snapshot", None)
+
+        final = {
+            "_snapshot": {
+                "descripcion": (
+                    "Data quemada compartida del dashboard de Ingresos. "
+                    "Se actualiza sola al procesar un Excel en Make. "
+                    "No editar a mano."
+                ),
+                "actualizado_en": datetime.now().isoformat(
+                    timespec="seconds"
+                ),
+                "origen": "excel-parser / Make",
+                "publicado_por": "publicar_snapshot_ingresos",
+                "api": "https://excel-parser-m9q8.onrender.com/data.json",
+                "como_actualizar": (
+                    "Automático al subir un Excel. Manual de respaldo: "
+                    "node tools/actualizar-snapshot.mjs"
+                )
+            },
+            **salida
+        }
+
+        commit = _subir_archivo_github(
+            token,
+            repo,
+            branch,
+            path,
+            json.dumps(final, ensure_ascii=False, indent=2) + "\n",
+            "data: actualizar snapshot del dashboard de Ingresos"
+        )
+
+        print(
+            "Snapshot de Ingresos publicado:",
+            repo + "/" + branch + "/" + path,
+            "commit:",
+            commit
+        )
+
+        return {
+            "published": True,
+            "repo": repo,
+            "branch": branch,
+            "path": path,
+            "commit": commit
+        }
+
+    except Exception as error:
+        print(
+            "Error publicando snapshot de Ingresos:",
+            str(error)
+        )
+        return {
+            "published": False,
+            "reason": str(error)
+        }
+
+
+def restaurar_dashboard_desde_github():
+    """
+    Descarga la última data del dashboard desde GitHub.
+    Se usa cuando Render se reinicia y borra el disco efímero.
+    Devuelve None si no hay respaldo disponible.
+    """
+    candidatas = []
+
+    token = _token_github()
+
+    url_explicita = str(
+        os.environ.get(BACKUP_RAW_URL_ENV, "") or ""
+    ).strip()
+
+    if url_explicita:
+        candidatas.append(
+            ("raw", url_explicita)
+        )
+
+    # Respaldo JSON que sube excel-parser después de cada Excel.
+    repo_respaldo = (
+        str(os.environ.get(BACKUP_REPO_ENV, "") or "").strip()
+        or str(os.environ.get(PUBLISH_REPO_ENV, "") or "").strip()
+        or SNAPSHOT_REPO_DEFECTO
+    )
+
+    branch_respaldo = (
+        str(os.environ.get(BACKUP_BRANCH_ENV, "") or "").strip()
+        or str(os.environ.get(PUBLISH_BRANCH_ENV, "") or "").strip()
+        or SNAPSHOT_BRANCH_DEFAULT
+    )
+
+    path_respaldo = (
+        str(
+            os.environ.get(BACKUP_PATH_ENV, "")
+            or BACKUP_PATH_DEFAULT
+        ).strip().lstrip("/")
+    )
+
+    # Snapshot quemado del prototipado: mismo contenido, otra puerta de entrada.
+    _token_s, repo_snapshot, branch_snapshot, path_snapshot = (
+        _config_snapshot()
+    )
+
+    fuentes = [
+        (repo_respaldo, branch_respaldo, path_respaldo),
+        (repo_snapshot, branch_snapshot, path_snapshot)
+    ]
+
+    for repo, branch, path in fuentes:
+        candidatas.append(
+            (
+                "raw",
+                "https://raw.githubusercontent.com/"
+                + repo
+                + "/"
+                + urllib.parse.quote(branch)
+                + "/"
+                + urllib.parse.quote(path)
+            )
+        )
+
+        if token:
+            candidatas.append(
+                (
+                    "api",
+                    "https://api.github.com/repos/"
+                    + repo
+                    + "/contents/"
+                    + urllib.parse.quote(path)
+                    + "?ref="
+                    + urllib.parse.quote(branch)
+                )
+            )
+
+    candidatas.append(
+        ("raw", BACKUP_RAW_URL_DEFECTO)
+    )
+
+    for tipo, url in candidatas:
+        try:
+            if tipo == "api":
+                respuesta = _github_request(url, token)
+
+                contenido = base64.b64decode(
+                    respuesta.get("content", "") or ""
+                ).decode("utf-8")
+
+            else:
+                requerimiento = urllib.request.Request(
+                    url,
+                    headers={
+                        "User-Agent": "excel-parser/1.0",
+                        "Cache-Control": "no-cache"
+                    }
+                )
+
+                with urllib.request.urlopen(
+                    requerimiento,
+                    timeout=20
+                ) as response:
+                    contenido = response.read().decode("utf-8")
+
+            datos = json.loads(contenido)
+
+            if tiene_datos_utiles_dashboard(datos):
+                print(
+                    "Dashboard restaurado desde GitHub:",
+                    url
+                )
+                return datos
+
+        except Exception as error:
+            print(
+                "Respaldo no disponible en",
+                url,
+                "->",
+                str(error)
+            )
+
+    return None
+
+
 def cargar_dashboard_data():
 
     try:
@@ -7816,9 +8405,12 @@ def cargar_dashboard_data():
                 encoding="utf-8"
             ) as archivo:
 
-                return json.load(
+                data_local = json.load(
                     archivo
                 )
+
+            if tiene_datos_utiles_dashboard(data_local):
+                return data_local
 
     except Exception as error:
 
@@ -7826,6 +8418,13 @@ def cargar_dashboard_data():
             "Error leyendo dashboard_data.json:",
             str(error)
         )
+
+    # Disco local vacío (Render reinició): restaurar el respaldo de GitHub.
+    restaurado = restaurar_dashboard_desde_github()
+
+    if restaurado:
+        guardar_dashboard_data(restaurado)
+        return restaurado
 
     return DASHBOARD_CACHE
 
@@ -8477,6 +9076,14 @@ def process_excel():
             dashboard_payload
         )
 
+        publicar_backup_json(
+            dashboard_payload
+        )
+
+        publicar_snapshot_ingresos(
+            dashboard_payload
+        )
+
         # ====================================================
         # ELIMINAR INPUT
         # ====================================================
@@ -8735,6 +9342,14 @@ def finalize_batch():
         )
 
         publicacion = publicar_datos_quemados(
+            dashboard_payload
+        )
+
+        publicar_backup_json(
+            dashboard_payload
+        )
+
+        publicar_snapshot_ingresos(
             dashboard_payload
         )
 
