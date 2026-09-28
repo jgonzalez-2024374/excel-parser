@@ -312,6 +312,601 @@ body[data-country] .kpi .hint{font-size:12.5px;line-height:1.4}
 .executive-cover{box-shadow:none}
 @media (max-width:900px){.kpis{grid-template-columns:1fr}.hero-actions{margin-left:0}}
 }
+
+/* ===== Tamaño único de botones (misma medida que las pestañas) ===== */
+@media screen {
+.country-btn,
+.hero-actions button,
+.tab,
+.date-apply,
+.date-reset {
+    height: 48px;
+    min-height: 48px;
+    padding: 0 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center
+}
+
+.date-reset {
+    min-width: 48px;
+    padding: 0
+}
+
+.date-filter input[type="date"] {
+    height: 48px;
+    min-height: 48px;
+    width: 158px;
+    padding: 0 10px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text);
+    background: rgba(16, 20, 30, .8);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color-scheme: dark;
+    cursor: pointer
+}
+
+.date-filter input[type="date"]:focus {
+    border-color: var(--hl-line)
+}
+
+.tabs-row .date-filter {
+    padding: 0 10px
+}
+}
+
+/* ===== Imprimir junto al interruptor de moneda ===== */
+@media screen {
+.top-toolbar-left {
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 0
+}
+
+.hero-actions {
+    flex: 0 0 auto
+}
+}
+
+/* ===== Modal de impresión: elegir país / consolidado ===== */
+@media screen {
+.print-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(5, 7, 12, .72)
+}
+
+.print-backdrop[hidden] {
+    display: none
+}
+
+.print-dialog {
+    width: min(560px, 100%);
+    background: #121724;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .55)
+}
+
+.print-dialog h3 {
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 700
+}
+
+.print-dialog-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13.5px
+}
+
+.print-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 18px 0 12px
+}
+
+.print-option {
+    min-height: 48px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 10px;
+    background: rgba(16, 20, 30, .8);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 13.5px;
+    font-weight: 700;
+    line-height: 1.1;
+    cursor: pointer;
+    transition: background .15s, border-color .15s
+}
+
+.print-option:hover:not(:disabled) {
+    background: rgba(240, 40, 74, .12);
+    border-color: var(--hl-line);
+    color: #fff
+}
+
+.print-option:disabled {
+    opacity: .4;
+    cursor: not-allowed
+}
+
+.print-option-state {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted)
+}
+
+.print-note {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--muted)
+}
+
+.print-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px
+}
+
+.print-cancel {
+    min-height: 48px;
+    min-width: 130px;
+    padding: 0 18px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer
+}
+
+.print-cancel:hover {
+    background: rgba(240, 40, 74, .12);
+    border-color: var(--hl-line);
+    color: #fff
+}
+
+@media (max-width:640px) {
+    .print-options {
+        grid-template-columns: 1fr
+    }
+}
+}
+
+/* ===== Formato de impresión / PDF ===== */
+.print-stamp {
+    display: none
+}
+
+@page {
+    size: landscape;
+    margin: 10mm
+}
+
+@media print {
+.bg-fondo,
+.top-toolbar,
+.tabs-row,
+.hero-actions,
+.print-backdrop,
+.tab-currency,
+.toolbar .select {
+    display: none !important
+}
+
+.print-stamp {
+    display: block;
+    font-size: 11px;
+    color: #555;
+    margin-top: 3px
+}
+
+body {
+    background: #fff
+}
+
+.app {
+    max-width: none;
+    padding: 0
+}
+
+.page-head {
+    margin-bottom: 10px
+}
+
+.page-title {
+    font-size: 24px
+}
+
+.page-sub {
+    color: #555
+}
+
+/* Layout base: en pantalla estas reglas viven dentro de @media screen, así que
+   al imprimir hay que repetirlas (si no, todo se apila en una columna). */
+.info-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 12px
+}
+
+.info-tile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 8px
+}
+
+.info-tile span {
+    display: block;
+    color: #666 !important;
+    font-size: 11px
+}
+
+.info-tile b {
+    display: block;
+    color: #111 !important;
+    font-size: 12.5px
+}
+
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px
+}
+
+.kpis .kpi {
+    display: block;
+    margin-bottom: 0;
+    padding: 12px 14px;
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 10px;
+    box-shadow: none !important
+}
+
+.kpi .label {
+    color: #333 !important
+}
+
+.kpi .hint {
+    color: #666 !important
+}
+
+.grid2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    gap: 12px
+}
+
+.grid-equal {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px
+}
+
+.grid2 .card,
+.grid-equal .card {
+    margin-bottom: 0
+}
+
+.insights {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 0 0 8px;
+    color: #555 !important;
+    font-size: 12px
+}
+
+.section-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin-bottom: 10px
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px
+}
+
+.card {
+    display: block;
+    padding: 14px 16px;
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 10px;
+    box-shadow: none !important
+}
+
+.bank-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px
+}
+
+.info-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px;
+    background: #fff !important;
+    border-color: #ddd !important
+}
+
+.info-tile {
+    background: #fff !important;
+    border-color: #ddd !important;
+    padding: 7px 10px
+}
+
+.info-tile span {
+    color: #666 !important
+}
+
+.info-tile b {
+    color: #111 !important
+}
+
+.section {
+    display: block !important;
+    page-break-before: always;
+    margin-bottom: 16px
+}
+
+#resumen {
+    page-break-before: auto
+}
+
+.section-heading,
+.card h2 {
+    page-break-after: avoid
+}
+
+.card,
+.kpi,
+.info-tile,
+.bank-card {
+    background: #fff !important;
+    color: #111 !important;
+    border-color: #ddd !important;
+    box-shadow: none !important;
+    page-break-inside: avoid
+}
+
+.insight {
+    background: #fff !important;
+    color: #111 !important;
+    box-shadow: none !important;
+    border-color: #ddd !important;
+    border-left: 3px solid #F0284A !important;
+    page-break-inside: avoid
+}
+
+.card {
+    padding: 14px 16px
+}
+
+.card h2 {
+    font-size: 15px;
+    margin-bottom: 4px;
+    color: #111 !important
+}
+
+.kpi .value {
+    font-size: 22px
+}
+
+.desc,
+.hint,
+.sub,
+.note,
+.small,
+.footer,
+.legend,
+.legend span {
+    color: #555 !important
+}
+
+.table-wrap {
+    overflow: visible !important;
+    border-color: #ddd !important;
+    border-radius: 0
+}
+
+.table-wrap table {
+    width: 100% !important;
+    font-size: 10px;
+    border-collapse: collapse
+}
+
+.table-wrap thead {
+    display: table-header-group
+}
+
+.table-wrap tr {
+    page-break-inside: avoid
+}
+
+th {
+    background: #eee !important;
+    color: #111 !important;
+    border-color: #ddd !important
+}
+
+td {
+    background: #fff !important;
+    color: #111 !important;
+    border-color: #e6e6e6 !important
+}
+
+.bank-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px
+}
+
+canvas {
+    height: 250px !important
+}
+
+.footer {
+    border-top: 1px solid #ddd
+}
+
+/* Texto legible sobre fondos claros (en pantalla estos bloques son oscuros) */
+.bank-card {
+    background: #fff !important;
+    color: #111 !important;
+    border: 1px solid #ddd !important;
+    padding: 12px 14px;
+    border-radius: 10px
+}
+
+.bank-title {
+    color: #111 !important
+}
+
+.bank-card .big {
+    color: #111 !important
+}
+
+.bank-card .small {
+    color: #555 !important
+}
+
+.mini {
+    background: #fff !important;
+    border: 1px solid #e4e7ec !important;
+    color: #111 !important
+}
+
+.mini b {
+    color: #111 !important
+}
+
+.mini b.positive,
+.mini b.negative {
+    color: #111 !important
+}
+
+.mini b.positive {
+    color: #0E8F63 !important
+}
+
+.mini b.negative {
+    color: #C0334D !important
+}
+
+.mini span {
+    color: #666 !important
+}
+
+.bank-list {
+    background: #fff !important
+}
+
+.bank-row {
+    background: #fff !important;
+    color: #111 !important;
+    border: 1px solid #ddd !important;
+    border-radius: 10px
+}
+
+.bank-row strong {
+    color: #111 !important
+}
+
+.bank-row small {
+    color: #666 !important
+}
+
+.bank-row .amount {
+    color: #111 !important
+}
+
+.progress {
+    background: #e8eaee !important
+}
+
+.insight {
+    background: #fff !important;
+    color: #111 !important;
+    border: 1px solid #ddd !important;
+    border-left: 3px solid #F0284A !important;
+    border-radius: 8px;
+    padding: 12px 14px
+}
+
+.insight .tag {
+    color: #666 !important
+}
+
+.insight b {
+    color: #111 !important
+}
+
+.insight p {
+    color: #555 !important
+}
+
+.section-chip {
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    color: #555 !important
+}
+
+.toolbar h2,
+.section-heading h2,
+.section-heading p {
+    color: #111 !important
+}
+
+.section-heading p {
+    color: #555 !important
+}
+}
 </style>
 
 
@@ -326,6 +921,7 @@ body[data-country] .kpi .hint{font-size:12.5px;line-height:1.4}
       <div class="page-kicker">Ingresos</div>
       <h1 class="page-title">Saldos Bancarios</h1>
       <p class="page-sub">Resumen de saldos, movimientos y flujo financiero por banco y cuenta.</p>
+      <div class="print-stamp" id="printStamp"></div>
     </header>
     <div class="top-toolbar">
       <div class="top-toolbar-left">
@@ -375,18 +971,12 @@ body[data-country] .kpi .hint{font-size:12.5px;line-height:1.4}
               </label>
             </div>
           </div>
+          <div class="hero-actions">
+            <button type="button" id="printBtn">
+              <img class="save-icon" src="/static/assets/img/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
+            </button>
+          </div>
       </div>
-      <div class="hero-actions">
-      <button type="button" onclick="window.print()">
-        <img class="save-icon" src="/static/assets/img/imprimir.png" alt="Imprimir"> Imprimir / Guardar PDF
-      </button>
-      <button type="button" onclick="toggleFullscreen()">
-        <img class="save-icon" src="/static/assets/img/presentacion.png" alt="Presentación"> Presentación
-      </button>
-      <button type="button" onclick="generarDashboardIngresos()">
-        Descargar dashboard de ingresos
-      </button>
-    </div>
     </div>
     <section class="info-strip" aria-label="Datos del período">
       <div class="info-tile"><img src="/static/assets/img/tiempo.png" alt=""><div><span>Rango de fechas analizado:</span><b id="rangeText">—</b></div></div>
@@ -556,6 +1146,34 @@ body[data-country] .kpi .hint{font-size:12.5px;line-height:1.4}
     <div class="footer">
       <span>Fuente: <b id="sourceFile"></b></span>
       <span>Dashboard generado a partir de información contenida en el Excel suministrado.</span>
+    </div>
+  </div>
+
+  <!-- Modal: elegir qué país (o consolidado) se imprime / guarda en PDF -->
+  <div class="print-backdrop" id="printModal" hidden>
+    <div class="print-dialog" role="dialog" aria-modal="true" aria-labelledby="printModalTitle">
+      <h3 id="printModalTitle">Imprimir / Guardar PDF</h3>
+      <p class="print-dialog-sub">¿Qué información necesita? Se generará el documento con el período
+        seleccionado.</p>
+      <div class="print-options">
+        <button type="button" class="print-option" data-print-country="GUATEMALA">
+          <span>Guatemala</span>
+          <small class="print-option-state"></small>
+        </button>
+        <button type="button" class="print-option" data-print-country="EL_SALVADOR">
+          <span>El Salvador</span>
+          <small class="print-option-state"></small>
+        </button>
+        <button type="button" class="print-option" data-print-country="CONSOLIDADO">
+          <span>Consolidado regional</span>
+          <small class="print-option-state"></small>
+        </button>
+      </div>
+      <p class="print-note">Incluye resumen ejecutivo, detalle por banco, flujo diario y detalle de
+        cuentas del país elegido.</p>
+      <div class="print-actions">
+        <button type="button" class="print-cancel" id="printModalCancel">Cancelar</button>
+      </div>
     </div>
   </div>
 

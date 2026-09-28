@@ -1150,6 +1150,10 @@
   // El tablero responde al cambio de cualquiera de las dos fechas.
   dateFrom.addEventListener('change', () => { syncDateLimits(); applyCurrentDateFilter(false) });
   dateTo.addEventListener('change', () => { syncDateLimits(); applyCurrentDateFilter(false) });
+  // El calendario se abre con un click en cualquier punto del campo, no solo en el icono.
+  [dateFrom, dateTo].forEach(inp => inp.addEventListener('click', () => {
+    try { if (typeof inp.showPicker === 'function') inp.showPicker(); } catch (e) { /* sin soporte: se abre con el icono del navegador */ }
+  }));
   document.getElementById('applyDateFilter').addEventListener('click', () => applyCurrentDateFilter(true));
   document.getElementById('resetDateFilter').addEventListener('click', () => {
     dateFrom.value = MIN_DATE;
@@ -1174,13 +1178,13 @@
   function roundedRect(ctx, x, y, w, h, r, fill) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill() }
   function text(ctx, t, x, y, opt = {}) { ctx.fillStyle = opt.color || '#D9E1EC'; ctx.font = `${opt.weight || 600} ${opt.size || 12}px Inter,Segoe UI,Arial`; ctx.textAlign = opt.align || 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y) }
   function drawGroupedBars(id, labels, s1, s2, c1, c2) {
-    const { ctx, w, h } = fitCanvas(document.getElementById(id)); ctx.clearRect(0, 0, w, h); const L = 85, R = 18, T = 25, B = 45, pw = w - L - R, ph = h - T - B; const max = Math.max(...s1, ...s2, 1) * 1.12; ctx.strokeStyle = '#3B4350'; ctx.lineWidth = 1; for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); text(ctx, moneyAllViews(max * (1 - i / 4)), L - 8, y, { size: 10, color: '#8F9AAB', align: 'right', weight: 500 }) } const group = pw / labels.length, bw = Math.min(32, group * .28); labels.forEach((lab, i) => { const cx = L + group * (i + .5), h1 = ph * s1[i] / max, h2 = ph * s2[i] / max; roundedRect(ctx, cx - bw - 3, T + ph - h1, bw, h1, 6, c1); roundedRect(ctx, cx + 3, T + ph - h2, bw, h2, 6, c2); text(ctx, lab, cx, h - B / 2 + 15, { size: 10, color: '#B8C2D1', align: 'center', weight: 700 }) });
+    const { ctx, w, h } = fitCanvas(document.getElementById(id)); ctx.clearRect(0, 0, w, h); ctx.fillStyle = '#0F1420'; ctx.fillRect(0, 0, w, h); const L = 85, R = 18, T = 25, B = 45, pw = w - L - R, ph = h - T - B; const max = Math.max(...s1, ...s2, 1) * 1.12; ctx.strokeStyle = '#3B4350'; ctx.lineWidth = 1; for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); text(ctx, moneyAllViews(max * (1 - i / 4)), L - 8, y, { size: 10, color: '#8F9AAB', align: 'right', weight: 500 }) } const group = pw / labels.length, bw = Math.min(32, group * .28); labels.forEach((lab, i) => { const cx = L + group * (i + .5), h1 = ph * s1[i] / max, h2 = ph * s2[i] / max; roundedRect(ctx, cx - bw - 3, T + ph - h1, bw, h1, 6, c1); roundedRect(ctx, cx + 3, T + ph - h2, bw, h2, 6, c2); text(ctx, lab, cx, h - B / 2 + 15, { size: 10, color: '#B8C2D1', align: 'center', weight: 700 }) });
   }
   function drawNetBars() {
-    const { ctx, w, h } = fitCanvas(document.getElementById('netBankChart')); ctx.clearRect(0, 0, w, h); const vals = DATA.banks.map(b => b.netFlow), labels = DATA.banks.map(b => b.name.replace('Banco ', '')); const L = 85, R = 20, T = 25, B = 45, pw = w - L - R, ph = h - T - B, max = Math.max(...vals.map(Math.abs), 1) * 1.15, mid = T + ph / 2; ctx.strokeStyle = '#667085'; ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(w - R, mid); ctx.stroke(); const group = pw / vals.length, bw = Math.min(48, group * .48); vals.forEach((v, i) => { const barh = (ph / 2) * Math.abs(v) / max, cx = L + group * (i + .5), y = v >= 0 ? mid - barh : mid; roundedRect(ctx, cx - bw / 2, y, bw, barh, 7, v >= 0 ? '#34D399' : '#FB7185'); text(ctx, labels[i], cx, h - 18, { size: 10, color: '#B8C2D1', align: 'center', weight: 700 }); text(ctx, moneyAllViews(v), cx, v >= 0 ? Math.max(T + 10, y - 10) : Math.min(h - B - 5, y + barh + 12), { size: 10, color: v >= 0 ? '#6EE7B7' : '#FDA4AF', align: 'center', weight: 700 }) });
+    const { ctx, w, h } = fitCanvas(document.getElementById('netBankChart')); ctx.clearRect(0, 0, w, h); ctx.fillStyle = '#0F1420'; ctx.fillRect(0, 0, w, h); const vals = DATA.banks.map(b => b.netFlow), labels = DATA.banks.map(b => b.name.replace('Banco ', '')); const L = 85, R = 20, T = 25, B = 45, pw = w - L - R, ph = h - T - B, max = Math.max(...vals.map(Math.abs), 1) * 1.15, mid = T + ph / 2; ctx.strokeStyle = '#667085'; ctx.beginPath(); ctx.moveTo(L, mid); ctx.lineTo(w - R, mid); ctx.stroke(); const group = pw / vals.length, bw = Math.min(48, group * .48); vals.forEach((v, i) => { const barh = (ph / 2) * Math.abs(v) / max, cx = L + group * (i + .5), y = v >= 0 ? mid - barh : mid; roundedRect(ctx, cx - bw / 2, y, bw, barh, 7, v >= 0 ? '#34D399' : '#FB7185'); text(ctx, labels[i], cx, h - 18, { size: 10, color: '#B8C2D1', align: 'center', weight: 700 }); text(ctx, moneyAllViews(v), cx, v >= 0 ? Math.max(T + 10, y - 10) : Math.min(h - B - 5, y + barh + 12), { size: 10, color: v >= 0 ? '#6EE7B7' : '#FDA4AF', align: 'center', weight: 700 }) });
   }
   function drawDaily() {
-    const canvas = document.getElementById('dailyChart'), { ctx, w, h } = fitCanvas(canvas); ctx.clearRect(0, 0, w, h); if (!DATA.daily.length) { text(ctx, 'Sin movimientos en el período seleccionado', w / 2, h / 2, { size: 13, color: '#94A0B2', align: 'center', weight: 650 }); return } const L = 80, R = 20, T = 24, B = 48, pw = w - L - R, ph = h - T - B, vals = [...DATA.daily.map(d => d.credits), ...DATA.daily.map(d => d.debits)], max = Math.max(...vals, 1) * 1.1; ctx.strokeStyle = '#3B4350'; for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); text(ctx, moneyAllViews(max * (1 - i / 4)), L - 8, y, { size: 10, color: '#8F9AAB', align: 'right', weight: 500 }) } const x = i => L + pw * (i / (DATA.daily.length - 1 || 1)), y = v => T + ph - (v / max * ph); function line(key, color) { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); DATA.daily.forEach((d, i) => { const xx = x(i), yy = y(d[key]); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy) }); ctx.stroke(); DATA.daily.forEach((d, i) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x(i), y(d[key]), 3, 0, Math.PI * 2); ctx.fill() }) } line('credits', '#34D399'); line('debits', '#FB7185'); DATA.daily.forEach((d, i) => { if (i % 2 === 0 || DATA.daily.length < 12) text(ctx, d.label, x(i), h - 18, { size: 9, color: '#9BA6B6', align: 'center', weight: 600 }) });
+    const canvas = document.getElementById('dailyChart'), { ctx, w, h } = fitCanvas(canvas); ctx.clearRect(0, 0, w, h); ctx.fillStyle = '#0F1420'; ctx.fillRect(0, 0, w, h); if (!DATA.daily.length) { text(ctx, 'Sin movimientos en el período seleccionado', w / 2, h / 2, { size: 13, color: '#94A0B2', align: 'center', weight: 650 }); return } const L = 80, R = 20, T = 24, B = 48, pw = w - L - R, ph = h - T - B, vals = [...DATA.daily.map(d => d.credits), ...DATA.daily.map(d => d.debits)], max = Math.max(...vals, 1) * 1.1; ctx.strokeStyle = '#3B4350'; for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); text(ctx, moneyAllViews(max * (1 - i / 4)), L - 8, y, { size: 10, color: '#8F9AAB', align: 'right', weight: 500 }) } const x = i => L + pw * (i / (DATA.daily.length - 1 || 1)), y = v => T + ph - (v / max * ph); function line(key, color) { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); DATA.daily.forEach((d, i) => { const xx = x(i), yy = y(d[key]); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy) }); ctx.stroke(); DATA.daily.forEach((d, i) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x(i), y(d[key]), 3, 0, Math.PI * 2); ctx.fill() }) } line('credits', '#34D399'); line('debits', '#FB7185'); DATA.daily.forEach((d, i) => { if (i % 2 === 0 || DATA.daily.length < 12) text(ctx, d.label, x(i), h - 18, { size: 9, color: '#9BA6B6', align: 'center', weight: 600 }) });
   }
   function drawAll() { if (document.getElementById('balancesChart').offsetParent) drawGroupedBars('balancesChart', DATA.banks.map(b => b.name.replace('Banco ', '')), DATA.banks.map(b => b.initial), DATA.banks.map(b => b.final), '#60A5FA', '#34D399'); if (document.getElementById('flowBankChart').offsetParent) drawGroupedBars('flowBankChart', DATA.banks.map(b => b.name.replace('Banco ', '')), DATA.banks.map(b => b.credits), DATA.banks.map(b => b.debits), '#34D399', '#FB7185'); if (document.getElementById('netBankChart').offsetParent) drawNetBars(); if (document.getElementById('dailyChart').offsetParent) drawDaily() }
   window.addEventListener('resize', () => setTimeout(drawAll, 80));
@@ -1291,3 +1295,107 @@
   })();
 
   window.COUNTRY_CURRENCY_VIEW = COUNTRY_CURRENCY_VIEW;
+
+  /* ===== Impresión / PDF: preguntar antes qué país (o consolidado) se necesita ===== */
+  (function () {
+    const openBtn = document.getElementById('printBtn');
+    const modal = document.getElementById('printModal');
+    if (!openBtn || !modal) return;
+
+    const options = Array.prototype.slice.call(modal.querySelectorAll('.print-option'));
+    const cancelBtn = document.getElementById('printModalCancel');
+    const stamp = document.getElementById('printStamp');
+    let sectionsGuard = null;
+
+    function bankCount(country) {
+      const regional = (window.DASHBOARD_BASE_DATA || {}).regional || {};
+      const source = country === 'CONSOLIDADO'
+        ? regional.CONSOLIDADO
+        : regional[country];
+      return ((source || {}).banks || []).length;
+    }
+
+    function currentCountry() {
+      return window.DASHBOARD_ACTIVE_COUNTRY || 'GUATEMALA';
+    }
+
+    function refreshOptions() {
+      const current = currentCountry();
+      options.forEach(opt => {
+        const country = opt.dataset.printCountry;
+        const count = bankCount(country);
+        const state = opt.querySelector('.print-option-state');
+        opt.disabled = count === 0;
+        if (state) {
+          state.textContent = count === 0
+            ? 'sin datos'
+            : count + (count === 1 ? ' banco' : ' bancos') + (country === current ? ' · en pantalla' : '');
+        }
+      });
+    }
+
+    function fillStamp() {
+      if (!stamp) return;
+      const text = sel => {
+        const el = document.querySelector(sel);
+        return el && el.textContent ? el.textContent.trim() : '—';
+      };
+      stamp.textContent = 'País: ' + text('.countryLabel') +
+        ' · Período: ' + text('#rangeText') +
+        ' · Moneda: ' + text('.currencyLabel') +
+        ' · Impreso el ' + new Date().toLocaleString('es-GT');
+    }
+
+    function closeModal() {
+      modal.hidden = true;
+    }
+
+    function printCountry(country) {
+      closeModal();
+      const current = currentCountry();
+      if (country !== current && bankCount(country) > 0 && typeof window.changeDashboardCountry === 'function') {
+        window.changeDashboardCountry(country);
+      }
+      fillStamp();
+      // Dejar que renderAll() pinte y el período se actualice antes de imprimir.
+      setTimeout(function () {
+        fillStamp();
+        try { window.print(); } catch (e) { /* el usuario puede volver a intentarlo */ }
+      }, 300);
+    }
+
+    // En impresión se ven las cuatro secciones (aunque en pantalla solo esté activa una pestaña).
+    function showAllSections() {
+      if (sectionsGuard) return;
+      sectionsGuard = [];
+      Array.prototype.forEach.call(document.querySelectorAll('.section'), sec => {
+        sectionsGuard.push([sec, sec.style.display]);
+        sec.style.display = 'block';
+      });
+      fillStamp();
+      try { drawAll(); } catch (e) { /* sin gráficos no se aborta la impresión */ }
+    }
+
+    function restoreSections() {
+      if (!sectionsGuard) return;
+      sectionsGuard.forEach(pair => { pair[0].style.display = pair[1]; });
+      sectionsGuard = null;
+      try { drawAll(); } catch (e) { /* noop */ }
+    }
+
+    openBtn.addEventListener('click', function () {
+      refreshOptions();
+      modal.hidden = false;
+    });
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) closeModal();
+    });
+    options.forEach(opt => opt.addEventListener('click', function () {
+      printCountry(opt.dataset.printCountry);
+    }));
+
+    window.addEventListener('beforeprint', showAllSections);
+    window.addEventListener('afterprint', restoreSections);
+  })();
