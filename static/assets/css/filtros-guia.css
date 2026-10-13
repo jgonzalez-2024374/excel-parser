@@ -1,0 +1,152 @@
+/* ══════════════════════════════════════════════════════════════════
+   FILTROS DE LA GUÍA (GUIA_DISEÑO_GENERAL · §03) — compartido
+   Operaciones (Todos · GT · SV) · Período · Moneda · Filtros tipo Excel
+   Se usa con assets/js/filtros-guia.js. Íconos en blanco; las banderas
+   conservan sus colores.
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --fg-surface:     #151c2e;
+  --fg-surface-2:   #0f1623;
+  --fg-surface-3:   #1a2d47;
+  --fg-line:        rgba(128,164,207,.2);
+  --fg-line-strong: rgba(128,164,207,.38);
+  --fg-text:        #f5f7fb;
+  --fg-muted:       #8da1bf;
+  --fg-soft:        #607492;
+  --fg-accent:      #ef3e4d;
+  --fg-accent-2:    #ff5b78;
+  --fg-yellow:      #f2c94c;
+  --fg-font:        'Montserrat','Segoe UI',sans-serif;
+  --fg-mono:        'Cascadia Code','Fira Mono',Consolas,monospace;
+}
+
+/* La barra que contiene el panel debe estar posicionada (relative o sticky) */
+.xf-open { z-index: 40; }
+
+/* Operaciones */
+.op-group, .period-control, .fx-control {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 46px; padding: 5px 8px 5px 12px;
+  border: 1px solid var(--fg-line-strong); border-radius: 10px; background: var(--fg-surface-2);
+}
+.op-label {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--fg-muted);
+  margin-right: 4px;
+}
+.op-btn {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 14px;
+  border: 1px solid var(--fg-line-strong); border-radius: 8px; background: var(--fg-surface-3);
+  color: var(--fg-text); font: 700 11px var(--fg-font); cursor: pointer; transition: .18s ease;
+}
+.op-btn:hover  { border-color: var(--fg-accent-2); }
+.op-btn.active { background: var(--fg-accent); border-color: var(--fg-accent); color: #fff; box-shadow: 0 6px 16px rgba(239,62,77,.28); }
+.op-flag {
+  display: inline-block; width: 20px; height: 14px; border-radius: 2px; flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25); background-size: cover;
+}
+.op-flag-gt { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Crect width='30' height='20' fill='%234997d0'/%3E%3Crect x='10' width='10' height='20' fill='%23fff'/%3E%3Ccircle cx='15' cy='10' r='3' fill='none' stroke='%233a8a3e' stroke-width='1.3'/%3E%3C/svg%3E"); }
+.op-flag-sv { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Crect width='30' height='20' fill='%230f47af'/%3E%3Crect y='6.67' width='30' height='6.66' fill='%23fff'/%3E%3Ccircle cx='15' cy='10' r='2.4' fill='none' stroke='%23c9a227' stroke-width='1.1'/%3E%3C/svg%3E"); }
+
+/* Período */
+.period-label { margin-right: 4px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+.period-icon  { display: inline-flex; color: #fff; }
+.period-icon svg { width: 18px; height: 18px; }
+.period-input {
+  height: 34px; padding: 0 10px; border: 1px solid var(--fg-line-strong); border-radius: 8px;
+  background: #0f1623; color: var(--fg-text); font: 600 12px var(--fg-font); color-scheme: dark; outline: 0; cursor: pointer;
+}
+.period-input:focus { border-color: var(--fg-accent); box-shadow: 0 0 0 3px rgba(239,62,77,.16); }
+.period-input::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .75; }
+.period-sep { color: var(--fg-soft); }
+
+/* Moneda: 1 USD = Q tasa oficial · $ [switch] Q */
+.fx-control { padding: 5px 12px; color: var(--fg-muted); font-size: 11px; }
+.fx-rate { font-family: var(--fg-mono); color: #c9d6ea; white-space: nowrap; }
+.fx-rate.is-fallback { color: var(--fg-yellow); }
+.fx-sym { font-weight: 800; color: var(--fg-muted); transition: color .18s; }
+.fx-sym.on { color: #fff; }
+.fx-switch { position: relative; display: inline-block; width: 40px; height: 22px; cursor: pointer; }
+.fx-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.fx-switch i { position: absolute; inset: 0; border: 1px solid var(--fg-line-strong); border-radius: 99px; background: #303542; transition: .2s; }
+.fx-switch i::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: .2s; }
+.fx-switch input:checked + i { background: var(--fg-accent); border-color: var(--fg-accent); }
+.fx-switch input:checked + i::after { transform: translateX(18px); }
+.fx-switch input:focus-visible + i { box-shadow: 0 0 0 3px rgba(239,62,77,.25); }
+.period-reset, .xf-reset {
+  display: inline-grid; place-items: center; padding: 0; cursor: pointer; color: #fff;
+  border: 1px solid var(--fg-line-strong); background: var(--fg-surface-3); transition: .18s ease;
+}
+.period-reset { width: 34px; height: 34px; border-radius: 8px; }
+.xf-reset     { width: 38px; height: 38px; border-radius: 50%; margin-left: auto; }
+.period-reset:hover, .xf-reset:hover { border-color: var(--fg-accent-2); }
+.period-reset svg, .xf-reset svg { width: 16px; height: 16px; }
+
+/* Filtros combinados tipo Excel */
+.xf { position: static; }
+.xf-toggle {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 8px 12px;
+  border: 1px solid var(--fg-line-strong); border-radius: 8px; background: var(--fg-surface);
+  color: var(--fg-text); font: 600 11px var(--fg-font); cursor: pointer; transition: .18s ease;
+}
+.xf-toggle:hover, .xf-toggle[aria-expanded="true"], .xf-toggle.has-filters { border-color: var(--fg-accent); background: var(--fg-surface-3); }
+.xf-toggle svg { width: 15px; height: 15px; color: #fff; }
+.xf-chevron { transition: transform .18s; }
+.xf-toggle[aria-expanded="true"] .xf-chevron { transform: rotate(180deg); }
+.xf-count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--fg-accent); color: #fff; font: 700 10px var(--fg-mono); }
+.xf-count[hidden] { display: none; }
+.xf-panel {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+  width: min(760px, 100%); padding: 12px;
+  border: 1px solid var(--fg-line-strong); border-radius: 12px; background: var(--fg-surface);
+  box-shadow: 0 18px 40px rgba(0,0,0,.5);
+}
+.xf-panel[hidden] { display: none; }
+.xf-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.xf-col { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 10px; border: 1px solid var(--fg-line); border-radius: 9px; background: var(--fg-surface-2); }
+.xf-col h5 { display: flex; justify-content: space-between; gap: 8px; margin: 0; color: #fff; font-size: 11px; letter-spacing: .4px; }
+.xf-col h5 small { color: var(--fg-muted); font: 600 10px var(--fg-mono); }
+.xf-search {
+  min-height: 32px; padding: 6px 9px; border: 1px solid var(--fg-line-strong); border-radius: 7px;
+  background: #0f1623; color: var(--fg-text); font: 11px var(--fg-font); outline: 0;
+}
+.xf-search:focus { border-color: var(--fg-accent); }
+.xf-list { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow: auto; scrollbar-color: var(--fg-accent) transparent; }
+.xf-option { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; color: var(--fg-text); font-size: 11px; cursor: pointer; }
+.xf-option:hover { background: var(--fg-surface-3); }
+.xf-option.xf-all { color: var(--fg-muted); border-bottom: 1px solid var(--fg-line); border-radius: 6px 6px 0 0; margin-bottom: 3px; }
+.xf-option input { accent-color: var(--fg-accent); width: 14px; height: 14px; margin: 0; flex-shrink: 0; }
+.xf-opt-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xf-opt-text small { display: block; color: var(--fg-soft); font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; }
+.xf-option em { margin-left: auto; padding: 1px 7px; border-radius: 99px; background: rgba(255,255,255,.08); color: var(--fg-text); font: 700 10px var(--fg-mono); font-style: normal; }
+.xf-empty { padding: 6px; color: var(--fg-soft); font-size: 10px; }
+.xf-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.xf-hint { margin-right: auto; color: var(--fg-yellow); font-size: 10px; }
+.xf-btn { min-height: 34px; padding: 7px 13px; border: 1px solid var(--fg-line-strong); border-radius: 8px; background: var(--fg-surface-3); color: var(--fg-text); font: 600 11px var(--fg-font); cursor: pointer; }
+.xf-btn:hover { border-color: var(--fg-accent-2); }
+.xf-apply { background: var(--fg-accent); border-color: var(--fg-accent); color: #fff; }
+.xf-apply:disabled { opacity: .45; cursor: not-allowed; }
+.xf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.xf-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 320px; padding: 5px 6px 5px 10px; border: 1px solid rgba(239,62,77,.45); border-radius: 99px; background: rgba(239,62,77,.1); color: var(--fg-text); font-size: 10px; }
+.xf-chip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+.xf-chip button { display: inline-grid; place-items: center; flex-shrink: 0; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.12); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; }
+.xf-chip button:hover { background: var(--fg-accent); }
+
+@media (max-width: 760px) {
+  .op-group, .period-control, .fx-control { width: 100%; flex-wrap: wrap; }
+  .op-label { width: 100%; }
+  .op-btn { flex: 1; justify-content: center; }
+  .period-input { flex: 1; min-width: 0; }
+  .xf { width: 100%; }
+  .xf-toggle { width: 100%; }
+  .xf-reset { margin-left: 0; }
+
+  /* Período con dos fechas: título arriba y fechas del mismo ancho abajo */
+  .period-control:has(.period-sep) { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; padding: 8px 10px; }
+  .period-control:has(.period-sep) .period-icon  { grid-column: 1; grid-row: 1; justify-self: start; }
+  .period-control:has(.period-sep) .period-label { grid-column: 1 / 3; grid-row: 1; padding-left: 28px; }
+  .period-control:has(.period-sep) .period-reset { grid-column: 3; grid-row: 1; justify-self: end; }
+  .period-control:has(.period-sep) .period-input { grid-row: 2; width: 100%; min-width: 0; padding: 0 8px; }
+  .period-control:has(.period-sep) .period-input:first-of-type { grid-column: 1; }
+  .period-control:has(.period-sep) .period-sep { grid-column: 2; grid-row: 2; }
+  .period-control:has(.period-sep) .period-input:last-of-type { grid-column: 3; }
+}
