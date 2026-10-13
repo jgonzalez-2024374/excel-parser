@@ -1,0 +1,1262 @@
+/* ══════════════════════════════════════════════════════════════════
+   ESTÁNDAR VISUAL DE DASHBOARDS — según Ingresos y SIMs
+   Se enlaza al FINAL de cada dashboard (después de sus estilos) y solo
+   cambia la apariencia: no toca la lógica ni el HTML generado por JS.
+   1) Tokens: se reasignan las variables propias de cada dashboard a la
+      paleta y tipografía de Ingresos.
+   2) Módulos: encabezado, pestañas, KPIs, tarjetas, tablas y barra de
+      filtros (layout de GUIA_DISEÑO_GENERAL).
+   ══════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+
+/* ── 1. TOKENS ───────────────────────────────────────────────────── */
+:root {
+  /* Paleta Ingresos */
+  --std-bg: #0a0e1a;
+  --std-card: #151c2e;
+  --std-card-hover: #1c2438;
+  --std-elevated: #1a2d47;
+  --std-surface-2: #0f1623;
+  --std-border: #263b59;
+  --std-border-light: #385171;
+  --std-text: #f5f8fc;
+  --std-text-2: #a9b9cf;
+  --std-muted: #7890ad;
+  --std-red: #ff1744;
+  --std-red-2: #ff5b78;
+  --std-font: 'Montserrat', 'Segoe UI', sans-serif;
+
+  /* Fuentes (todas las variantes usadas en los dashboards) */
+  --font: var(--std-font);
+  --font-sans: var(--std-font);
+  --font-ui: var(--std-font);
+  --font-mono: var(--std-font);
+  --mono: var(--std-font);
+
+  /* Fondos y superficies */
+  --bg: var(--std-bg);
+  --bg-dark: var(--std-bg);
+  --bg-color: var(--std-bg);
+  --bg-primary: var(--std-bg);
+  --fondo: var(--std-bg);
+  --shell: var(--std-bg);
+  --paper: var(--std-bg);
+  --paper-deep: var(--std-surface-2);
+  --bg-card: var(--std-card);
+  --card-bg: var(--std-card);
+  --card: var(--std-card);
+  --lateral: var(--std-card);
+  --panel: var(--std-card);
+  --panel-bg: var(--std-card);
+  --panel-strong: var(--std-card);
+  --card-bg-alt: var(--std-surface-2);
+  --card-2: var(--std-elevated);
+  --bg-card-2: var(--std-surface-2);
+  --bg-card-hover: var(--std-card-hover);
+  --card-hover: var(--std-card-hover);
+  --hover: var(--std-card-hover);
+  --bg-elevated: var(--std-elevated);
+  --surface: var(--std-card);
+  --surface-2: var(--std-surface-2);
+  --surface-3: var(--std-elevated);
+
+  /* Bordes */
+  --border: var(--std-border);
+  --border-color: var(--std-border);
+  --border-strong: var(--std-border-light);
+  --border-light: var(--std-border-light);
+  --line: var(--std-border);
+  --line-2: var(--std-border-light);
+  --line-strong: var(--std-border-light);
+
+  /* Texto */
+  --text: var(--std-text);
+  --text-main: var(--std-text);
+  --text-primary: var(--std-text);
+  --ink: var(--std-text);
+  --text-secondary: var(--std-text-2);
+  --ink-2: var(--std-text-2);
+  --muted: var(--std-text-2);
+  --text-muted: var(--std-muted);
+  --ink-3: var(--std-muted);
+  --muted-2: var(--std-muted);
+  --text-soft: var(--std-muted);
+
+  /* Acento rojo Intelfon */
+  --accent: var(--std-red);
+  --accent-2: var(--std-red-2);
+  --red: var(--std-red);
+  --red-primary: var(--std-red);
+  --intelfon-red: var(--std-red);
+  --brand: var(--std-red);
+  --brand-2: var(--std-red-2);
+}
+
+/* Fondo corporativo (igual que Ingresos / dashboard.css) */
+@media screen {
+  html body {
+    background:
+      linear-gradient(rgba(10, 14, 26, .82), rgba(10, 14, 26, .82)),
+      url("../img/fondo.png") center / cover no-repeat fixed,
+      radial-gradient(ellipse 1200px 600px at 90% -10%, rgba(239, 62, 77, .08), transparent 60%),
+      radial-gradient(ellipse 1000px 500px at 0% 100%, rgba(59, 130, 246, .04), transparent 60%),
+      var(--std-bg);
+    color: var(--std-text);
+  }
+}
+html body { font-family: var(--std-font); font-variant-numeric: tabular-nums; }
+/* Margen exterior igual en todos (el de dashboard.css); antes cada dashboard traía el suyo */
+@media screen {
+  html body { margin: 0 !important; padding: 28px !important; }
+}
+@media screen and (max-width: 600px) {
+  html body { padding: 14px !important; }
+}
+html body :is(button, input, select, textarea) { font-family: inherit; }
+
+/* ── 2. ENCABEZADO ───────────────────────────────────────────────── */
+html body :is(.page-eyebrow, .hero-eyebrow, .header-eyebrow, .oc-eyebrow, .bill-eyebrow, .mailing-eyebrow, .apx-eyebrow) {
+  font-family: var(--std-font);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--std-red);
+}
+html body :is(.page-title, .hero-title, .header-title, .oc-title, .apx-title, .header h1, header h1, .cab h1) {
+  font-family: var(--std-font);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -.5px;
+  color: #fff;
+}
+html body :is(.page-sub, .hero-sub, .header-sub, .oc-sub, .apx-sub, .bill-sub) { font-size: 12px; color: var(--std-text-2); }
+
+/* ── 3. PESTAÑAS (botones como Ingresos / SIMs) ──────────────────── */
+html body :is(.tab-btn, .act-mod-btn, .bill-mod-btn, .gps-view-tab, .apx-tab, .nav-item, .tabs #nav button) {
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1px solid var(--std-border-light);
+  border-radius: 10px;
+  background: var(--std-card);
+  color: var(--std-text);
+  font: 700 12.5px/1.1 var(--std-font);
+  box-shadow: none;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s, box-shadow .15s;
+}
+html body :is(.tab-btn, .act-mod-btn, .bill-mod-btn, .gps-view-tab, .apx-tab, .nav-item, .tabs #nav button):hover {
+  border-color: var(--std-red);
+  box-shadow: 0 0 0 1px rgba(255, 23, 68, .18);
+}
+html body :is(.tab-btn, .act-mod-btn, .bill-mod-btn, .gps-view-tab, .apx-tab, .nav-item, .tabs #nav button):is(.active, .is-active, [aria-current="true"], [aria-selected="true"]) {
+  background: var(--std-red);
+  border-color: var(--std-red);
+  color: #fff;
+}
+
+/* ── 4. KPIs ─────────────────────────────────────────────────────── */
+html body :is(.kpi, .kpi-card, .kpi-card-exact, .oc-kpi, .bill-kpi, .stat-box, .ase-kpi, .rrss-kpi, .pc-kpi-card, .cmp-metric, .apx-kpi) {
+  background: var(--std-card);
+  border: 1px solid var(--std-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+html body :is(.kpi-label, .oc-kpi-label, .k-label, .apx-kpi-label, .cmp-metric-label) {
+  font-family: var(--std-font);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--std-text-2);
+}
+html body :is(.kpi-value, .kpi-number, .oc-kpi-value, .k-num, .apx-kpi-number, .cmp-metric-value) {
+  font-family: var(--std-font);
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+html body :is(.kpi-sub, .kpi-meta, .kpi-footnote, .kpi-foot, .oc-kpi-meta, .k-sub, .apx-kpi-foot, .cmp-metric-detail) {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--std-muted);
+}
+
+/* ── 5. TARJETAS ─────────────────────────────────────────────────── */
+html body :is(.card, .chart-panel, .chart-card, .oc-card, .bill-card, .bill-panel, .apx-card, .pc-chart-card, .rrss-card) {
+  background: var(--std-card);
+  border: 1px solid var(--std-border);
+  border-radius: 10px;
+}
+html body :is(.card-title, .panel-title, .apx-card-title, .card-head-title, .section-title, .pcab h2) {
+  font-family: var(--std-font);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--std-text);
+}
+html body :is(.card-sub, .card-caption, .apx-card-sub, .panel-sub) { font-size: 12px; color: var(--std-text-2); }
+
+/* ── 5b. COMPONENTES DE LA PLANTILLA: idénticos en todos los dashboards ──
+   (dashboards/plantilla/dashboard-template.html, medidas de SIMs)
+   · .kpi: sin íconos ni franjas de color; etiqueta, cifra y nota con la misma letra.
+   · .card: sin franjas ni brillos; título y descripción iguales.
+   Se fuerza con !important porque cada dashboard traía su propia versión. */
+html body .kpi {
+  position: relative;
+  min-height: 96px;
+  padding: 12px 22px !important;
+  border: 1px solid var(--std-border) !important;
+  border-radius: 10px !important;
+  background: var(--std-card) !important;
+  box-shadow: none !important;
+  text-align: left !important;
+}
+html body :is(.kpi, .card)::before,
+html body :is(.kpi, .card):not(.std-busy)::after { content: none !important; display: none !important; }
+html body .kpi :is(.kpi-icon, .kpi-ico, .kpi-head svg, svg.kpi-svg) { display: none !important; }
+html body .kpi-label {
+  display: block;
+  margin: 0 !important;
+  font: 700 12px/1.35 var(--std-font) !important;
+  letter-spacing: .6px !important;
+  text-transform: uppercase !important;
+  color: var(--std-text-2) !important;
+}
+html body .kpi-value {
+  display: block;
+  margin: 10px 0 8px !important;
+  font: 800 21px/1.15 var(--std-font) !important;
+  letter-spacing: normal !important;
+  color: var(--std-text);
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+/* Inventario pintaba la cifra con texto degradado (color transparente); sin el
+   degradado las cifras sin color propio quedaban invisibles */
+html body .inventory-page .kpi-value:not([class*="text-"]) { color: var(--std-text) !important; }
+html body .kpi-value.is-ok    { color: #31e8ad !important; }
+html body .kpi-value.is-warn  { color: #f2c94c !important; }
+html body .kpi-value.is-error { color: #ff5b78 !important; }
+html body .kpi-value.is-info  { color: #5c8fff !important; }
+html body .kpi-sub {
+  display: block;
+  margin: 0 !important;
+  font: 500 10px/1.35 var(--std-font) !important;
+  color: var(--std-muted) !important;
+}
+html body .card {
+  padding: 22px 24px;
+  border: 1px solid var(--std-border) !important;
+  border-radius: 10px !important;
+  background: var(--std-card) !important;
+  box-shadow: none !important;
+}
+html body .card-title {
+  font: 700 20px/1.2 var(--std-font) !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  color: var(--std-text) !important;
+}
+html body .card-caption {
+  font: 400 12px/1.5 var(--std-font) !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  color: var(--std-text-2) !important;
+}
+
+/* ── 6. TABLAS ───────────────────────────────────────────────────── */
+html body :is(.table-wrap, .table-scroll-container, .oc-table-wrap, .bill-table-wrap, .apx-table-scroll, .rrss-table-wrap) {
+  border-color: var(--std-border);
+  border-radius: 10px;
+}
+html body :is(.table-wrap, .table-scroll-container, .oc-table-wrap, .bill-table-wrap, .apx-table-scroll, .rrss-table-wrap) :is(th, thead td),
+html body :is(.custom-table, .data-table, .oc-table, .bill-table, .rrss-table, .apx-table, .sla-case-table) th {
+  background: #1c2438;
+  color: var(--std-muted);
+  font: 800 10px var(--std-font);
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--std-border);
+}
+html body :is(.custom-table, .data-table, .oc-table, .bill-table, .rrss-table, .apx-table, .sla-case-table, .table-wrap table) td {
+  font-size: 11px;
+  color: var(--std-text);
+  border-bottom-color: var(--std-border);
+}
+
+/* ── 7. BARRA DE FILTROS — idéntica a SIMs / Órdenes de compra ─────
+   Plantilla: GUIA_DISEÑO_GENERAL + assets/css/filtros-guia.css.
+   Cada dashboard conserva sus filtros (los que aplican); aquí solo se
+   iguala el aspecto, también para los nombres de clase propios
+   (op-control-group, period-reset-btn, filters-btn, refresh-circle-btn…).
+   Se usa !important porque varios dashboards los estilan con #id. */
+:root {
+  --flt-line: rgba(128, 164, 207, .2);
+  --flt-line-strong: rgba(128, 164, 207, .38);
+  --flt-surface: #151c2e;
+  --flt-surface-2: #0f1623;
+  --flt-surface-3: #1a2d47;
+  --flt-text: #f5f7fb;
+  --flt-muted: #8da1bf;
+  --flt-soft: #607492;
+  --flt-accent: #ef3e4d;
+  --flt-accent-2: #ff5b78;
+  --flt-reset-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 3-6.7L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E");
+}
+
+/* Recuadro que rodea los filtros */
+html body :is(.sims-fbar, .inventory-filters-v2, .oc-filters-v2, .apx-filters, #filters.filter-demo, .filters-box-card, #fx-main, .mf-filtros > .fx-bar, .gps-filter-toolbar) {
+  padding: 15px !important;
+  border: 1px solid var(--flt-line) !important;
+  border-radius: 9px !important;
+  background: var(--flt-surface-2) !important;
+  box-shadow: none !important;
+}
+html body :is(.filters-bar, .apx-filter-row, .fx-bar, .gps-filter-toolbar) { gap: 9px !important; align-items: center !important; }
+/* Textos que no están en la plantilla: "Filtros del ejemplo" (copiado de la guía) y el título "Filtros" de GPS */
+html body .filters-box-eyebrow,
+html body .filters-header { display: none !important; }
+
+/* Operaciones · Período · Moneda: grupos en recuadro */
+html body :is(.op-group, .op-control-group, .period-control, .fx-control) {
+  display: inline-flex;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 46px !important;
+  padding: 5px 8px 5px 12px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 10px !important;
+  background: var(--flt-surface-2) !important;
+  box-shadow: none !important;
+}
+html body .op-btn-group { display: inline-flex !important; align-items: center; gap: 8px !important; padding: 0 !important; border: 0 !important; background: none !important; }
+html body .op-label {
+  margin-right: 4px !important;
+  color: var(--flt-muted) !important;
+  font: 800 10px var(--std-font) !important;
+  letter-spacing: 1.2px !important;
+  text-transform: uppercase !important;
+}
+html body .op-btn {
+  display: inline-flex;
+  align-items: center !important;
+  gap: 7px !important;
+  min-height: 34px !important;
+  padding: 6px 14px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-3) !important;
+  color: var(--flt-text) !important;
+  font: 700 11px var(--std-font) !important;
+  box-shadow: none !important;
+}
+html body .op-btn:hover { border-color: var(--flt-accent-2) !important; }
+html body .op-btn.active { background: var(--flt-accent) !important; border-color: var(--flt-accent) !important; color: #fff !important; box-shadow: 0 6px 16px rgba(239, 62, 77, .28) !important; }
+html body :is(.op-flag, .flag-icon) { width: 20px !important; height: 14px !important; border-radius: 2px; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(255, 255, 255, .25); }
+
+html body .period-label { margin-right: 4px !important; color: #fff !important; font: 700 12px var(--std-font) !important; text-transform: none !important; letter-spacing: 0 !important; }
+html body .period-icon { color: #fff !important; }
+html body .period-input {
+  height: 34px !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-2) !important;
+  color: var(--flt-text) !important;
+  font: 600 12px var(--std-font) !important;
+  color-scheme: dark;
+}
+html body .period-input:focus { border-color: var(--flt-accent) !important; box-shadow: 0 0 0 3px rgba(239, 62, 77, .16) !important; }
+html body :is(.period-sep, .period-dash) { color: var(--flt-soft) !important; }
+html body :is(.period-reset, .period-reset-btn) {
+  display: inline-grid;
+  place-items: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-3) !important;
+  color: #fff !important;
+}
+
+html body .fx-control { padding: 5px 12px !important; color: var(--flt-muted) !important; font-size: 11px !important; }
+html body :is(.fx-rate, .fx-rate-text) { color: #c9d6ea !important; font: 600 11px 'Cascadia Code', 'Fira Mono', Consolas, monospace !important; white-space: nowrap; }
+html body :is(.fx-sym, .fx-currency-lbl) { color: var(--flt-muted) !important; font-weight: 800 !important; }
+html body :is(.fx-sym.on, .fx-currency-lbl.active) { color: #fff !important; }
+
+/* Botón Filtros */
+html body :is(.xf-toggle, .filters-btn) {
+  display: inline-flex;
+  align-items: center !important;
+  gap: 7px !important;
+  min-height: 38px !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface) !important;
+  color: var(--flt-text) !important;
+  font: 600 11px var(--std-font) !important;
+  box-shadow: none !important;
+}
+html body :is(.xf-toggle, .filters-btn):is(:hover, [aria-expanded="true"], .has-filters) { border-color: var(--flt-accent) !important; background: var(--flt-surface-3) !important; }
+html body :is(.xf-count, .filters-badge) { background: var(--flt-accent) !important; color: #fff !important; border-radius: 99px !important; font: 700 10px var(--std-font) !important; }
+
+/* Restablecer: botón redondo con ícono, como en la plantilla */
+html body :is(.xf-reset, .refresh-circle-btn, .filter-btn.reset, .apx-reset, .mf-filtros .reset-btn) {
+  display: inline-grid;
+  place-items: center !important;
+  flex: 0 0 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-height: 0 !important;
+  margin-left: auto !important;
+  padding: 0 !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 50% !important;
+  background: var(--flt-surface-3) var(--flt-reset-icon) center / 16px no-repeat !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+html body :is(.xf-reset, .refresh-circle-btn, .filter-btn.reset, .apx-reset, .mf-filtros .reset-btn) > * { display: none !important; }
+html body :is(.xf-reset, .refresh-circle-btn, .filter-btn.reset, .apx-reset, .mf-filtros .reset-btn, .period-reset, .period-reset-btn, .op-btn):hover { border-color: var(--flt-accent-2) !important; }
+
+/* Panel tipo Excel y chips */
+html body .xf-panel {
+  padding: 12px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 12px !important;
+  background: var(--flt-surface) !important;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .5) !important;
+}
+html body .xf-col { padding: 10px !important; border: 1px solid var(--flt-line) !important; border-radius: 9px !important; background: var(--flt-surface-2) !important; }
+html body :is(.xf-col h5, .xf-col-title) { color: #fff !important; font: 700 11px var(--std-font) !important; letter-spacing: .4px !important; }
+html body .xf-search { min-height: 32px !important; border: 1px solid var(--flt-line-strong) !important; border-radius: 7px !important; background: var(--flt-surface-2) !important; color: var(--flt-text) !important; font: 11px var(--std-font) !important; }
+html body :is(.xf-footer .ghost-btn, .xf-btn, .xf-btn-clean, .xf-clear) {
+  min-height: 34px !important;
+  padding: 7px 13px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-3) !important;
+  color: var(--flt-text) !important;
+  font: 600 11px var(--std-font) !important;
+}
+html body :is(.xf-apply, .xf-btn-apply) { background: var(--flt-accent) !important; border-color: var(--flt-accent) !important; color: #fff !important; }
+html body .xf-chip { border: 1px solid rgba(239, 62, 77, .45) !important; border-radius: 99px !important; background: rgba(239, 62, 77, .1) !important; color: var(--flt-text) !important; font-size: 10px !important; }
+
+/* Medidas exactas (algunos dashboards traen relleno o alto propio) */
+html body :is(.op-label, .toolbar-label) { padding: 0 !important; border: 0 !important; width: auto !important; min-width: 0 !important; }
+html body :is(.op-btn, .country-btn, .period-input, .xf-toggle, .filters-btn, .filters-toggle, .period-reset, .period-reset-btn, .xf-reset) { box-sizing: border-box !important; }
+html body :is(.op-btn, .country-btn) { height: 34px !important; }
+html body :is(.op-btn, .country-btn, .xf-toggle, .filters-btn, .filters-toggle, .period-input, .period-label, .date-filter-title, .fx-control, .country-currency-control) { letter-spacing: normal !important; word-spacing: normal !important; }
+html body :is(.xf-toggle, .filters-btn, .filters-toggle) { height: 38px !important; }
+
+/* Período idéntico en todos (medidas de Órdenes de compra): ícono 18px, fechas 139×34,
+   "dd/mm/aaaa" en blanco y botón de restablecer de 34px con el mismo ícono.
+   Incluye los campos de fecha propios de RRHH y Mailing (period-field). */
+html body :is(.period-label, .date-filter-title) { display: inline-flex !important; align-items: center !important; gap: 8px !important; }
+html body :is(.period-icon, .period-label, .date-filter-title) svg,
+html body .period-icon { width: 18px !important; height: 18px !important; flex-shrink: 0; }
+html body :is(.period-control, #periodFilter) input[type="date"],
+html body :is(.period-field, .apx-period-field) { width: 139px !important; min-width: 0 !important; flex: 0 0 139px !important; }
+html body :is(.period-field, .apx-period-field) { position: relative; padding: 0 !important; border: 0 !important; background: none !important; }
+html body :is(.period-field, .apx-period-field) input.period-input { width: 100% !important; padding-right: 30px !important; }
+html body :is(.period-field, .apx-period-field) :is(.period-cal, .apx-period-cal) { width: 16px !important; height: 16px !important; opacity: .75; }
+html body :is(.period-label, .date-filter-title) { margin-right: 4px !important; }
+@media (min-width: 761px) {
+  html body :is(.period-control, #periodFilter.date-filter.date-filter) { width: 461px !important; justify-content: flex-start !important; box-sizing: border-box !important; }
+}
+/* Separador "—" con el mismo ancho en todos */
+html body :is(.period-sep, .period-dash, #periodFilter .date-sep) { flex: 0 0 14px !important; width: 14px !important; margin: 0 !important; padding: 0 !important; text-align: center !important; font: 400 12px var(--std-font) !important; }
+html body #periodFilter label { display: contents !important; }
+html body .period-input::placeholder { color: var(--flt-text) !important; opacity: 1 !important; }
+html body .period-input::-webkit-datetime-edit { color: var(--flt-text); }
+html body :is(.period-reset, .period-reset-btn, #periodFilter .date-reset) {
+  background: var(--flt-surface-3) var(--flt-reset-icon) center / 15px no-repeat !important;
+  color: transparent !important;
+  font-size: 0 !important;
+}
+html body :is(.period-reset, .period-reset-btn, #periodFilter .date-reset) > * { display: none !important; }
+
+/* Ícono y chevron del botón Filtros: los mismos de SIMs / OC en todos.
+   Se ocultan los íconos propios (embudo, ⌄…) y se dibujan con ::before / ::after. */
+:root {
+  --flt-filter-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6h16M7 12h10M10 18h4'/%3E%3C/svg%3E");
+  --flt-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+html body :is(.xf-toggle, .filters-btn, .filters-toggle) > :is(svg, [data-icon], .filters-icon, .chevron-icon, span[aria-hidden="true"]):not(.xf-count):not(.filters-badge) { display: none !important; }
+html body :is(.xf-toggle, .filters-btn, .filters-toggle)::before,
+html body :is(.xf-toggle, .filters-btn, .filters-toggle)::after {
+  content: '';
+  flex-shrink: 0;
+  background: center / contain no-repeat;
+}
+html body :is(.xf-toggle, .filters-btn, .filters-toggle)::before { order: -1; width: 15px; height: 15px; background-image: var(--flt-filter-icon); }
+html body :is(.xf-toggle, .filters-btn, .filters-toggle)::after  { order: 99; width: 14px; height: 14px; background-image: var(--flt-chevron); transition: transform .18s; }
+html body :is(.xf-toggle, .filters-btn, .filters-toggle)[aria-expanded="true"]::after { transform: rotate(180deg); }
+
+/* Buscadores dentro de la barra */
+html body :is(.inventory-search, .oc-search, .apx-search) input,
+html body input:is(.inventory-search, .apx-search, .inf-search) {
+  min-height: 38px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-2) !important;
+  color: var(--flt-text) !important;
+  font: 500 12px var(--std-font) !important;
+  box-shadow: none !important;
+}
+html body :is(.inventory-search, .oc-search, .apx-search) input:focus { border-color: var(--flt-accent) !important; outline: 0; }
+
+/* RRHH marca Todas, GT y SV como activos a la vez: se resalta solo "Todas", como en los demás (solo visual) */
+html body .apx-filters .op-group:not(:has(.op-btn:not(.active))) .op-btn.active:not(:first-of-type) {
+  background: var(--flt-surface-3) !important;
+  border-color: var(--flt-line-strong) !important;
+  box-shadow: none !important;
+}
+
+/* ── 9. COMO SIMS: encabezado, adornos, botones, viñetas e íconos ──── */
+/* Encabezado: mismas medidas que SIMs (algunos dashboards las fijan con selectores más específicos) */
+html body :is(.page-eyebrow, .hero-eyebrow, .header-eyebrow, .oc-eyebrow, .bill-header .bill-eyebrow, .mailing-eyebrow, .apx-eyebrow, .cover-kicker) {
+  font: 800 12px var(--std-font) !important;
+  letter-spacing: 2px !important;
+  text-transform: uppercase !important;
+  color: var(--std-red) !important;
+}
+html body :is(.page-header .page-title, .hero-title, .header-title, .oc-title, .apx-title, .bill-header h1, header h1, .cab h1, .cover-title) {
+  font: 800 24px/1.15 var(--std-font) !important;
+  letter-spacing: -.5px !important;
+  color: #fff !important;
+}
+html body :is(.page-header .page-sub, .hero-sub, .header-subtitle, .oc-sub, .apx-subtitle, .bill-header h1 + p, .cover-copy) {
+  font: 400 12px/1.5 var(--std-font) !important;
+  color: var(--std-text-2) !important;
+}
+
+/* Sin líneas ni barras decorativas de color (SIMs no las tiene) */
+html body .inventory-page::before,
+html body .inventory-page .page-header::after,
+html body .oc-module::before,
+html body .oc-header::after,
+html body :is(.inventory-page .card, .inventory-page .kpi, .oc-card, .oc-kpi)::before,
+html body :is(.inventory-page .kpi, .oc-kpi)::after { display: none !important; }
+
+/* Botones de acción (Actualizar datos, Informe detallado, Importar/Cargar, Imprimir): .mso-action de SIMs */
+html body :is(
+  .hero-actions > button, .inventory-toolbar-actions .btn, .oc-report-open,
+  .actions-left > .btn:not(.btn-excel):not(.btn-pdf):not(.gps-download-dashboard-btn),
+  .empty-state .btn, .load-btn, .btn-p, .page-header .btn, .rrss-btn, .pc-import-btn, .cmp-upload-btn, .process-row .btn-primary
+) {
+  display: inline-flex;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  border: 1px solid var(--std-border-light) !important;
+  border-radius: 10px !important;
+  background: var(--std-card) !important;
+  color: var(--std-text) !important;
+  font: 700 12.5px var(--std-font) !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Descargar Excel: botón rojo de SIMs (.filter-chip.active.inf-download) */
+html body :is(
+  .export-excel, .btn-excel, .informe-export, .oc-export, .pc-export-btn, .ls-export-btn,
+  .inventory-report-actions .btn, .gps-report-actions .btn, .inf-export .btn.green,
+  .apx-table-tools .apx-export:first-of-type, .inf-acciones .inf-btn:first-of-type
+) {
+  display: inline-flex;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  min-height: 38px !important;
+  padding: 8px 14px !important;
+  border: 1px solid var(--std-red) !important;
+  border-radius: 8px !important;
+  background: var(--std-red) !important;
+  color: #fff !important;
+  font: 600 11px var(--std-font) !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+/* CSV / PDF / descargar dashboard: botón secundario de SIMs (.filter-chip.mso-ghost) */
+html body :is(
+  .export-pdf, .btn-pdf, .gps-download-dashboard-btn, .inf-export .btn:not(.green),
+  .apx-table-tools .apx-export:not(:first-of-type), .inf-acciones .inf-btn:not(:first-of-type)
+) {
+  display: inline-flex;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  min-height: 38px !important;
+  padding: 8px 14px !important;
+  border: 1px solid var(--std-border-light) !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--std-text-2) !important;
+  font: 600 11px var(--std-font) !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+html body :is(
+  .export-excel, .btn-excel, .informe-export, .oc-export, .pc-export-btn, .ls-export-btn,
+  .inventory-report-actions .btn, .gps-report-actions .btn, .inf-export .btn, .apx-table-tools .apx-export, .inf-acciones .inf-btn,
+  .export-pdf, .btn-pdf, .gps-download-dashboard-btn, .hero-actions > button, .actions-left > .btn, .inventory-toolbar-actions .btn,
+  .oc-report-open, .load-btn, .btn-p, .rrss-btn, .pc-import-btn, .cmp-upload-btn
+):hover { border-color: var(--std-red) !important; color: #fff !important; }
+/* Íconos de los botones: los de SIMs (⬇ descargar, ↻ actualizar), sin imágenes ni SVG propios */
+html body :is(
+  .export-excel, .btn-excel, .informe-export, .oc-export, .pc-export-btn, .ls-export-btn,
+  .inventory-report-actions .btn, .gps-report-actions .btn, .inf-export .btn, .apx-table-tools .apx-export, .inf-acciones .inf-btn,
+  .export-pdf, .btn-pdf, .gps-download-dashboard-btn, .hero-actions > button, .actions-left > .btn, .inventory-toolbar-actions .btn,
+  .oc-report-open, .load-btn, .btn-p, .rrss-btn, .pc-import-btn, .cmp-upload-btn
+) :is(svg, img, i, .save-icon) { display: none !important; }
+html body :is(
+  .export-excel, .btn-excel, .informe-export, .oc-export, .pc-export-btn, .ls-export-btn,
+  .inventory-report-actions .btn, .gps-report-actions .btn, .inf-export .btn, .apx-table-tools .apx-export, .inf-acciones .inf-btn,
+  .export-pdf, .btn-pdf, .gps-download-dashboard-btn, .hero-actions > button
+)::before { content: '⬇'; position: static !important; inset: auto !important; width: auto !important; height: auto !important; background: none !important; opacity: 1 !important; transform: none !important; }
+html body .actions-left > .btn:first-child::before { content: '↻'; position: static !important; width: auto !important; height: auto !important; background: none !important; opacity: 1 !important; }
+html body :is(.inventory-toolbar-actions .btn, .oc-report-open, .load-btn, .btn-p, .rrss-btn, .pc-import-btn, .cmp-upload-btn)::before { display: none !important; }
+
+/* Viñetas de leyenda: cuadradas de 9px como SIMs (.chart-legend i) */
+html body :is(.legend i, .legend-swatch, .legend-dot, .legend-item .dot, .chart-legend i) {
+  width: 9px !important;
+  height: 9px !important;
+  min-width: 9px !important;
+  border-radius: 2px !important;
+}
+
+/* Íconos de módulos, tarjetas y KPIs en blanco (regla de la guía) */
+html body :is(.kpi-icon, .card-icon, .rrss-kpi-ico, .apx-kpi-dot) { color: #fff; }
+
+/* Pestañas de módulos: siempre iguales, solo el nombre (sin íconos ni contadores).
+   Respaldo por si algún módulo vuelve a traerlos en su HTML o JS. */
+html body :is(.tab-btn, .act-mod-btn, .bill-mod-btn, .gps-view-tab, .apx-tab, .nav-item, .tabs #nav button, .tabs .tab)
+  :is(svg, img, i, [class*="icon"], [class*="badge"], [class*="count"]) { display: none !important; }
+
+/* Gráficas sin brillo: ni halos (box-shadow 0 0 …) ni drop-shadow en barras, líneas,
+   donas o medidores. La guía muestra un brillo en las barras verticales: no se usa. */
+html body :is(canvas, .line-chart svg, .line-chart svg *, .vertical-bar .bar-column span, .bar-fill,
+  .ase-rank-fill, .fn-gauge-fg, #donutSvg, #donutSvg *) {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* ── 10. CONSULTA A LA API — igual que SIMs (lo maneja assets/js/estandar.js) ──
+   · .std-sync: estado bajo el título ("Consultando la API…" / "Actualizado HH:MM")
+   · .std-busy: sección que se está actualizando (borde, barrido, línea de progreso)
+   · html.std-cargando: primera carga → spinner de SIMs en lugar de los cargadores propios */
+html body .std-sync {
+  margin: 8px 0 0;
+  font: 400 12px/1.5 var(--std-font);
+  color: var(--std-text-2);
+}
+html body .std-sync.std-sync-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 7px 14px 7px 12px;
+  border: 1px solid rgba(239, 62, 77, .45);
+  border-radius: 999px;
+  background: rgba(239, 62, 77, .12);
+  color: var(--std-text);
+  font-weight: 600;
+  box-shadow: 0 0 0 4px rgba(239, 62, 77, .07);
+  animation: std-sync-glow 1.6s ease-in-out infinite;
+}
+html body .std-sync.std-sync-busy::before {
+  content: '';
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 91, 120, .35);
+  border-top-color: var(--std-red-2);
+  border-radius: 50%;
+  animation: std-spin .8s linear infinite;
+}
+html body .std-sync.std-sync-error { color: var(--std-red-2); font-weight: 600; }
+/* No se estira dentro de encabezados en columna y respeta la sangría del título (Ingresos) */
+html body .std-sync { align-self: flex-start; width: auto; max-width: max-content; }
+html body .title-container .std-sync { margin-left: 2rem; }
+
+/* ── 11. ANIMACIONES DE SIMS (las activa assets/js/estandar.js) ────── */
+html.std-anim body .std-rv {
+  transition: opacity .55s ease, transform .55s cubic-bezier(.2, .75, .25, 1), box-shadow .3s ease !important;
+}
+html.std-anim body .std-rv.std-out { opacity: 0 !important; transform: translateY(18px) !important; }
+html.std-anim body .std-rv.std-in  { opacity: 1 !important; transform: none !important; }
+/* Al pasar el cursor la tarjeta se eleva, como en SIMs */
+html.std-anim body .std-rv.std-in:is(.kpi, .kpi-card, .kpi-card-exact, .oc-kpi, .bill-kpi, .stat-box, .apx-kpi, .card, .chart-panel, .chart-card, .oc-card, .bill-card, .bill-panel, .apx-card, .pc-chart-card, .rrss-card):hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(196, 60, 80, .42) !important;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, .2) !important;
+}
+/* Filas de tabla en cascada (sims-row-in) */
+@keyframes std-row-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+html.std-anim body table tbody tr { animation: std-row-in .35s ease both !important; }
+html.std-anim body table tbody tr:nth-child(2) { animation-delay: .03s !important; }
+html.std-anim body table tbody tr:nth-child(3) { animation-delay: .06s !important; }
+html.std-anim body table tbody tr:nth-child(4) { animation-delay: .09s !important; }
+html.std-anim body table tbody tr:nth-child(5) { animation-delay: .12s !important; }
+html.std-anim body table tbody tr:nth-child(6) { animation-delay: .15s !important; }
+html.std-anim body table tbody tr:nth-child(n+7) { animation-delay: .18s !important; }
+@media (prefers-reduced-motion: reduce) {
+  html.std-anim body .std-rv.std-out { opacity: 1 !important; transform: none !important; }
+  html.std-anim body table tbody tr { animation: none !important; }
+}
+@keyframes std-sync-glow { 50% { border-color: rgba(255, 91, 120, .75); box-shadow: 0 0 0 5px rgba(239, 62, 77, .12); } }
+@keyframes std-spin { to { transform: rotate(360deg); } }
+
+/* Sección que se está actualizando (.mso-busy de SIMs) */
+html body .std-busy { position: relative; border-color: rgba(239, 62, 77, .35) !important; }
+html body .std-busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 28%, rgba(255, 91, 120, .09) 45%, rgba(92, 143, 255, .07) 55%, transparent 72%);
+  background-size: 260% 100%;
+  animation: std-busy-sweep 1.25s linear infinite;
+}
+@keyframes std-busy-sweep { to { background-position: -160% 0; } }
+
+/* Primera carga: un solo spinner de SIMs (.sims-loader) centrado; el contenido
+   aparece todo junto, con el revelado de SIMs, cuando terminan de llegar los datos.
+   Los cargadores propios de cada dashboard no se muestran. */
+html body .std-loader { display: none; }
+html.std-cargando body .std-loader {
+  display: block;
+  position: fixed;
+  left: 50%;
+  top: 58%;
+  z-index: 60;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border: 3px solid rgba(128, 164, 207, .38);
+  border-top-color: var(--std-red);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: std-spin .8s linear infinite;
+}
+html.std-cargando.std-anim body .std-rv { opacity: 0 !important; transform: translateY(18px) !important; }
+html body [data-std-gate] { transition: opacity .55s ease; }
+html.std-cargando body [data-std-gate] { opacity: 0 !important; pointer-events: none !important; }
+/* Mientras se lee el HTML no se pinta nada: el contenido nunca aparece antes que el spinner */
+html.std-precarga body { opacity: 0 !important; }
+html body :is(#loading.bill-loading, #loader.loader),
+html.std-cargando body #emptyState { display: none !important; }
+/* Filas de esqueleto de los informes: SIMs no las usa */
+html body :is(.inventory-report-loading, .oc-report-loading) { display: none !important; }
+
+/* Barras de desplazamiento iguales en todos: oscuras y delgadas, como las de SIMs
+   (Inventario mostraba la barra blanca por defecto del navegador) */
+html { color-scheme: dark; }
+html, html body, html body * { scrollbar-width: thin; scrollbar-color: #385171 transparent; }
+
+/* Un solo scroll: "overflow-x: hidden" convierte el eje vertical en scroll propio
+   (segunda barra en Inventario mínimo). "clip" recorta igual sin crear scroll. */
+html body :is(.inventory-page, .oc-module) { overflow-x: clip !important; overflow-y: visible !important; }
+/* La barra de filtros se desplaza con la página, como en SIMs (nunca fija arriba).
+   relative (no static) para que el panel Filtros siga anclado a la barra. */
+html body :is(.inventory-filters-top, .inventory-filters-v2, .oc-filters, .oc-filters-v2, .apx-filters, #filters.filter-demo, .filters-bar-wrapper, .filters-box-card, #fx-main, .mf-filtros, .gps-filter-card, .gps-filter-toolbar, .top-toolbar, .sims-fbar) {
+  position: relative !important;
+  top: auto !important;
+}
+
+/* Contenedores con solo desplazamiento horizontal (tablas anchas): sin scroll vertical propio */
+html body [style*="overflow-x:auto"]:not([style*="overflow-y"]) { overflow-y: hidden !important; }
+/* Tablas largas: mismo tope que SIMs (.mso-table-tall) */
+html body .oc-table-wrap { height: auto !important; max-height: 520px !important; }
+
+/* Banderas de Operaciones: las mismas de SIMs, ocupando todo su espacio.
+   Ingresos usaba PNG con margen transparente (la bandera quedaba dentro de un recuadro). */
+html body .country-btn img { display: none !important; }
+html body .country-btn[data-country="GUATEMALA"]::before,
+html body .country-btn[data-country="EL_SALVADOR"]::before {
+  content: '';
+  flex-shrink: 0;
+  width: 20px;
+  height: 14px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .25);
+  background: center / cover no-repeat;
+}
+html body .country-btn[data-country="GUATEMALA"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Crect width='30' height='20' fill='%234997d0'/%3E%3Crect x='10' width='10' height='20' fill='%23fff'/%3E%3Ccircle cx='15' cy='10' r='3' fill='none' stroke='%233a8a3e' stroke-width='1.3'/%3E%3C/svg%3E"); }
+html body .country-btn[data-country="EL_SALVADOR"]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Crect width='30' height='20' fill='%230f47af'/%3E%3Crect y='6.67' width='30' height='6.66' fill='%23fff'/%3E%3Ccircle cx='15' cy='10' r='2.4' fill='none' stroke='%23c9a227' stroke-width='1.1'/%3E%3C/svg%3E"); }
+/* Banderas SVG en línea (30×20) que no llenaban su caja de 20×14: se ajustan sin dejar margen */
+html body .op-flag { overflow: hidden !important; }
+html body .op-flag svg { width: 21px !important; height: 14px !important; max-width: none !important; margin-left: -.5px; }  /* 30×20 → alto completo, se recorta medio píxel por lado */
+html body .op-flag svg, html body svg.flag-icon { display: block; }
+
+/* Mailing: tarjetas sin franjas de color (arcoíris arriba / borde izquierdo de color)
+   y títulos de sección sin la barrita roja, como las tarjetas de los demás */
+html body :is(.hero-kpi, .health-card, .counter, .cmp-camp-card) {
+  border: 1px solid var(--std-border) !important;
+  border-radius: 10px !important;
+  background: var(--std-card) !important;
+  box-shadow: none !important;
+}
+html body :is(.hero-kpi, .cmp-camp-card)::before { display: none !important; }
+html body :is(.section-group-label, .section-label) {
+  padding-left: 0 !important;
+  border-left: 0 !important;
+  color: var(--std-text-2) !important;
+  font: 800 10px var(--std-font) !important;
+  letter-spacing: 1.2px !important;
+  text-transform: uppercase !important;
+}
+
+/* Sin línea divisoria bajo el encabezado (SIMs no la tiene) */
+html body :is(.hero-top, body > header, .header-wrap > header, .enc, .apx-header, .container > header, .main > header, .mailing-header, header.top) { border-bottom: 0 !important; box-shadow: none !important; }
+html body header:has(h1) { border-bottom: 0 !important; }
+
+/* SIMs usa este mismo estándar: sus indicadores propios equivalentes no se muestran */
+html body :is(#pageSync, #globalLoader, .sims-loader) { display: none !important; }
+html body .mso-busy::before,
+html body .mso-busy::after { display: none !important; }
+html body .mso-busy :is(.kpi-value, .op-card-total, tbody, .vertical-bars, .line-chart) { opacity: 1 !important; }
+
+/* Otras formas de mostrar el estado de la API: se reemplazan por .std-sync */
+html body :is(
+  #inventoryUpdated, .oc-status:not(.oc-status-note), .bill-status-pill, #updatedLabel.apx-updated,
+  #loadStatus.apx-loadstatus, .loaded:has(#badgeCount), #lastUpdatedLabel, #statusMsg,
+  #updatedBox, .pill:has(#sello), #estado.aviso, #rrss-status
+) { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  html body .std-busy::after { animation: none; background: rgba(255, 91, 120, .05); }
+  html body .std-sync.std-sync-busy, html body .std-sync.std-sync-busy::before { animation: none; }
+}
+
+/* ── 8. INGRESOS — su barra (country-btn, currency-toggle, date-filter,
+   filters-toggle) con la plantilla y el orden de la guía:
+   Operaciones · Moneda · Período · Filtros ─────────────────────────── */
+/* Acciones (Imprimir) arriba a la derecha y la barra a todo el ancho, como en Inventario mínimo */
+html body .top-toolbar { flex-wrap: wrap !important; }
+html body .top-toolbar > .hero-actions { order: -1; width: 100%; justify-content: flex-end; }
+html body .top-toolbar-left {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px !important;
+  padding: 15px !important;
+  border: 1px solid var(--flt-line) !important;
+  border-radius: 9px !important;
+  background: var(--flt-surface-2) !important;
+}
+html body .top-toolbar-left .currency-filters { display: contents !important; }
+html body .top-toolbar-left > .country-switcher { order: 1; }
+html body .top-toolbar-left .currency-switcher { order: 2; }
+html body .top-toolbar-left > .date-filter { order: 3; }
+html body .top-toolbar-left .filters-control,
+html body .top-toolbar-left > #ingresosXf { order: 4; }
+html body .top-toolbar-left > #ingresosXfChips { order: 5; }
+html body .top-toolbar-left > #ingresosResetFilters { order: 6; }
+html body .top-toolbar-left { position: relative; }
+html body :is(.country-switcher, .country-currency-control, #periodFilter.date-filter) {
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 46px !important;
+  width: auto !important;
+  padding: 5px 8px 5px 12px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 10px !important;
+  background: var(--flt-surface-2) !important;
+  box-shadow: none !important;
+}
+html body .country-switcher .toolbar-label {
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  line-height: 1.2 !important;
+  margin-right: 4px !important;
+  color: var(--flt-muted) !important;
+  font: 800 10px var(--std-font) !important;
+  letter-spacing: 1.2px !important;
+  text-transform: uppercase !important;
+}
+html body .country-buttons { gap: 8px !important; }
+html body .country-btn {
+  gap: 7px !important;
+  min-height: 34px !important;
+  padding: 6px 14px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-3) !important;
+  color: var(--flt-text) !important;
+  font: 700 11px var(--std-font) !important;
+  box-shadow: none !important;
+}
+html body .country-btn:hover { border-color: var(--flt-accent-2) !important; }
+html body .country-btn.active { background: var(--flt-accent) !important; border-color: var(--flt-accent) !important; color: #fff !important; box-shadow: 0 6px 16px rgba(239, 62, 77, .28) !important; }
+html body .country-btn img { width: 20px !important; height: 14px !important; border-radius: 2px; object-fit: cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, .25); }
+html body .country-currency-control { padding: 5px 12px !important; }
+html body .country-currency-control .exchange-info { color: #c9d6ea !important; font: 600 11px 'Cascadia Code', 'Fira Mono', Consolas, monospace !important; }
+html body .currency-toggle { gap: 8px !important; }
+html body .currency-toggle-labels, html body .currency-toggle-labels span { color: var(--flt-muted) !important; font: 800 11px var(--std-font) !important; }
+html body .currency-toggle-labels .selected { color: #fff !important; }
+html body .currency-toggle-track { width: 40px !important; height: 22px !important; border: 1px solid var(--flt-line-strong) !important; background: #303542 !important; }
+html body .currency-toggle-track::after { top: 3px !important; left: 3px !important; width: 14px !important; height: 14px !important; }
+html body .currency-toggle input:checked + .currency-toggle-track { background: var(--flt-accent) !important; border-color: var(--flt-accent) !important; }
+html body .currency-toggle input:checked + .currency-toggle-track::after { transform: translateX(18px) !important; }
+html body #periodFilter .date-filter-title { gap: 8px !important; color: #fff !important; font: 700 12px var(--std-font) !important; }
+html body #periodFilter .date-filter-title svg { width: 18px; height: 18px; color: #fff; }
+html body #periodFilter input[type="date"] {
+  width: 139px !important;
+  height: 34px !important;
+  min-width: 0 !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-2) !important;
+  color: var(--flt-text) !important;
+  font: 600 12px var(--std-font) !important;
+}
+html body #periodFilter .date-sep { color: var(--flt-soft) !important; }
+html body #periodFilter .date-reset {
+  width: 34px !important;
+  height: 34px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-3) var(--flt-reset-icon) center / 15px no-repeat !important;
+  color: transparent !important;
+  font-size: 0 !important;
+}
+html body .filters-toggle {
+  gap: 7px !important;
+  min-height: 38px !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface) !important;
+  color: var(--flt-text) !important;
+  font: 600 11px var(--std-font) !important;
+}
+html body .filters-toggle:is(:hover, [aria-expanded="true"]) { border-color: var(--flt-accent) !important; background: var(--flt-surface-3) !important; }
+html body .filters-menu {
+  padding: 12px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 12px !important;
+  background: var(--flt-surface) !important;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .5) !important;
+}
+
+/* ── 12. VIÑETAS (bullets) — todas como las de SIMs ─────────────────
+   Un solo marcador en todos los dashboards: cuadro de 9 px con esquinas
+   de 2 px, del color de la serie o del estado, sin anillo ni brillo.
+   (Antes: puntos redondos de 6–10 px, con halo o con anillo, según el
+   dashboard.) No incluye las barras de color de Ingresos (.bank-row .dot)
+   ni los puntos que forman parte de una gráfica (líneas, lollipop). */
+html body :is(
+  .dot:not(.bank-row .dot), .std-dot, .legend-swatch.dot, .status-dot, .mf-dot, .oc-key,
+  .cat-dot, .category-dot, .kpi-chip-dot, .res-detail-dot, .resolution-dot, .sla-section-dot, .flow-dot,
+  .rrss-fuente-punto, .apx-dot, .apx-country-dot, .ase-rank-legend i
+) {
+  display: inline-block;
+  flex: 0 0 9px !important;
+  width: 9px !important;
+  height: 9px !important;
+  min-width: 9px !important;
+  border: 0 !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  vertical-align: middle;
+}
+html body .inventory-page .inventory-status::before {
+  flex: 0 0 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+/* Leyenda de gráfica (SIMs .chart-legend): viñeta de color + texto gris */
+html body .chart-legend.std-legend,
+html body .std-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0;
+  color: var(--std-muted);
+  font: 500 10.5px var(--std-font);
+}
+html body .std-legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--std-text-2); }
+html body .std-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+html body .std-legend b { font-weight: 700; color: var(--std-text); }
+
+/* Viñetas de estado con conteo (bullets de la guía): fila neutra, la viñeta
+   lleva el color; texto y cifra en los colores de texto, nunca en el de la serie */
+html body .std-bullets { display: grid; gap: 8px; }
+html body .std-bullets.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html body .std-bullet {
+  display: grid;
+  grid-template-columns: 9px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--std-border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .025);
+  color: var(--std-text-2);
+  font: 600 11px var(--std-font);
+  transition: background .15s, border-color .15s;
+}
+html body .std-bullet b { font: 700 13px var(--std-font); color: var(--std-text); }
+html body .std-bullet.is-clickable { cursor: pointer; }
+html body .std-bullet.is-clickable:hover { background: rgba(255, 255, 255, .05); border-color: var(--std-border-light); }
+
+/* Leyendas que eran "pastillas" de color (SAC, Inventario): mismo formato que arriba */
+html body #mod-flujo .flow-legend li {
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  color: var(--std-text-2) !important;
+  font: 500 10.5px var(--std-font) !important;
+}
+html body #mod-flujo .flow-legend { gap: 8px 14px !important; }
+html body #mod-flujo .flow-legend .flow-dot { background: var(--c) !important; }
+html body .cat-sla-legend li {
+  border: 1px solid var(--std-border) !important;
+  border-radius: 7px !important;
+  background: rgba(255, 255, 255, .025) !important;
+  color: var(--std-text-2) !important;
+}
+html body .cat-sla-legend li .cat-dot { background: var(--chip) !important; }
+html body .inventory-page .ranking-item .inventory-status { color: var(--std-text-2) !important; font: 600 12px var(--std-font) !important; }
+html body .inventory-page .ranking-item .inventory-status.critical::before { background: #ff6575; }
+html body .inventory-page .ranking-item .inventory-status.available::before { background: #31e8ad; }
+
+/* ── 13. SIN BRILLOS — los halos y sombras de color que quedaban ──────
+   Solo el botón activo de los filtros conserva su sombra (está en la guía).
+   Al pasar el cursor, las tarjetas se elevan con la sombra oscura de SIMs. */
+html body :is(.phase-card, .phase-card-exact):hover { box-shadow: 0 14px 32px rgba(0, 0, 0, .2) !important; }
+html body :is(
+  .stage-box.is-selected, .close-btn:hover, .action-btn:hover, .btn-clean:hover, .action-btn:active, .btn-clean:active,
+  #btnResetTableFilters:hover, .export-excel:hover, .export-pdf:hover, .xf-btn-apply, .xf-apply,
+  .inventory-page .btn-primary:hover, .inventory-page .inventory-page-button:hover,
+  .oc-btn:hover, .oc-export:hover, .oc-badge, .oc-switch-track,
+  .analytics-mode-toggle button.active, .cmp-upload-btn:hover, .fn-upload-btn:hover, .cargo-btn-primary:hover,
+  .stat-box .kpi-icon, .section-title::before, .action-bar .status-dot, .btn:hover
+) { box-shadow: none !important; }
+html body :is(.pill-btn.is-active, .pill-btn.active, .inventory-page .inventory-presets button.is-active) {
+  box-shadow: 0 6px 16px rgba(239, 62, 77, .28) !important;
+}
+html body :is(.inventory-page .page-title, .header-title) { text-shadow: none !important; }
+
+/* ── 14. SAC — mismo lenguaje que los demás dashboards ───────────────
+   SAC traía su propio sistema (íconos en cada tarjeta, KPIs con ícono y
+   minigráfica, franjas y degradados de color, leyendas en pastillas).
+   Aquí se lleva a la guía sin tocar su HTML generado ni su lógica. */
+
+/* Mismo margen exterior que los demás (antes sumaba el de .main) */
+html body .main:has(> .topbar) { max-width: none !important; padding: 0 0 40px !important; }
+
+/* KPIs: etiqueta, cifra y nota en una columna. Antes la cuadrícula
+   "ícono | texto" dejaba el texto en la columna de 40 px del ícono oculto
+   (una palabra por línea). */
+html body .kpis .kpi { display: block !important; min-height: 96px !important; animation: none !important; }
+html body .kpi .kpi-copy { display: block; min-width: 0; }
+html body .kpi-spark { display: none !important; }
+html body .kpi .k-label {
+  display: block;
+  margin: 0 !important;
+  font: 700 12px/1.35 var(--std-font) !important;
+  letter-spacing: .6px !important;
+  text-transform: uppercase !important;
+  color: var(--std-text-2) !important;
+}
+html body .kpi .k-num { display: block; margin: 10px 0 8px !important; font: 800 21px/1.15 var(--std-font) !important; }
+html body .kpi .k-sub { display: block; margin: 0 !important; font: 500 10px/1.35 var(--std-font) !important; color: var(--std-muted) !important; }
+
+/* Sin íconos decorativos: solo quedan los funcionales (filtros, buscar, flechas de navegación) */
+html body :is(.kpi-icon, .card-icon, .res-quad-icon, .cat-tile-icon, .flow-summary-icon, .finalized-detail-icon) { display: none !important; }
+html body :is(.kpi-hint, .flow-note, .category-click-help, .res-quad-cta, .res-stage-cta, .weekly-range-btn,
+  .cat-empty, .inf-empty, .kpi-detail-empty) > svg { display: none !important; }
+
+/* Textos de ayuda: nota simple, sin pastilla punteada */
+html body :is(.kpi-hint, .flow-note, .category-click-help) {
+  display: block !important;
+  margin: 10px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  color: var(--std-muted) !important;
+  font: 500 11px var(--std-font) !important;
+  text-align: left !important;
+}
+
+/* Títulos de tarjeta iguales a .card-title / .card-caption */
+html body .card-head-title { gap: 0 !important; }
+html body :is(.card-head h3, .inf-head h3) {
+  margin: 0 0 4px !important;
+  font: 700 20px/1.2 var(--std-font) !important;
+  color: var(--std-text) !important;
+}
+html body :is(.card-head, .inf-head) .sub { font: 400 12px/1.5 var(--std-font) !important; color: var(--std-text-2) !important; }
+
+/* Tarjetas internas: sin degradados ni franjas de color */
+html body :is(.res-quad, .flow-summary-card, .cat-tile, .cat-rank-card, .chart-card) {
+  background: var(--std-card) !important;
+  box-shadow: none !important;
+}
+html body :is(.res-quad, .flow-summary-card) { background: var(--std-surface-2) !important; border: 1px solid var(--std-border) !important; border-radius: 10px !important; }
+html body :is(.res-quad, .cat-tile, .cat-rank-card)::before,
+html body :is(.cat-tile, .cat-rank-card)::after { display: none !important; }
+html body .res-quad.is-active { border-color: var(--std-red) !important; }
+html body .res-quad:hover { transform: translateY(-2px); border-color: rgba(196, 60, 80, .42) !important; }
+
+/* Leyendas en pastilla → leyenda de SIMs (viñeta de color + texto gris) */
+html body .cat-legend li {
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  color: var(--std-text-2) !important;
+  font: 500 10.5px var(--std-font) !important;
+}
+html body .cat-legend { gap: 8px 14px !important; }
+
+/* Rango semanal: mismas medidas que el Período de la barra de filtros */
+html body .weekly-date-field > span { color: var(--flt-muted) !important; font: 800 10px var(--std-font) !important; letter-spacing: 1.2px !important; text-transform: uppercase !important; }
+html body .weekly-date-field input[type="date"] {
+  height: 34px !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-2) !important;
+  color: var(--flt-text) !important;
+  font: 600 12px var(--std-font) !important;
+  color-scheme: dark;
+}
+html body .weekly-range-btn {
+  min-height: 34px !important;
+  padding: 6px 14px !important;
+  border: 1px solid var(--flt-line-strong) !important;
+  border-radius: 8px !important;
+  background: var(--flt-surface-3) !important;
+  color: var(--flt-text) !important;
+  font: 700 11px var(--std-font) !important;
+  box-shadow: none !important;
+}
+html body .weekly-range-btn.primary { background: var(--flt-accent) !important; border-color: var(--flt-accent) !important; color: #fff !important; }
+html body .weekly-range { background: transparent !important; box-shadow: none !important; }
+
+/* ── 15. SIN ÍCONOS DECORATIVOS — como SIMs y la guía ───────────────
+   Los íconos solo se usan donde tienen función (filtros, período, buscar,
+   flechas de navegación, descargar). Se quitan los de KPIs, títulos,
+   tarjetas de menú, estados vacíos, notas y pestañas. */
+/* GPS */
+html body :is(.stat-box .kpi-icon, .menu-card .menu-icon, .additional-tool-card .menu-icon) { display: none !important; }
+html body .stat-box {
+  min-height: 96px !important;
+  padding: 12px 22px !important;
+  border: 1px solid var(--std-border) !important;
+  border-radius: 10px !important;
+  background: var(--std-card) !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+html body .stat-box::after, html body .section-title::before { display: none !important; }
+html body .stat-box h3 {
+  margin: 0 !important;
+  font: 700 12px/1.35 var(--std-font) !important;
+  letter-spacing: .6px !important;
+  text-transform: uppercase !important;
+  color: var(--std-text-2) !important;
+}
+html body .stat-box p { margin: 10px 0 8px !important; font: 800 21px/1.15 var(--std-font) !important; }
+html body .section-title { padding-left: 0 !important; }
+/* Mailing */
+html body :is(.drop-zone .icon, .cmp-empty-icon, .fn-empty-icon, .fn-level-icon, .cmp-crown, .banner-icon,
+  .cmp-camp-winner-badge > svg, .fn-tl-fecha svg, .cmp-view-switch svg, .fn-view-toggle svg) { display: none !important; }
+/* Flujo de ventas */
+html body :is(.emb-ico, .ase-days .ico, .cico, .rrss-head-ico) { display: none !important; }
+/* Esos íconos ocupaban la primera columna de una cuadrícula: al ocultarlos se quita
+   también su columna, si no el resto de la fila se corre a la columna del ícono
+   (nombre del canal / de la etapa aplastado y barras de 26 px). */
+html body .cb { grid-template-columns: minmax(0, 1fr) !important; }
+html body :is(.emb-cab, .emb-fila, .caida) { grid-template-columns: 22px 150px minmax(110px, 1fr) 92px 86px !important; }
+html body .emb-cab > span:nth-child(2) { display: none !important; }
+html body .caida-in { grid-column: 3 / -1 !important; }
+@media (max-width: 860px) {
+  html body :is(.emb-cab, .emb-fila, .caida) { grid-template-columns: 22px minmax(0, 1fr) 78px !important; }
+  html body .caida-in { grid-column: 2 / -1 !important; }
+  html body .emb-fila .emb-conv { grid-column: -2 / -1 !important; }
+}
+html body :is(.nota-cuenta, .alerta-dato, .emb-guia) > svg { display: none !important; }
+
+/* GPS: mismo fondo corporativo y mismo encabezado (sin franja opaca) que los demás */
+@media screen {
+  html body.gps-dashboard {
+    background:
+      linear-gradient(rgba(10, 14, 26, .82), rgba(10, 14, 26, .82)),
+      url("../img/fondo.png") center / cover no-repeat fixed,
+      var(--std-bg) !important;
+  }
+}
+html body.gps-dashboard > header {
+  margin: 0 0 22px !important;
+  padding: 0 !important;
+  background: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── 16. ORDEN COMO LOS DEMÁS: encabezado · filtros · pestañas · contenido ──
+   En Inventario mínimo y Órdenes de compra la barra de filtros está dentro de la
+   vista "Vista general" (el Informe detallado tiene sus propios filtros), por eso
+   quedaba debajo de las pestañas. Se reordena solo visualmente: la vista general
+   se "abre" (display: contents) y la barra sube sobre las pestañas; en el Informe
+   la vista general está oculta y la barra no aparece. Durante la primera carga
+   se deja como bloque para que siga oculta junto con el resto. */
+html body :is(.inventory-page, .oc-module) { display: flex; flex-direction: column; }
+html:not(.std-cargando) body :is(#inventoryOverviewView, #ocOverviewView):not([hidden]) { display: contents; }
+html body .inventory-page > .page-header,
+html body .oc-module > .page-header { order: -4; }
+html body .inventory-page > .inventory-toolbar { order: -3; }
+html body :is(.inventory-filters-v2, .oc-filters-v2) { order: -2; margin-bottom: 18px !important; }
+html body :is(#inventoryTabs, #ocTabs) { order: -1; }
+/* "Limpiar filtros" del Informe de Inventario: botón secundario, sin el ícono de descarga */
+html body #inventoryReportReset { border-color: var(--std-border-light) !important; background: transparent !important; color: var(--std-text-2) !important; }
+html body #inventoryReportReset::before { content: none !important; display: none !important; }
+
+/* ── 17. AÑADIDOS DE LAS RAMAS (PDF de informes) — con el mismo estándar ──
+   · El CSV de respaldo de Marketing, RRHH y SAC empieza oculto con [hidden]; los
+     estilos de botón de arriba (display: inline-flex) le ganaban al [hidden] del
+     navegador y lo dejaban visible.
+   · El aviso de "no se pudo generar" va igual en todos: el .error-box de la plantilla.
+   · GPS: su capa propia de fondo.png se apaga para que el fondo sea el mismo que en
+     los demás dashboards (el fondo corporativo ya lo pone la sección 15). */
+html body :is(button, .inf-aviso, .apx-export-aviso)[hidden] { display: none !important; }
+html body :is(.inf-aviso, .apx-export-aviso) {
+  margin: 0 0 10px !important;
+  padding: 10px 14px !important;
+  border: 1px solid rgba(197, 61, 78, .25) !important;
+  border-radius: 8px !important;
+  background: rgba(197, 61, 78, .1) !important;
+  color: #e56070 !important;
+  font: 500 12px/1.45 var(--std-font) !important;
+}
+html body .apx-export-aviso { margin: 10px 16px 0 !important; }
+html body.gps-dashboard.dark::before { content: none !important; display: none !important; }
