@@ -8584,6 +8584,32 @@ def renderizar_dashboard_autonomo(datos_override=None):
 
     html = patron_img.sub(reemplazar_img, html)
 
+    # 3b) Imágenes referenciadas dentro del JS/CSS ya embebido (BANK_LOGOS,
+    # url() de fondos, etc.): /static/... -> data:image/...;base64,...
+    # Sin esto, la descarga abierta con file:/// resuelve /static/... contra
+    # el disco (C:/static/...) y los logos de bancos no cargan.
+    patron_img_literal = re.compile(
+        r'(["\'])(/static/assets/img/[^"\'()]+?\.(?:png|jpe?g|gif|svg|webp))\1',
+        re.IGNORECASE
+    )
+
+    def reemplazar_img_literal(match):
+        quote, url = match.groups()
+        path = _dashboard_asset_path(url)
+
+        if not path or not os.path.isfile(path):
+            return match.group(0)
+
+        try:
+            mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
+            with open(path, "rb") as fh:
+                encoded = base64.b64encode(fh.read()).decode("ascii")
+            return quote + "data:" + mime + ";base64," + encoded + quote
+        except Exception:
+            return match.group(0)
+
+    html = patron_img_literal.sub(reemplazar_img_literal, html)
+
     return html
 
 
