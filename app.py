@@ -1175,7 +1175,7 @@ def obtener_column_letter_seguro(column):
 # PARSER UNIVERSAL / NORMALIZACIÓN
 # ============================================================
 
-PARSER_VERSION = "universal-3.7-identificacion-cheques"
+PARSER_VERSION = "universal-3.8-cheques-abreviaturas-simbolos"
 
 # Este parser NO depende de un banco concreto. Las listas siguientes son
 # vocabulario contable para reconocer columnas, no formatos rígidos por banco.
@@ -1198,6 +1198,10 @@ HEADER_ALIASES = {
         "descripcion", "description", "detalle", "concepto", "glosa", "memo",
         "movimiento", "detalle movimiento", "descripcion movimiento",
         "descripcion de transaccion", "transaction description", "narrative",
+        # Banco Agrícola titula la columna del concepto solo "Transaccion".
+        # Sin este alias la palabra se coloca como "fecha" (por "fecha
+        # transaccion") y el texto del movimiento se pierde por completo.
+        "transaccion", "transacciones",
     ],
     "debito": [
         "debito", "debit", "debe", "cargo", "cargos", "retiro", "retiros",
@@ -3698,21 +3702,165 @@ def detectar_saldo_inicial(rows, header_index):
 # IDENTIFICACIÓN DE MOVIMIENTOS CON CHEQUE
 # ============================================================
 
+# Abreviaturas que usan los estados de cuenta para el mismo concepto:
+# cheque, cheques, CHQ, CHEQ, CHKS, CHECK, CK (con o sin "s" y a veces
+# pegados al número: "CHQ12345", "CK12345").
+CHEQUE_TOKENS = r"cheques?|chqs?|cheqs?|chks?|checks?|cks?"
+
+# Etiquetas y símbolos que acompañan al número: No., Nro., N°, Nº, N.º, #, №.
+CHEQUE_NUM_LABEL = r"n\.?[°ºo]\.?|nro\.?|num(?:ero)?\.?|#|№"
+
+# Separadores tolerados entre la palabra cheque y su número.
+CHEQUE_NUM_SEP = r"[\s:#\-/.·]*"
+
+# Captura un número de cheque (3 a 24 caracteres con al menos un dígito).
+CHEQUE_NUM_VALUE = r"((?=[A-Za-z0-9\-/]*\d)[A-Za-z0-9\-/]{3,24})\b"
+
+# Palabras que indican que el número siguiente es una cuenta, no un cheque.
+CHEQUE_CUENTA_RE = re.compile(r"\b(?:cta|cuenta|cuentano|account)\b", re.IGNORECASE)
+
 CHEQUE_INDICATOR_RE = re.compile(
-    r"(?:"
-    r"\b(?:cheque(?:s)?|cheq(?:ues)?|chq(?:s)?|check(?:s)?)\b"
-    r"|\b(?:chq|cheq|ck)(?=[#:\- ]*\d)"
-    r")",
+    rf"\b(?:{CHEQUE_TOKENS})(?:\b|{CHEQUE_NUM_SEP}\d)",
     re.IGNORECASE,
 )
 
 CHEQUE_RETURN_RE = re.compile(
     r"(?:"
     r"devuelt|devoluc|rechaz|sin\s+fondos|fondos\s+insuficient|"
-    r"protestad|returned|unpaid|\bnsf\b|revers(?:o|ion)|reversi[oó]n"
+    r"protestad|returned|unpaid|\bnsf\b|revers\w*|"
+    r"\bdev\b|\brech\b|\brch\b|\bprot\b"
     r")",
     re.IGNORECASE,
 )
+
+
+def normalizar_numero_cheque(valor):
+    """Normaliza el número de cheque para que todas las fuentes cuadren.
+
+    El mismo cheque llega escrito de formas distintas según la columna:
+      - celda numérica:        826486.0 / "826486.0" -> "826486"
+      - con ceros de relleno:  "000011666"           -> "11666"
+      - con símbolos:          "N° 1234" / "#1234"   -> "1234"
+      - con abreviaturas:      "CHQ No. 1234"        -> "1234"
+
+    Devuelve "" cuando el valor no contiene un número utilizable (fechas,
+    palabras sueltas, etc.).
+    """
+    if valor is None or isinstance(valor, bool):
+        return ""
+
+    if isinstance(valor, (int, float)):
+        try:
+            numero = float(valor)
+            texto = str(int(numero)) if numero.is_integer() else str(valor).strip()
+        except (TypeError, ValueError):
+            texto = str(valor).strip()
+    else:
+        texto = str(valor).replace("\xa0", " ").strip()
+
+    if not texto:
+        return ""
+
+    texto = texto.strip("\"'`´")
+
+    # "826486.0" / "826486,00": sobrantes de celdas numéricas.
+    texto = re.sub(r"^(?P<entero>\d+)[.,]0+$", r"\g<entero>", texto)
+
+    # Etiqueta inicial: "CHQ No.", "Cheque:", "N°", "#".
+    texto = re.sub(
+        rf"^(?:{CHEQUE_TOKENS}){CHEQUE_NUM_SEP}",
+        "",
+        texto,
+        flags=re.IGNORECASE,
+    )
+    texto = re.sub(
+        rf"^(?:{CHEQUE_NUM_LABEL}){CHEQUE_NUM_SEP}",
+        "",
+        texto,
+        flags=re.IGNORECASE,
+    )
+
+    texto = texto.strip(" \t\"'`´:.,-–—/#·°º")
+
+    if not re.search(r"\d", texto):
+        return ""
+
+    # Fechas: nunca son número de cheque.
+    if re.fullmatch(r"\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?", texto):
+        return ""
+
+    # Debe quedar un identificador limpio (letras/dígitos, guiones, barras).
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9\-/]*", texto):
+        fragmentos = [f for f in re.split(r"\s+", texto) if re.search(r"\d", f)]
+        if not fragmentos:
+            return ""
+        texto = fragmentos[-1].strip(" \t\"'`´:.,-–—/#·°º")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9\-/]*", texto):
+            return ""
+
+    # Los ceros de relleno hacen que el número no cuadre con la referencia.
+    if re.fullmatch(r"\d+", texto):
+        texto = texto.lstrip("0") or "0"
+
+    return texto
+
+
+def _extraer_numero_cheque(texto):
+    """Busca el número de cheque asociado a la palabra cheque en un texto.
+
+    Cubre las formas reales de los bancos:
+      "CHEQUE No. 000011666", "CHQ#12345", "CK 12345", "CHQ N° 4321/AB",
+      "Cheque devuelto No. 9911", "N° CHEQUE 3344".
+    """
+    if not texto:
+        return ""
+
+    patrones = (
+        # "CHEQUE No. 1234" / "CHQ N° 1234" / "CK 1234" / "CHQ1234"
+        rf"\b(?:{CHEQUE_TOKENS})\s*{CHEQUE_NUM_SEP}"
+        rf"(?:{CHEQUE_NUM_LABEL}{CHEQUE_NUM_SEP})?{CHEQUE_NUM_VALUE}",
+        # "No. de CHEQUE 1234" / "N° CHEQUE 1234"
+        rf"\b(?:{CHEQUE_NUM_LABEL}){CHEQUE_NUM_SEP}(?:de\s+)?(?:{CHEQUE_TOKENS})"
+        rf"{CHEQUE_NUM_SEP}{CHEQUE_NUM_VALUE}",
+    )
+
+    for patron in patrones:
+        match = re.search(patron, texto, re.IGNORECASE)
+        if match:
+            numero = normalizar_numero_cheque(match.group(1))
+            if numero:
+                return numero
+
+    # Ventana corta después de la palabra cheque: tolera palabras en medio
+    # ("Cheque devuelto No. 9911") y símbolos pegados ("CHQ N° 4321/AB").
+    for match in re.finditer(rf"\b(?:{CHEQUE_TOKENS})\b", texto, re.IGNORECASE):
+        ventana = texto[match.end():match.end() + 60]
+
+        for etiqueta in re.finditer(
+            rf"(?:{CHEQUE_NUM_LABEL}){CHEQUE_NUM_SEP}{CHEQUE_NUM_VALUE}",
+            ventana,
+            re.IGNORECASE,
+        ):
+            contexto = ventana[max(0, etiqueta.start() - 20):etiqueta.start()]
+            # "CTA No. 123456" es una cuenta, no el número del cheque.
+            if CHEQUE_CUENTA_RE.search(contexto):
+                continue
+            numero = normalizar_numero_cheque(etiqueta.group(1))
+            if numero:
+                return numero
+
+        # Número inmediatamente después, sin palabras de por medio.
+        inmediato = re.match(
+            rf"{CHEQUE_NUM_SEP}{CHEQUE_NUM_VALUE}",
+            ventana,
+            re.IGNORECASE,
+        )
+        if inmediato:
+            numero = normalizar_numero_cheque(inmediato.group(1))
+            if numero:
+                return numero
+
+    return ""
 
 
 def detectar_movimiento_cheque(
@@ -3733,6 +3881,9 @@ def detectar_movimiento_cheque(
     DEVUELTO tiene prioridad sobre el signo porque una devolución puede aparecer
     como débito o crédito dependiendo de si se revierte un cheque depositado o
     un cheque emitido.
+
+    El número de cheque se normaliza (ver normalizar_numero_cheque) para que
+    la descripción, la referencia y el reporte muestren el mismo valor.
     """
 
     partes = [
@@ -3777,31 +3928,30 @@ def detectar_movimiento_cheque(
 
     numero_cheque = ""
 
-    # Primero buscar un número ligado explícitamente a CHEQUE / CHQ / CHECK.
-    patrones_numero = [
-        r"\b(?:cheque|cheq|chq|check)\s*(?:no\.?|nro\.?|num\.?|numero|#)?\s*[:#\-]?\s*((?=[A-Z0-9\-]*\d)[A-Z0-9\-]{3,24})\b",
-        r"\b(?:no\.?|nro\.?|num\.?|numero)\s*(?:de\s+)?(?:cheque|cheq|chq|check)\s*[:#\-]?\s*((?=[A-Z0-9\-]*\d)[A-Z0-9\-]{3,24})\b",
-    ]
-
-    for patron in patrones_numero:
-        match = re.search(patron, texto_original, re.IGNORECASE)
-        if match:
-            candidato = str(match.group(1) or "").strip(" -:#")
-            if candidato:
-                numero_cheque = candidato
-                break
+    # Número ligado a la palabra cheque. Se prueba primero la descripción
+    # (es donde el banco lo escribe) y luego código y referencia.
+    for parte in (descripcion, codigo, referencia):
+        parte_texto = str(parte or "").strip()
+        if not parte_texto:
+            continue
+        numero_cheque = (
+            _extraer_numero_cheque(parte_texto)
+            or _extraer_numero_cheque(clean_text(parte_texto))
+        )
+        if numero_cheque:
+            break
 
     # Si no aparece junto a la palabra cheque, usar la referencia solo cuando
-    # parezca realmente un identificador (contiene dígitos y no es una frase).
+    # parezca realmente un identificador (un solo valor con dígitos, sin frases).
     if not numero_cheque:
-        ref = str(referencia or "").strip()
+        ref = str(referencia or "").replace("\xa0", " ").strip()
         if (
             ref
-            and len(ref) <= 30
+            and len(ref) <= 40
+            and not re.search(r"\s", ref)
             and re.search(r"\d", ref)
-            and re.fullmatch(r"[A-Za-z0-9._/\-]+", ref)
         ):
-            numero_cheque = ref
+            numero_cheque = normalizar_numero_cheque(ref)
 
     return {
         "es_cheque": True,

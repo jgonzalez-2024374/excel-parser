@@ -1096,9 +1096,13 @@
         `${model.cheques.length} movimiento(s) con cheque en el período`, 26);
       const chequeBody = model.cheques.map(transaction => {
         const bank = (transaction.bank || transaction.bankName || transaction.bankCanonical || '—');
-        // Algunos cheques vienen del Excel como "826476.0": se normaliza a entero
-        const check = String(transaction.checkNumber || transaction.chequeNumber || transaction.reference || '—')
-          .replace(/\.0+$/, '') || '—';
+        // Los cheques vienen con abreviaturas, símbolos o decimales de relleno
+        // ("CHQ No. 000011666", "826476.0"): se normaliza para que cuadre con
+        // la tabla del dashboard.
+        const raw = transaction.checkNumber || transaction.chequeNumber || transaction.reference || '';
+        const check = (typeof normalizeCheckNumber === 'function'
+          ? normalizeCheckNumber(raw)
+          : String(raw).replace(/\.0+$/, '')) || '—';
         let type = '—';
         try { type = chequeType(transaction).type; } catch (e) { type = Number(transaction.debit || 0) > 0 ? 'EGRESO' : 'INGRESO'; }
         return [
