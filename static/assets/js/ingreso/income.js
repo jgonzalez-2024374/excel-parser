@@ -1758,9 +1758,44 @@ function chequeText(transaction) {
     .toUpperCase();
 }
 
+// Los cheques llegan del Excel escritos de muchas formas: con abreviaturas
+// ("CHQ", "CK"), con símbolos ("N°", "No.", "#") o con ceros y decimales de
+// relleno ("000011666", "826486.0"). Se normaliza para que la tabla, el PDF
+// y el backend muestren el mismo número.
+function normalizeCheckNumber(value) {
+  if (value === undefined || value === null || value === '') return '';
+  let text = typeof value === 'number' ? String(value) : String(value).trim();
+  if (!text) return '';
+
+  // Celda numérica leída como texto: "826486.0" / "826486,00".
+  text = text.replace(/^(\d+)[.,]0+$/, '$1');
+  // Etiquetas iniciales: "CHQ No.", "Cheque:", "N°", "#".
+  text = text.replace(/^(?:cheques?|chqs?|cheqs?|chks?|checks?|cks?)[\s:.\-/#·]*/i, '');
+  text = text.replace(/^(?:n\.?[°ºo]\.?|nro\.?|num(?:ero)?\.?|#|№)[\s:.\-/#·]*/i, '');
+  text = text.replace(/^[\s:.\-–—/#·,;°º"'`]+|[\s:.\-–—/#·,;°º"'`]+$/g, '');
+  if (!/\d/.test(text)) return '';
+
+  // Fechas: nunca son número de cheque.
+  if (/^\d{1,2}[/.-]\d{1,2}([/.-]\d{2,4})?$/.test(text)) return '';
+
+  if (!/^[A-Za-z0-9][A-Za-z0-9\-/]*$/.test(text)) {
+    const fragmentos = text.split(/\s+/).filter(part => /\d/.test(part));
+    if (!fragmentos.length) return '';
+    text = fragmentos[fragmentos.length - 1]
+      .replace(/^[\s:.\-–—/#·,;°º"'`]+|[\s:.\-–—/#·,;°º"'`]+$/g, '');
+    if (!/^[A-Za-z0-9][A-Za-z0-9\-/]*$/.test(text)) return '';
+  }
+
+  // Los ceros de relleno hacen que el número no cuadre con la referencia.
+  if (/^\d+$/.test(text)) text = text.replace(/^0+(?=\d)/, '');
+  return text;
+}
+
 function chequeType(transaction) {
   const text = chequeText(transaction);
-  const returnedMatch = text.match(/DEVUELT\w*|RECHAZAD\w*|REVERSAD\w*|REBOTAD\w*|PROTESTAD\w*|SIN\s+FONDOS?|FONDOS?\s+INSUFICIENTES?/);
+  const returnedMatch = text.match(
+    /DEVUELT\w*|DEVOLUC\w*|RECHAZ\w*|REVERS\w*|REBOTAD\w*|PROTESTAD\w*|SIN\s+FONDOS?|FONDOS?\s+INSUFICIENTES?|\bDEV\b|\bRECH\b|\bRCH\b|\bPROT\b/
+  );
 
   if (returnedMatch) {
     return { type: 'DEVUELTO', reason: returnedMatch[0] };
@@ -1777,7 +1812,8 @@ function chequeType(transaction) {
 function isChequeTransaction(transaction) {
   return transaction.isCheck === true || Boolean(transactionValue(transaction, [
     'checkNumber', 'chequeNumber', 'numeroCheque', 'numero_cheque', 'noCheque', 'no_cheque', 'numCheque', 'num_cheque', 'check', 'cheque', 'checkType'
-  ])) || /\bCHEQUES?\b/i.test(String(transaction.description || ''));
+  ])) || /\b(?:CHEQUES?|CHQS?|CHEQS?|CHKS?|CHECKS?|CKS?)\b|\b(?:CHQ|CHEQ|CHK|CK)[\s:#\-/]*\d/i
+    .test(`${transaction.description || ''} ${transaction.reference || ''}`);
 }
 
 function renderChequeTable() {
@@ -1805,7 +1841,7 @@ function renderChequeTable() {
   console.table(rows.map(transaction => ({
     fecha: transaction.date,
     banco: transaction.bank,
-    cheque: transaction.checkNumber || transaction.reference,
+    cheque: normalizeCheckNumber(transaction.checkNumber) || normalizeCheckNumber(transaction.reference),
     tipo: chequeType(transaction).type,
     motivo: chequeType(transaction).reason,
     descripcion: transaction.description
@@ -1813,7 +1849,10 @@ function renderChequeTable() {
   console.log('[Cheques] movimientos renderizados:', rows.length, { country: ACTIVE_COUNTRY, startDate, endDate });
   table.innerHTML = rows.length ? rows.map(transaction => {
     const bank = transactionValue(transaction, ['bank', 'bankName', 'bankCanonical', 'name', 'banco']) || '—';
-    const checkNumber = transactionValue(transaction, ['checkNumber', 'chequeNumber', 'numeroCheque', 'numero_cheque', 'noCheque', 'no_cheque', 'numCheque', 'num_cheque', 'check', 'cheque']) || '—';
+    const checkNumber = normalizeCheckNumber(
+      transactionValue(transaction, ['checkNumber', 'chequeNumber', 'numeroCheque', 'numero_cheque', 'noCheque', 'no_cheque', 'numCheque', 'num_cheque', 'check', 'cheque'])
+      || transactionValue(transaction, ['reference'])
+    ) || '—';
     const type = chequeType(transaction).type;
     const normalizedType = type.toUpperCase();
     const typeClass = normalizedType === 'INGRESO'
